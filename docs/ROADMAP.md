@@ -48,6 +48,8 @@ Status: Implemented with image asset metadata, tags, categories, search query, s
 
 Implement an image library adapter for curated assets stored in Google Drive.
 
+Status: Draft implemented with local mock metadata records, ImageAsset mapping, search, find, random, score, select, Provider Registry token, and tests. Google APIs, OAuth, SDK usage, secrets, and real Drive access remain deferred.
+
 ## Phase 8: Coupang Affiliate
 
 Implement an affiliate provider adapter for Coupang while keeping affiliate enrichment optional per magazine.

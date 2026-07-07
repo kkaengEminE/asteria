@@ -118,12 +118,14 @@ Future image workflows should use the Image Asset Domain before calling storage-
 Expected image flow:
 
 1. Build an `ImageSearchQuery` from the article topic, mood, tags, rating needs, and aspect ratio.
-2. Ask an `ImageLibrary` provider for candidates.
+2. Ask an image library provider for candidates.
 3. Normalize provider results into domain `ImageAsset` values.
 4. Score candidates with domain `ImageSelectionCriteria`.
 5. Select an image without exposing storage-specific details to the Workflow Engine.
 
 Google Drive, S3, local storage, and Cloudinary remain provider adapter concerns.
+
+The current Google Drive image library adapter uses mock records only. It can verify provider registration, metadata mapping, search, and selection behavior before real Google Drive access exists.
 
 ## Prompt Integration Direction
 

@@ -76,6 +76,14 @@ Current publisher adapter draft:
 
 The WordPress adapter implements `Publisher` and returns dry-run preview results only. It performs local validation and does not call WordPress APIs.
 
+Current image adapter draft:
+
+- `providers/image/googleDrive/GoogleDriveImageLibrary`
+- `providers/image/googleDrive/GoogleDriveImageLibraryConfig`
+- `providers/image/googleDrive/GoogleDriveImageRecord`
+
+The Google Drive image library adapter implements the domain image library behavior with local mock records only. It maps Google Drive-shaped metadata into `ImageAsset` and supports search, find, random, score, and select without Google APIs.
+
 ## `src/services`
 
 Contains reusable application services that do not know about specific magazines or vendors.
