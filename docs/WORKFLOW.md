@@ -111,6 +111,20 @@ The registry should stay at the composition boundary. Workflow steps may receive
 
 Publisher provider steps should receive the shared `Publisher` interface. WordPress-specific validation and preview mapping happen inside the WordPress adapter, not in the Workflow Engine.
 
+## Image Selection Direction
+
+Future image workflows should use the Image Asset Domain before calling storage-specific adapters.
+
+Expected image flow:
+
+1. Build an `ImageSearchQuery` from the article topic, mood, tags, rating needs, and aspect ratio.
+2. Ask an `ImageLibrary` provider for candidates.
+3. Normalize provider results into domain `ImageAsset` values.
+4. Score candidates with domain `ImageSelectionCriteria`.
+5. Select an image without exposing storage-specific details to the Workflow Engine.
+
+Google Drive, S3, local storage, and Cloudinary remain provider adapter concerns.
+
 ## Prompt Integration Direction
 
 Prompt rendering should happen before AI provider calls. A future content generation step can load the magazine config, ask `PromptManager` for the correct prompt, render it with typed variables, and pass only the final text to an `AIProvider`.

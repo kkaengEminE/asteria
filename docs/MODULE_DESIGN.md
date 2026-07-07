@@ -34,6 +34,18 @@ Holds domain types that describe magazine publishing concepts. Future candidates
 - PodcastEpisode
 - AnalyticsSnapshot
 
+Current image domain foundation:
+
+- `domain/image/ImageAsset`
+- `domain/image/ImageMetadata`
+- `domain/image/ImageTag`
+- `domain/image/ImageCategory`
+- `domain/image/ImageSelectionCriteria`
+- `domain/image/ImageSearchQuery`
+- `domain/image/ImageScore`
+
+The image domain defines storage-agnostic image metadata, filtering, search matching, scoring, and selection helpers. It does not know about Google Drive, S3, local file systems, or Cloudinary.
+
 ## `src/providers`
 
 Contains adapters for external systems. Future providers should be added behind interfaces, for example:

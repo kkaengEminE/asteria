@@ -12,6 +12,8 @@ AI Publishing OS follows clean architecture principles. Domain concepts and appl
 
 `src/domain` contains magazine, article, media, campaign, and publishing concepts. Domain objects should stay independent from API clients and external SDKs.
 
+`src/domain/image` contains the storage-agnostic Image Asset Domain. It defines image assets, metadata, tags, categories, search queries, selection criteria, and scoring helpers that future image storage providers must support.
+
 ### Providers
 
 `src/providers` is reserved for replaceable infrastructure adapters. Future examples include WordPress publishers, Google Drive image libraries, Coupang affiliate providers, and AI model providers.
@@ -96,6 +98,12 @@ Provider categories include:
 Publishers implement the `Publisher` interface and receive `PublishingPayload` values. Provider-specific payload mapping and validation belong inside the provider adapter. Workflow steps should depend on `Publisher`, not WordPress-specific classes.
 
 The current WordPress adapter is a dry-run draft. It does not use a WordPress SDK, credentials, network calls, or production publishing behavior.
+
+## Image Domain Boundary
+
+The Image Asset Domain does not know about Google Drive, S3, local files, Cloudinary, or any other storage provider. Storage providers must adapt their own metadata into the domain image model before workflows or services search, score, or select images.
+
+Image selection should be based on domain-level metadata such as topic, mood, tags, category, orientation, aspect ratio, rating, favorite status, source reference, and checksum. Provider-specific IDs may be stored only as source metadata, not as workflow assumptions.
 
 ## Workflow Failure Boundary
 

@@ -38,6 +38,12 @@ Implement a WordPress publisher adapter behind the `Publisher` interface.
 
 Status: Draft implemented with local payload validation, Provider Registry token, dry-run preview result, Cat dry-run registration, and tests. Real API calls, secrets, SDK usage, and production publishing remain deferred.
 
+## Phase 6.5: Image Asset Domain
+
+Define the storage-agnostic image model that all future image providers must support.
+
+Status: Implemented with image asset metadata, tags, categories, search query, selection criteria, scoring helpers, validation, and tests. Google Drive, S3, local storage, and Cloudinary remain future adapters.
+
 ## Phase 7: Google Drive Image Library
 
 Implement an image library adapter for curated assets stored in Google Drive.
