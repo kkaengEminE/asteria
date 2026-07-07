@@ -1,9 +1,10 @@
 import { ProviderNotFoundError, ProviderRegistry } from '../../providers/index.ts';
+import { GoogleDriveImageLibrary } from '../../providers/image/googleDrive/index.ts';
 import { WordPressPublisher } from '../../providers/publisher/wordpress/index.ts';
 import { DryRunWorkflowFactory, type DryRunResult } from '../../services/dryRun/index.ts';
 import { createCatDryRunSteps } from './dryRunSteps.ts';
-import { createMockAIProvider, createMockResearchProvider } from './mockProviders.ts';
-import { mockAiProviderToken, mockPublisherToken, mockResearchProviderToken } from './providerTokens.ts';
+import { createMockAIProvider, createMockResearchProvider, mockCatImageRecords } from './mockProviders.ts';
+import { mockAiProviderToken, mockImageLibraryToken, mockPublisherToken, mockResearchProviderToken } from './providerTokens.ts';
 
 export interface CatMagazineDryRunOptions {
   topic?: string;
@@ -34,6 +35,10 @@ export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {
       magazineSlug: 'cat',
       dryRun: true
     });
+    const imageLibrary = await registry.resolve(mockImageLibraryToken, {
+      magazineSlug: 'cat',
+      dryRun: true
+    });
 
     const steps = createCatDryRunSteps({
       topic,
@@ -41,7 +46,8 @@ export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {
       promptKey: options.promptKey,
       researchProvider,
       aiProvider,
-      publisher
+      publisher,
+      imageLibrary
     });
     const workflowFactory = new DryRunWorkflowFactory();
 
@@ -83,6 +89,18 @@ export function registerCatDryRunMockProviders(registry: ProviderRegistry): void
         new WordPressPublisher({
           siteUrl: 'https://example.test',
           dryRun: true
+        })
+    );
+  }
+
+  if (!registry.has(mockImageLibraryToken)) {
+    registry.register(
+      mockImageLibraryToken,
+      () =>
+        new GoogleDriveImageLibrary({
+          name: 'cat-google-drive-images',
+          dryRun: true,
+          records: mockCatImageRecords
         })
     );
   }

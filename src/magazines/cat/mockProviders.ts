@@ -5,6 +5,7 @@ import type {
   ResearchProvider
 } from '../../core/index.ts';
 import type { ResearchQuery, ResearchResult } from '../../core/types.ts';
+import type { GoogleDriveImageRecord } from '../../providers/image/googleDrive/index.ts';
 
 export function createMockResearchProvider(): ResearchProvider {
   return {
@@ -57,3 +58,63 @@ function createMockSeo(prompt: string): string {
     `Prompt preview: ${prompt.slice(0, 80)}`
   ].join('\n');
 }
+
+export const mockCatImageRecords: GoogleDriveImageRecord[] = [
+  {
+    id: 'cat-window-enrichment',
+    filename: 'cat-window-enrichment.jpg',
+    title: 'Cat watching enrichment toys by the window',
+    description: 'A curious indoor cat near a window with enrichment toys.',
+    tags: ['cat', 'window', 'enrichment', 'play', 'toy', 'cute'],
+    category: 'hero',
+    width: 1800,
+    height: 1000,
+    rating: 5,
+    favorite: true,
+    driveFileId: 'mock-drive-cat-window-enrichment',
+    mockUri: 'mock://google-drive/cat-window-enrichment.jpg',
+    checksum: 'mock-checksum-cat-window-enrichment'
+  },
+  {
+    id: 'cat-sleep',
+    filename: 'cat-sleep.jpg',
+    title: 'Sleeping cat',
+    description: 'A cute cat sleeping in soft light.',
+    tags: ['cat', 'sleep', 'cute'],
+    category: 'article',
+    width: 1200,
+    height: 900,
+    rating: 4,
+    favorite: false,
+    driveFileId: 'mock-drive-cat-sleep',
+    mockUri: 'mock://google-drive/cat-sleep.jpg'
+  },
+  {
+    id: 'cat-food-health',
+    filename: 'cat-food-health.jpg',
+    title: 'Healthy cat food',
+    description: 'A cat eating a balanced meal.',
+    tags: ['cat', 'food', 'health'],
+    category: 'article',
+    width: 1400,
+    height: 900,
+    rating: 4,
+    favorite: false,
+    driveFileId: 'mock-drive-cat-food-health',
+    mockUri: 'mock://google-drive/cat-food-health.jpg'
+  },
+  {
+    id: 'cat-toy-play',
+    filename: 'cat-toy-play.jpg',
+    title: 'Cat playing with toy',
+    description: 'An energetic cat playing with a toy.',
+    tags: ['cat', 'play', 'toy', 'enrichment'],
+    category: 'social',
+    width: 1080,
+    height: 1080,
+    rating: 5,
+    favorite: true,
+    driveFileId: 'mock-drive-cat-toy-play',
+    mockUri: 'mock://google-drive/cat-toy-play.jpg'
+  }
+];

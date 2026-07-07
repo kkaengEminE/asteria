@@ -23,6 +23,17 @@ function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagazineDryR
     'SEO Preview:',
     result.seoPreview ?? 'Unavailable',
     '',
+    'Selected Image:',
+    result.selectedImage
+      ? [
+          `Filename: ${result.selectedImage.filename}`,
+          `Tags: ${result.selectedImage.tags.join(', ')}`,
+          `Category: ${result.selectedImage.category ?? 'Uncategorized'}`,
+          `Score: ${result.imageSelectionReason?.score ?? 'Unavailable'}`,
+          `Preview URI: ${result.imagePreview ?? 'Unavailable'}`
+        ].join('\n')
+      : 'Unavailable',
+    '',
     'Publish Preview:',
     result.publishPreview
       ? `${result.publishPreview.status}: ${result.publishPreview.message ?? 'Dry-run preview generated.'}`

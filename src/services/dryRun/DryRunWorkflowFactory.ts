@@ -1,12 +1,13 @@
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
 import type { PublishingResult, ResearchResult } from '../../core/types.ts';
+import type { ImageAsset } from '../../domain/image/index.ts';
 import {
   SequentialWorkflowEngine,
   type WorkflowContext,
   type WorkflowResult,
   type WorkflowStep
 } from '../../workflows/index.ts';
-import { type DryRunResult, summarizeMagazine } from './DryRunResult.ts';
+import { type DryRunImageSelectionReason, type DryRunResult, summarizeImage, summarizeMagazine } from './DryRunResult.ts';
 
 export interface BuildDryRunWorkflowOptions {
   workflowName: string;
@@ -28,6 +29,8 @@ export interface CreateDryRunResultOptions {
   seoKey?: string;
   publishKey?: string;
   researchKey?: string;
+  selectedImageKey?: string;
+  imageSelectionReasonKey?: string;
   magazineConfigKey?: string;
   previewLength?: number;
 }
@@ -64,6 +67,7 @@ export class DryRunWorkflowFactory {
   createResult(options: CreateDryRunResultOptions): DryRunResult {
     const context = options.workflowResult.context;
     const magazineConfig = context.data[options.magazineConfigKey ?? 'magazineConfig'] as MagazineConfig | undefined;
+    const selectedImage = context.data[options.selectedImageKey ?? 'selectedImage'] as ImageAsset | undefined;
 
     return {
       magazine: magazineConfig ? summarizeMagazine(magazineConfig) : undefined,
@@ -75,6 +79,11 @@ export class DryRunWorkflowFactory {
       seoPreview: context.data[options.seoKey ?? 'seoPreview'] as string | undefined,
       publishPreview: context.data[options.publishKey ?? 'publishPreview'] as PublishingResult | undefined,
       researchPreview: context.data[options.researchKey ?? 'researchResults'] as ResearchResult[] | undefined,
+      selectedImage: selectedImage ? summarizeImage(selectedImage) : undefined,
+      imageSelectionReason: context.data[options.imageSelectionReasonKey ?? 'imageSelectionReason'] as
+        | DryRunImageSelectionReason
+        | undefined,
+      imagePreview: selectedImage?.uri,
       error: options.workflowResult.status === 'failed' ? options.workflowResult.message : undefined
     };
   }
@@ -87,4 +96,3 @@ function preview(value: unknown, maxLength = 500): string | undefined {
 
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
 }
-

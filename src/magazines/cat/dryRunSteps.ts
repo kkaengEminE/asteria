@@ -2,6 +2,7 @@ import { loadMagazineConfig } from '../../config/index.ts';
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
 import type { AIProvider, Publisher, ResearchProvider } from '../../core/index.ts';
 import type { ContentDraft, PublishingDestination } from '../../core/types.ts';
+import type { ImageDomainLibrary, ImageSelectionCriteria } from '../../domain/image/index.ts';
 import { PromptManager } from '../../prompts/index.ts';
 import { DryRunStepFactory, requireWorkflowData } from '../../services/dryRun/index.ts';
 import type { WorkflowStep } from '../../workflows/index.ts';
@@ -13,6 +14,7 @@ export interface CatDryRunStepOptions {
   researchProvider: ResearchProvider;
   aiProvider: AIProvider;
   publisher: Publisher;
+  imageLibrary: ImageDomainLibrary;
 }
 
 export function createCatDryRunSteps(options: CatDryRunStepOptions): WorkflowStep[] {
@@ -22,10 +24,54 @@ export function createCatDryRunSteps(options: CatDryRunStepOptions): WorkflowSte
     createLoadConfigStep(stepFactory, options),
     createLoadPromptStep(stepFactory, options),
     createResearchStep(stepFactory, options),
+    createSelectImageStep(stepFactory, options),
     createGenerateArticleStep(stepFactory, options),
     createGenerateSeoStep(stepFactory, options),
     createPublishPreviewStep(stepFactory, options)
   ];
+}
+
+function createSelectImageStep(stepFactory: DryRunStepFactory, options: CatDryRunStepOptions): WorkflowStep {
+  return stepFactory.createStep({
+    name: 'Select Image',
+    async execute(context) {
+      const criteria = createCatImageSelectionCriteria(options.topic);
+      const candidates = await options.imageLibrary.search({
+        text: 'cat',
+        criteria: {
+          tags: criteria.tags,
+          minimumRating: criteria.minimumRating
+        }
+      });
+      const selectedImage = await options.imageLibrary.select(candidates, criteria);
+
+      if (!selectedImage) {
+        throw new Error('No image matched Cat Magazine dry-run criteria.');
+      }
+
+      const score = await options.imageLibrary.score(selectedImage, criteria);
+
+      return {
+        ...context,
+        data: {
+          ...context.data,
+          imageCandidates: candidates,
+          selectedImage,
+          imageSelectionCriteria: criteria,
+          imageSelectionReason: {
+            score,
+            reasons: [
+              `matched topic: ${options.topic}`,
+              `matched tags: ${(criteria.tags ?? []).join(', ')}`,
+              `category preference: ${criteria.category}`,
+              `minimum rating: ${criteria.minimumRating}`,
+              selectedImage.metadata.favorite ? 'favorite image' : 'not marked favorite'
+            ]
+          }
+        }
+      };
+    }
+  });
 }
 
 function createLoadConfigStep(stepFactory: DryRunStepFactory, options: CatDryRunStepOptions): WorkflowStep {
@@ -168,6 +214,26 @@ function createContentDraft(body: string, language: string): ContentDraft {
     language,
     tags: ['cat', 'dry-run']
   };
+}
+
+function createCatImageSelectionCriteria(topic: string): ImageSelectionCriteria {
+  const topicTags = extractCatTopicTags(topic);
+
+  return {
+    topic,
+    tags: ['cat', ...topicTags],
+    category: 'hero',
+    aspectRatio: 'landscape',
+    minimumRating: 4,
+    randomWeight: 0.2
+  };
+}
+
+function extractCatTopicTags(topic: string): string[] {
+  const knownTags = ['sleep', 'food', 'play', 'toy', 'cute', 'window', 'health', 'enrichment'];
+  const normalizedTopic = topic.toLowerCase();
+
+  return knownTags.filter((tag) => normalizedTopic.includes(tag));
 }
 
 function createDryRunDestination(): PublishingDestination {

@@ -9,7 +9,7 @@ import {
   registerCatDryRunMockProviders,
   runCatMagazineDryRun
 } from '../src/magazines/cat/index.ts';
-import { mockAiProviderToken } from '../src/magazines/cat/providerTokens.ts';
+import { mockAiProviderToken, mockImageLibraryToken } from '../src/magazines/cat/providerTokens.ts';
 
 test('cat magazine dry run succeeds', async () => {
   const result = await runCatMagazineDryRun({ topic: 'indoor enrichment' });
@@ -20,6 +20,7 @@ test('cat magazine dry run succeeds', async () => {
     'Load Config',
     'Load Prompt',
     'Research',
+    'Select Image',
     'Generate Article',
     'Generate SEO',
     'Publish Preview'
@@ -28,6 +29,8 @@ test('cat magazine dry run succeeds', async () => {
   assert.match(result.articlePreview ?? '', /Mock Cat Care Article/);
   assert.match(result.seoPreview ?? '', /Title Tag/);
   assert.equal(result.publishPreview?.status, 'draft');
+  assert.equal(result.selectedImage?.filename, 'cat-window-enrichment.jpg');
+  assert.match(result.imagePreview ?? '', /^mock:\/\//);
 });
 
 test('cat magazine dry run fails when config is missing', async () => {
@@ -77,8 +80,49 @@ test('cat magazine dry run returns workflow failure when a step provider fails',
   });
 
   assert.equal(result.workflowStatus, 'failed');
-  assert.deepEqual(result.executedSteps, ['Load Config', 'Load Prompt', 'Research', 'Generate Article']);
+  assert.deepEqual(result.executedSteps, ['Load Config', 'Load Prompt', 'Research', 'Select Image', 'Generate Article']);
   assert.match(result.error ?? '', /Generate Article/);
+});
+
+test('cat magazine dry run image selection uses topic and tags', async () => {
+  const result = await runCatMagazineDryRun({ topic: 'cat toy enrichment play' });
+
+  assert.equal(result.workflowStatus, 'success');
+  assert.equal(result.selectedImage?.filename, 'cat-window-enrichment.jpg');
+  assert.ok(result.selectedImage?.tags.includes('enrichment'));
+  assert.ok(result.selectedImage?.tags.includes('toy'));
+  assert.match(result.imageSelectionReason?.reasons.join(' ') ?? '', /matched tags/);
+});
+
+test('cat magazine dry run includes image preview', async () => {
+  const result = await runCatMagazineDryRun({ topic: 'indoor enrichment' });
+
+  assert.equal(result.selectedImage?.category, 'hero');
+  assert.ok((result.imageSelectionReason?.score ?? 0) > 0);
+  assert.equal(result.imagePreview, 'mock://google-drive/cat-window-enrichment.jpg');
+});
+
+test('cat magazine dry run fails gracefully when image provider is missing', async () => {
+  const registry = new ProviderRegistry();
+  registerCatDryRunMockProviders(registry);
+  registry.remove(mockImageLibraryToken);
+
+  const result = await runCatMagazineDryRun({
+    topic: 'indoor enrichment',
+    registry,
+    registerMockProviders: false
+  });
+
+  assert.equal(result.workflowStatus, 'failed');
+  assert.deepEqual(result.executedSteps, []);
+  assert.match(result.error ?? '', /Provider not found/);
+});
+
+test('cat magazine dry run image preview makes no external api call', async () => {
+  const result = await runCatMagazineDryRun({ topic: 'indoor enrichment' });
+
+  assert.match(result.imagePreview ?? '', /^mock:\/\//);
+  assert.equal(result.selectedImage?.id, 'cat-window-enrichment');
 });
 
 function createFailingAIProvider(): AIProvider {

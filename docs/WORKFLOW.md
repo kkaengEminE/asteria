@@ -50,15 +50,18 @@ Current dry-run flow:
 
 1. Load Cat Magazine configuration.
 2. Load and render article and SEO prompts.
-3. Resolve mock research, AI, and publisher providers through `ProviderRegistry`.
-4. Build workflow execution through `DryRunWorkflowFactory`.
-5. Execute workflow steps through `SequentialWorkflowEngine`.
-6. Return a shared `DryRunResult`.
-7. Print a readable CLI report with `npm run dry-run`.
+3. Resolve mock research, AI, image, and publisher providers through `ProviderRegistry`.
+4. Select an image with the mock Google Drive image library.
+5. Build workflow execution through `DryRunWorkflowFactory`.
+6. Execute workflow steps through `SequentialWorkflowEngine`.
+7. Return a shared `DryRunResult`.
+8. Print a readable CLI report with `npm run dry-run`.
 
 No real AI generation, research, publishing, secrets, or files are produced.
 
 The publisher in this flow is resolved through `ProviderRegistry` and currently uses the WordPress publisher adapter in dry-run mode. The adapter returns a preview result only.
+
+The image library in this flow is resolved through `ProviderRegistry` and currently uses the Google Drive image library adapter in dry-run mode. The adapter uses mock records only and returns storage-agnostic image assets.
 
 ## Shared Dry-Run Workflow Foundation
 
@@ -126,6 +129,8 @@ Expected image flow:
 Google Drive, S3, local storage, and Cloudinary remain provider adapter concerns.
 
 The current Google Drive image library adapter uses mock records only. It can verify provider registration, metadata mapping, search, and selection behavior before real Google Drive access exists.
+
+Cat Magazine currently selects images using topic-derived tags, category preference, minimum rating, favorite scoring, and domain image scoring. The CLI reports filename, tags, category, score, and mock preview URI.
 
 ## Prompt Integration Direction
 

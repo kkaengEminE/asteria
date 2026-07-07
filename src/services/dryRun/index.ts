@@ -1,5 +1,5 @@
-export type { DryRunMagazineSummary, DryRunResult } from './DryRunResult.ts';
-export { summarizeMagazine } from './DryRunResult.ts';
+export type { DryRunImageSelectionReason, DryRunMagazineSummary, DryRunResult, DryRunSelectedImage } from './DryRunResult.ts';
+export { summarizeImage, summarizeMagazine } from './DryRunResult.ts';
 export { DryRunStepFactory, createDryRunStepResult, requireWorkflowData } from './DryRunStepFactory.ts';
 export type { DryRunStepDefinition } from './DryRunStepFactory.ts';
 export { DryRunWorkflowFactory } from './DryRunWorkflowFactory.ts';
@@ -8,4 +8,3 @@ export type {
   CreateDryRunResultOptions,
   ExecuteDryRunWorkflowOptions
 } from './DryRunWorkflowFactory.ts';
-

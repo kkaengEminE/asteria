@@ -50,6 +50,12 @@ Implement an image library adapter for curated assets stored in Google Drive.
 
 Status: Draft implemented with local mock metadata records, ImageAsset mapping, search, find, random, score, select, Provider Registry token, and tests. Google APIs, OAuth, SDK usage, secrets, and real Drive access remain deferred.
 
+## Phase 7.5: Image Selection Workflow Integration
+
+Integrate the mock image library into Cat Magazine dry run.
+
+Status: Implemented with mock image provider registration, Select Image workflow step, topic/tag/category/rating/favorite-based selection, selected image preview in DryRunResult, CLI output, and tests. No real image storage access is used.
+
 ## Phase 8: Coupang Affiliate
 
 Implement an affiliate provider adapter for Coupang while keeping affiliate enrichment optional per magazine.

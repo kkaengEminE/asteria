@@ -1,4 +1,5 @@
 import type { AIProvider, Publisher, ResearchProvider } from '../../core/index.ts';
+import type { ImageDomainLibrary } from '../../domain/image/index.ts';
 import { createProviderToken } from '../../providers/index.ts';
 
 export const mockResearchProviderToken = createProviderToken<ResearchProvider>(
@@ -19,3 +20,8 @@ export const mockPublisherToken = createProviderToken<Publisher>(
   'Mock publisher for Cat Magazine dry-run previews.'
 );
 
+export const mockImageLibraryToken = createProviderToken<ImageDomainLibrary>(
+  'Image',
+  'mock-google-drive-images',
+  'Mock Google Drive image library for Cat Magazine dry runs.'
+);
