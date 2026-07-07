@@ -46,6 +46,18 @@ Current image domain foundation:
 
 The image domain defines storage-agnostic image metadata, filtering, search matching, scoring, and selection helpers. It does not know about Google Drive, S3, local file systems, or Cloudinary.
 
+Current monetization domain foundation:
+
+- `domain/monetization/Product`
+- `domain/monetization/AffiliateLink`
+- `domain/monetization/Recommendation`
+- `domain/monetization/RecommendationReason`
+- `domain/monetization/ProductSearchQuery`
+- `domain/monetization/MonetizationResult`
+- `domain/monetization/MonetizationProvider`
+
+The monetization domain defines provider-agnostic products, recommendations, affiliate links, preview results, and a mock provider. It does not know about Coupang, Amazon, Temu, or affiliate APIs.
+
 ## `src/providers`
 
 Contains adapters for external systems. Future providers should be added behind interfaces, for example:

@@ -60,6 +60,12 @@ Status: Implemented with mock image provider registration, Select Image workflow
 
 Implement an affiliate provider adapter for Coupang while keeping affiliate enrichment optional per magazine.
 
+## Phase 8.0: Monetization Domain
+
+Define the provider-agnostic product, affiliate link, recommendation, and monetization result model that all future affiliate providers must support.
+
+Status: Implemented with product metadata, search query, recommendation model, recommendation reasons, mock affiliate link generation, mock monetization provider, preview results, Provider Registry compatibility, and tests. Coupang, Amazon, Temu, affiliate APIs, secrets, and external calls remain future adapters.
+
 ## Phase 9: Instagram Content Generator
 
 Generate Instagram-ready captions, hashtags, and image selection metadata from article content.

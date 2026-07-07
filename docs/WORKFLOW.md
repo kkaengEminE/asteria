@@ -132,6 +132,20 @@ The current Google Drive image library adapter uses mock records only. It can ve
 
 Cat Magazine currently selects images using topic-derived tags, category preference, minimum rating, favorite scoring, and domain image scoring. The CLI reports filename, tags, category, score, and mock preview URI.
 
+## Monetization Direction
+
+Future monetization workflows should use the Monetization Domain before calling affiliate-specific adapters.
+
+Expected monetization flow:
+
+1. Build a `ProductSearchQuery` from the article topic, category, tags, and rating requirements.
+2. Ask a monetization provider for provider-agnostic products.
+3. Generate recommendations with reason, confidence, priority, and score.
+4. Generate affiliate links through the provider boundary.
+5. Add monetization previews to publishing payloads only after disclosure and review rules are satisfied.
+
+Coupang, Amazon, Temu, tracking parameters, API credentials, commission logic, and product feed details remain provider adapter concerns.
+
 ## Prompt Integration Direction
 
 Prompt rendering should happen before AI provider calls. A future content generation step can load the magazine config, ask `PromptManager` for the correct prompt, render it with typed variables, and pass only the final text to an `AIProvider`.

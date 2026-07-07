@@ -14,6 +14,8 @@ AI Publishing OS follows clean architecture principles. Domain concepts and appl
 
 `src/domain/image` contains the storage-agnostic Image Asset Domain. It defines image assets, metadata, tags, categories, search queries, selection criteria, and scoring helpers that future image storage providers must support.
 
+`src/domain/monetization` contains the provider-agnostic Monetization Domain. It defines products, affiliate links, recommendations, recommendation reasons, product search queries, monetization results, and a mock monetization provider contract for future affiliate adapters.
+
 ### Providers
 
 `src/providers` is reserved for replaceable infrastructure adapters. Future examples include WordPress publishers, Google Drive image libraries, Coupang affiliate providers, and AI model providers.
@@ -110,6 +112,12 @@ The Image Asset Domain does not know about Google Drive, S3, local files, Cloudi
 Image selection should be based on domain-level metadata such as topic, mood, tags, category, orientation, aspect ratio, rating, favorite status, source reference, and checksum. Provider-specific IDs may be stored only as source metadata, not as workflow assumptions.
 
 The current Google Drive image library adapter is a mock-first draft. Drive file IDs and mock URIs stay inside adapter records or domain source metadata. OAuth, Google SDK usage, real Drive access, and network calls are deferred.
+
+## Monetization Domain Boundary
+
+The Monetization Domain does not know about Coupang, Amazon, Temu, or any affiliate implementation. Affiliate providers must adapt their own product catalogs and link generation into the domain product, recommendation, affiliate link, and monetization result models.
+
+Monetization workflows should operate on provider-agnostic product metadata such as name, category, tags, brand, price, currency, rating, thumbnail, URL, and provider name. Provider-specific APIs, credentials, tracking parameters, and commission rules belong in future adapters.
 
 ## Workflow Failure Boundary
 
