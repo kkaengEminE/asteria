@@ -60,6 +60,8 @@ Status: Implemented with mock image provider registration, Select Image workflow
 
 Implement an affiliate provider adapter for Coupang while keeping affiliate enrichment optional per magazine.
 
+Status: Draft implemented with local mock Coupang-style records, Product domain mapping, ranked recommendations, mock affiliate link generation, Provider Registry token, and tests. Coupang APIs, SDK usage, secrets, production links, and monetized publishing remain deferred.
+
 ## Phase 8.0: Monetization Domain
 
 Define the provider-agnostic product, affiliate link, recommendation, and monetization result model that all future affiliate providers must support.

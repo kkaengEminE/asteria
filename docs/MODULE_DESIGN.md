@@ -96,6 +96,15 @@ Current image adapter draft:
 
 The Google Drive image library adapter implements the domain image library behavior with local mock records only. It maps Google Drive-shaped metadata into `ImageAsset` and supports search, find, random, score, and select without Google APIs.
 
+Current monetization adapter draft:
+
+- `providers/monetization/coupang/CoupangAffiliateProvider`
+- `providers/monetization/coupang/CoupangAffiliateConfig`
+- `providers/monetization/coupang/CoupangProductRecord`
+- `providers/monetization/coupang/CoupangAffiliateLinkResult`
+
+The Coupang affiliate adapter implements `MonetizationProvider` with local mock records only. It maps Coupang-shaped product metadata into `Product`, supports product search, ranked recommendations, mock affiliate link generation, and preview creation without Coupang APIs.
+
 ## `src/services`
 
 Contains reusable application services that do not know about specific magazines or vendors.

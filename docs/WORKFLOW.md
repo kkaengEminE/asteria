@@ -146,6 +146,8 @@ Expected monetization flow:
 
 Coupang, Amazon, Temu, tracking parameters, API credentials, commission logic, and product feed details remain provider adapter concerns.
 
+The current Coupang affiliate adapter can be registered through `ProviderRegistry` and resolved as a `MonetizationProvider`. It uses mock product records, returns domain `Product` and `Recommendation` values, and generates `mock://` affiliate links only. It is not yet part of the Cat Magazine dry run and does not publish monetized content.
+
 ## Prompt Integration Direction
 
 Prompt rendering should happen before AI provider calls. A future content generation step can load the magazine config, ask `PromptManager` for the correct prompt, render it with typed variables, and pass only the final text to an `AIProvider`.

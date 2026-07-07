@@ -26,6 +26,8 @@ The Provider Registry lives in `src/providers` and owns provider registration, l
 
 `src/providers/image/googleDrive` contains the Google Drive image library adapter draft. It uses local mock metadata only, maps Google Drive-shaped records into the storage-agnostic Image Asset Domain, and does not call Google APIs.
 
+`src/providers/monetization/coupang` contains the Coupang affiliate adapter draft. It uses local mock Coupang-style product records only, maps them into the provider-agnostic Monetization Domain, and generates mock affiliate links without calling Coupang APIs.
+
 ### Services
 
 `src/services` is reserved for application services that combine core interfaces into useful operations, such as content planning, editorial validation, prompt rendering, and asset preparation.
@@ -118,6 +120,8 @@ The current Google Drive image library adapter is a mock-first draft. Drive file
 The Monetization Domain does not know about Coupang, Amazon, Temu, or any affiliate implementation. Affiliate providers must adapt their own product catalogs and link generation into the domain product, recommendation, affiliate link, and monetization result models.
 
 Monetization workflows should operate on provider-agnostic product metadata such as name, category, tags, brand, price, currency, rating, thumbnail, URL, and provider name. Provider-specific APIs, credentials, tracking parameters, and commission rules belong in future adapters.
+
+The current Coupang affiliate adapter is a mock-first draft. Coupang-shaped product IDs and records stay inside the adapter or product metadata. SDK usage, API credentials, real Coupang Partners links, network calls, and production monetized publishing are deferred.
 
 ## Workflow Failure Boundary
 
