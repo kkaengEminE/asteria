@@ -12,31 +12,40 @@ Load magazine configs from disk, validate required fields, and expose typed conf
 
 Create prompt set loading, prompt variable interpolation, and prompt version tracking.
 
-## Phase 4: Cat Magazine MVP
+Status: Foundation implemented with markdown prompt loading, registration, lookup, variable interpolation, validation, and shared-to-magazine override behavior. Prompt version tracking is deferred until real prompt lifecycle needs appear.
+
+## Phase 4: Provider Registry
+
+Manage provider registration, lookup, categories, and factory boundaries before real provider integrations.
+
+Status: Foundation implemented with provider tokens, categories, factories, context, registry operations, and mock-provider tests.
+
+## Phase 5: Cat Magazine MVP
 
 Build the first end-to-end dry-run magazine flow using Cat Magazine configuration.
 
-## Phase 5: WordPress Publisher
+Status: Dry-run MVP implemented with config loading, prompt rendering, mock provider resolution, sequential workflow execution, generated mock article, SEO preview, publish preview, CLI output, and tests. No real providers are used.
+
+## Phase 6: WordPress Publisher
 
 Implement a WordPress publisher adapter behind the `Publisher` interface.
 
-## Phase 6: Google Drive Image Library
+## Phase 7: Google Drive Image Library
 
 Implement an image library adapter for curated assets stored in Google Drive.
 
-## Phase 7: Coupang Affiliate
+## Phase 8: Coupang Affiliate
 
 Implement an affiliate provider adapter for Coupang while keeping affiliate enrichment optional per magazine.
 
-## Phase 8: Instagram Content Generator
+## Phase 9: Instagram Content Generator
 
 Generate Instagram-ready captions, hashtags, and image selection metadata from article content.
 
-## Phase 9: TTS + Podcast
+## Phase 10: TTS + Podcast
 
 Add text-to-speech generation and podcast publishing workflows behind replaceable interfaces.
 
-## Phase 10: Analytics
+## Phase 11: Analytics
 
 Collect publication and performance analytics through provider adapters and feed results into future editorial planning.
-

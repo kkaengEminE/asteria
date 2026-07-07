@@ -2,21 +2,60 @@
 
 The publishing flow should be built from small, replaceable workflow steps.
 
+## Workflow Engine Foundation
+
+The Workflow Engine executes registered `WorkflowStep` instances in sequence. Each step receives a `WorkflowContext` and returns a `WorkflowStepResult`.
+
+The engine is responsible for:
+
+- Preserving execution order.
+- Passing context from one step to the next.
+- Stopping on failure.
+- Returning a structured `WorkflowResult`.
+- Supporting cancellation between steps.
+- Accepting a simple logger interface.
+
+The engine is not responsible for:
+
+- Calling provider APIs directly.
+- Choosing AI models.
+- Loading or rendering prompt files directly.
+- Resolving or instantiating providers.
+- Publishing content itself.
+- Retrying provider operations.
+- Storing workflow state permanently.
+
 ## Target Daily Publishing Flow
 
 1. Load magazine configuration.
 2. Select topic or editorial plan item.
-3. Research the topic.
-4. Generate content draft.
-5. Select image candidates.
-6. Choose the best image.
-7. Add affiliate recommendations when configured.
-8. Prepare publishing payload.
-9. Run editorial checks.
-10. Publish or create a dry-run preview.
-11. Generate social derivatives when enabled.
-12. Generate TTS and podcast output when enabled.
-13. Record analytics metadata.
+3. Load and render the relevant prompt.
+4. Research the topic.
+5. Generate content draft.
+6. Select image candidates.
+7. Choose the best image.
+8. Add affiliate recommendations when configured.
+9. Prepare publishing payload.
+10. Run editorial checks.
+11. Publish or create a dry-run preview.
+12. Generate social derivatives when enabled.
+13. Generate TTS and podcast output when enabled.
+14. Record analytics metadata.
+
+## Cat Magazine Dry Run
+
+The Cat Magazine dry run verifies the current foundation without external APIs.
+
+Current dry-run flow:
+
+1. Load Cat Magazine configuration.
+2. Load and render article and SEO prompts.
+3. Resolve mock research, AI, and publisher providers through `ProviderRegistry`.
+4. Execute workflow steps through `SequentialWorkflowEngine`.
+5. Return a `DryRunResult`.
+6. Print a readable CLI report with `npm run dry-run`.
+
+No real AI generation, research, publishing, secrets, or files are produced.
 
 ## Dry-Run First
 
@@ -41,3 +80,27 @@ Workflow steps should report structured results. A failed step should identify:
 - Partial output, if any.
 - Suggested recovery action.
 
+The current engine stops at the first failed step and returns the accumulated step results. Future workflow-specific policies may add retries, rollback, or human review gates without changing provider interfaces.
+
+## Provider Integration Direction
+
+Future providers plug into workflows through composed steps:
+
+1. Application composition registers provider factories in `ProviderRegistry`.
+2. A workflow factory resolves needed provider interfaces from the registry.
+3. The factory builds provider-backed `WorkflowStep` instances.
+4. The engine executes those steps without knowing provider details.
+5. Tests can replace providers or steps with mock implementations.
+
+The registry should stay at the composition boundary. Workflow steps may receive provider interfaces as constructor inputs, but the Workflow Engine should never instantiate or resolve providers directly.
+
+## Prompt Integration Direction
+
+Prompt rendering should happen before AI provider calls. A future content generation step can load the magazine config, ask `PromptManager` for the correct prompt, render it with typed variables, and pass only the final text to an `AIProvider`.
+
+Prompt lookup order:
+
+1. Load shared prompts.
+2. Load magazine prompts.
+3. Let magazine prompts override shared prompts with the same key.
+4. Render the selected prompt with required variables.

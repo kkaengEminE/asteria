@@ -46,6 +46,15 @@ Contains adapters for external systems. Future providers should be added behind 
 - `providers/audio/tts`
 - `providers/analytics`
 
+Current provider registry foundation:
+
+- `ProviderToken`
+- `ProviderContext`
+- `ProviderFactory`
+- `ProviderRegistry`
+
+The registry supports provider registration, resolution, duplicate protection, lookup, removal, and category-filtered listing. Only mock providers should be used until real provider adapter sprints begin.
+
 ## `src/services`
 
 Contains reusable application services that do not know about specific magazines or vendors.
@@ -61,9 +70,33 @@ Future services:
 - Publishing coordinator
 - Analytics collector
 
+## `src/prompts`
+
+Contains prompt management logic:
+
+- `PromptLoader`
+- `PromptRegistry`
+- `PromptTemplate`
+- `PromptVariables`
+- `PromptManager`
+
+The module loads markdown prompt files, registers them by key, validates required template variables, and renders final prompt text. It does not know about concrete AI providers.
+
 ## `src/workflows`
 
 Contains workflow orchestration. Workflows should be assembled from `WorkflowStep` instances and executed by a `WorkflowEngine`.
+
+Current workflow core:
+
+- `WorkflowContext`
+- `WorkflowStep`
+- `WorkflowResult`
+- `WorkflowStatus`
+- `WorkflowEngine`
+- `SequentialWorkflowEngine`
+- `WorkflowLogger`
+
+`SequentialWorkflowEngine` is intentionally minimal. It registers steps, executes them in order, supports cancellation between steps, stops on failure, and returns structured results.
 
 Future workflows:
 
@@ -73,11 +106,33 @@ Future workflows:
 - Podcast episode generation
 - Analytics reporting
 
+Future provider-backed steps should live near the workflow or service that composes them. For example, a daily publishing workflow can compose a research step using `ResearchProvider`, a content step using `ContentGenerator`, and a publishing step using `Publisher`.
+
+Workflow composition should resolve providers through `ProviderRegistry` before constructing provider-backed steps. The engine itself should receive steps only.
+
 ## `src/magazines`
 
 Contains optional magazine-specific behavior. Most magazines should start as configuration only. Add code here only when a magazine has unique rules that cannot be represented cleanly in config or prompts.
+
+Current Cat Magazine dry-run module:
+
+- `DryRunResult`
+- `providerTokens`
+- `mockProviders`
+- `dryRunSteps`
+- `runCatMagazineDryRun`
+
+The dry-run module is a composition root for the first end-to-end architecture check. It uses only mock providers and does not publish files or call external APIs.
 
 ## `magazines`
 
 Contains runtime-facing magazine configuration examples and future real magazine configurations.
 
+## `prompts`
+
+Contains prompt assets:
+
+- `prompts/shared`
+- `prompts/magazines/{slug}`
+
+Shared prompts define defaults. Magazine prompts may override shared prompts with the same key.
