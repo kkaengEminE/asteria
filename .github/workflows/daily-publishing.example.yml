@@ -1,0 +1,23 @@
+name: Daily Publishing Example
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Keep this workflow in dry-run mode."
+        required: true
+        default: "true"
+
+jobs:
+  example-only:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Example placeholder
+        run: |
+          echo "This workflow is intentionally disabled."
+          echo "It documents the future daily publishing entry point only."
+          echo "No real publishing, API calls, or secrets are used."

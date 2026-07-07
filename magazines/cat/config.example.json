@@ -1,0 +1,40 @@
+{
+  "name": "Cat Magazine",
+  "slug": "cat",
+  "language": "en-US",
+  "audience": "Cat owners, cat lovers, and people researching practical feline care.",
+  "tone": "Warm, trustworthy, practical, and lightly playful.",
+  "topics": [
+    "cat health",
+    "nutrition",
+    "behavior",
+    "training",
+    "grooming",
+    "product guides",
+    "adoption",
+    "indoor enrichment"
+  ],
+  "imageSource": "google-drive-curated-library",
+  "affiliateProvider": "coupang",
+  "publishingDestinations": [
+    {
+      "type": "wordpress",
+      "name": "Cat Magazine WordPress",
+      "enabled": false,
+      "dryRunOnly": true
+    },
+    {
+      "type": "instagram",
+      "name": "Cat Magazine Instagram",
+      "enabled": false,
+      "dryRunOnly": true
+    }
+  ],
+  "schedule": {
+    "timezone": "Asia/Seoul",
+    "cadence": "daily",
+    "time": "09:00"
+  },
+  "promptSet": "cat-magazine-default"
+}
+
