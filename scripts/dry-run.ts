@@ -18,7 +18,7 @@ function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagazineDryR
     result.renderedPromptPreview ?? 'Unavailable',
     '',
     'Generated Mock Article:',
-    result.generatedMockArticle ?? 'Unavailable',
+    result.articlePreview ?? 'Unavailable',
     '',
     'SEO Preview:',
     result.seoPreview ?? 'Unavailable',
@@ -31,4 +31,3 @@ function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagazineDryR
     result.error ? `Error: ${result.error}` : 'No external APIs were called. Nothing was published.'
   ].join('\n');
 }
-

@@ -1,9 +1,6 @@
-import type { MagazineConfig } from '../../core/MagazineConfig.ts';
-import type { PublishingResult } from '../../core/types.ts';
 import { ProviderNotFoundError, ProviderRegistry } from '../../providers/index.ts';
-import { SequentialWorkflowEngine, type WorkflowResult } from '../../workflows/index.ts';
-import type { DryRunResult } from './DryRunResult.ts';
-import { createCatDryRunSteps, getResearchResults } from './dryRunSteps.ts';
+import { DryRunWorkflowFactory, type DryRunResult } from '../../services/dryRun/index.ts';
+import { createCatDryRunSteps } from './dryRunSteps.ts';
 import { createMockAIProvider, createMockPublisher, createMockResearchProvider } from './mockProviders.ts';
 import { mockAiProviderToken, mockPublisherToken, mockResearchProviderToken } from './providerTokens.ts';
 
@@ -37,7 +34,6 @@ export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {
       dryRun: true
     });
 
-    const engine = new SequentialWorkflowEngine({ name: 'cat-magazine-dry-run' });
     const steps = createCatDryRunSteps({
       topic,
       rootDir: options.rootDir,
@@ -46,21 +42,20 @@ export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {
       aiProvider,
       publisher
     });
+    const workflowFactory = new DryRunWorkflowFactory();
 
-    for (const step of steps) {
-      engine.register(step);
-    }
-
-    const workflowResult = await engine.execute({
+    const workflowResult = await workflowFactory.execute({
+      workflowName: 'cat-magazine-dry-run',
       workflowId: 'cat-magazine-dry-run',
       magazineSlug: 'cat',
-      dryRun: true,
-      data: {
-        topic
-      }
+      topic,
+      steps
     });
 
-    return toDryRunResult(topic, workflowResult);
+    return workflowFactory.createResult({
+      topic,
+      workflowResult
+    });
   } catch (error) {
     return {
       topic,
@@ -85,37 +80,6 @@ export function registerCatDryRunMockProviders(registry: ProviderRegistry): void
   }
 }
 
-function toDryRunResult(topic: string, workflowResult: WorkflowResult): DryRunResult {
-  const magazineConfig = workflowResult.context.data.magazineConfig as MagazineConfig | undefined;
-
-  return {
-    magazine: magazineConfig
-      ? {
-          name: magazineConfig.name,
-          slug: magazineConfig.slug,
-          language: magazineConfig.language
-        }
-      : undefined,
-    topic,
-    workflowStatus: workflowResult.status,
-    executedSteps: workflowResult.steps.map((step) => step.stepName),
-    renderedPromptPreview: preview(workflowResult.context.data.articlePrompt),
-    generatedMockArticle: workflowResult.context.data.generatedArticle as string | undefined,
-    seoPreview: workflowResult.context.data.seoPreview as string | undefined,
-    publishPreview: workflowResult.context.data.publishPreview as PublishingResult | undefined,
-    researchPreview: getResearchResults(workflowResult.context),
-    error: workflowResult.status === 'failed' ? workflowResult.message : undefined
-  };
-}
-
-function preview(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  return value.length > 500 ? `${value.slice(0, 500)}...` : value;
-}
-
 function describeError(error: unknown): string {
   if (error instanceof ProviderNotFoundError) {
     return error.message;
@@ -127,4 +91,3 @@ function describeError(error: unknown): string {
 
   return String(error);
 }
-

@@ -70,6 +70,14 @@ Future services:
 - Publishing coordinator
 - Analytics collector
 
+Current dry-run service foundation:
+
+- `DryRunResult`
+- `DryRunStepFactory`
+- `DryRunWorkflowFactory`
+
+The dry-run services provide shared workflow construction, workflow execution, step helper utilities, and dry-run result shaping. They do not know about Cat Magazine prompts or provider implementations.
+
 ## `src/prompts`
 
 Contains prompt management logic:
@@ -116,13 +124,12 @@ Contains optional magazine-specific behavior. Most magazines should start as con
 
 Current Cat Magazine dry-run module:
 
-- `DryRunResult`
 - `providerTokens`
 - `mockProviders`
 - `dryRunSteps`
 - `runCatMagazineDryRun`
 
-The dry-run module is a composition root for the first end-to-end architecture check. It uses only mock providers and does not publish files or call external APIs.
+The dry-run module is a composition root for the first end-to-end architecture check. It uses only mock providers and does not publish files or call external APIs. Generic dry-run workflow execution and result shaping are delegated to `src/services/dryRun`.
 
 ## `magazines`
 

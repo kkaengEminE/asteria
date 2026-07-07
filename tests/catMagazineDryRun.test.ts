@@ -25,7 +25,7 @@ test('cat magazine dry run succeeds', async () => {
     'Publish Preview'
   ]);
   assert.match(result.renderedPromptPreview ?? '', /indoor enrichment/);
-  assert.match(result.generatedMockArticle ?? '', /Mock Cat Care Article/);
+  assert.match(result.articlePreview ?? '', /Mock Cat Care Article/);
   assert.match(result.seoPreview ?? '', /Title Tag/);
   assert.equal(result.publishPreview?.status, 'draft');
 });
@@ -89,4 +89,3 @@ function createFailingAIProvider(): AIProvider {
     }
   };
 }
-

@@ -1,9 +1,10 @@
 import { loadMagazineConfig } from '../../config/index.ts';
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
 import type { AIProvider, Publisher, ResearchProvider } from '../../core/index.ts';
-import type { ContentDraft, PublishingDestination, ResearchResult } from '../../core/types.ts';
+import type { ContentDraft, PublishingDestination } from '../../core/types.ts';
 import { PromptManager } from '../../prompts/index.ts';
-import type { WorkflowContext, WorkflowStep, WorkflowStepResult } from '../../workflows/index.ts';
+import { DryRunStepFactory, requireWorkflowData } from '../../services/dryRun/index.ts';
+import type { WorkflowStep } from '../../workflows/index.ts';
 
 export interface CatDryRunStepOptions {
   topic: string;
@@ -15,39 +16,41 @@ export interface CatDryRunStepOptions {
 }
 
 export function createCatDryRunSteps(options: CatDryRunStepOptions): WorkflowStep[] {
+  const stepFactory = new DryRunStepFactory();
+
   return [
-    createLoadConfigStep(options),
-    createLoadPromptStep(options),
-    createResearchStep(options),
-    createGenerateArticleStep(options),
-    createGenerateSeoStep(options),
-    createPublishPreviewStep(options)
+    createLoadConfigStep(stepFactory, options),
+    createLoadPromptStep(stepFactory, options),
+    createResearchStep(stepFactory, options),
+    createGenerateArticleStep(stepFactory, options),
+    createGenerateSeoStep(stepFactory, options),
+    createPublishPreviewStep(stepFactory, options)
   ];
 }
 
-function createLoadConfigStep(options: CatDryRunStepOptions): WorkflowStep {
-  return {
+function createLoadConfigStep(stepFactory: DryRunStepFactory, options: CatDryRunStepOptions): WorkflowStep {
+  return stepFactory.createStep({
     name: 'Load Config',
-    async execute(context): Promise<WorkflowStepResult> {
+    async execute(context) {
       const magazineConfig = await loadMagazineConfig('cat', { rootDir: options.rootDir });
 
-      return success('Load Config', {
+      return {
         ...context,
         magazineSlug: magazineConfig.slug,
         data: {
           ...context.data,
           magazineConfig
         }
-      });
+      };
     }
-  };
+  });
 }
 
-function createLoadPromptStep(options: CatDryRunStepOptions): WorkflowStep {
-  return {
+function createLoadPromptStep(stepFactory: DryRunStepFactory, options: CatDryRunStepOptions): WorkflowStep {
+  return stepFactory.createStep({
     name: 'Load Prompt',
-    async execute(context): Promise<WorkflowStepResult> {
-      const magazineConfig = requireData<MagazineConfig>(context, 'magazineConfig');
+    async execute(context) {
+      const magazineConfig = requireWorkflowData<MagazineConfig>(context, 'magazineConfig');
       const promptManager = new PromptManager();
 
       await promptManager.load({ magazineSlug: magazineConfig.slug });
@@ -64,113 +67,95 @@ function createLoadPromptStep(options: CatDryRunStepOptions): WorkflowStep {
         primaryKeyword: options.topic
       });
 
-      return success('Load Prompt', {
+      return {
         ...context,
         data: {
           ...context.data,
           articlePrompt,
           seoPrompt
         }
-      });
+      };
     }
-  };
+  });
 }
 
-function createResearchStep(options: CatDryRunStepOptions): WorkflowStep {
-  return {
+function createResearchStep(stepFactory: DryRunStepFactory, options: CatDryRunStepOptions): WorkflowStep {
+  return stepFactory.createStep({
     name: 'Research',
-    async execute(context): Promise<WorkflowStepResult> {
+    async execute(context) {
       const researchResults = await options.researchProvider.search({
         topic: options.topic,
         language: 'en-US'
       });
 
-      return success('Research', {
+      return {
         ...context,
         data: {
           ...context.data,
           researchResults
         }
-      });
+      };
     }
-  };
+  });
 }
 
-function createGenerateArticleStep(options: CatDryRunStepOptions): WorkflowStep {
-  return {
+function createGenerateArticleStep(stepFactory: DryRunStepFactory, options: CatDryRunStepOptions): WorkflowStep {
+  return stepFactory.createStep({
     name: 'Generate Article',
-    async execute(context): Promise<WorkflowStepResult> {
-      const articlePrompt = requireData<string>(context, 'articlePrompt');
+    async execute(context) {
+      const articlePrompt = requireWorkflowData<string>(context, 'articlePrompt');
       const response = await options.aiProvider.generate({ prompt: articlePrompt });
 
-      return success('Generate Article', {
+      return {
         ...context,
         data: {
           ...context.data,
-          generatedArticle: response.text
+          articlePreview: response.text
         }
-      });
+      };
     }
-  };
+  });
 }
 
-function createGenerateSeoStep(options: CatDryRunStepOptions): WorkflowStep {
-  return {
+function createGenerateSeoStep(stepFactory: DryRunStepFactory, options: CatDryRunStepOptions): WorkflowStep {
+  return stepFactory.createStep({
     name: 'Generate SEO',
-    async execute(context): Promise<WorkflowStepResult> {
-      const seoPrompt = requireData<string>(context, 'seoPrompt');
+    async execute(context) {
+      const seoPrompt = requireWorkflowData<string>(context, 'seoPrompt');
       const response = await options.aiProvider.generate({ prompt: seoPrompt });
 
-      return success('Generate SEO', {
+      return {
         ...context,
         data: {
           ...context.data,
           seoPreview: response.text
         }
-      });
+      };
     }
-  };
+  });
 }
 
-function createPublishPreviewStep(options: CatDryRunStepOptions): WorkflowStep {
-  return {
+function createPublishPreviewStep(stepFactory: DryRunStepFactory, options: CatDryRunStepOptions): WorkflowStep {
+  return stepFactory.createStep({
     name: 'Publish Preview',
-    async execute(context): Promise<WorkflowStepResult> {
-      const magazineConfig = requireData<MagazineConfig>(context, 'magazineConfig');
-      const generatedArticle = requireData<string>(context, 'generatedArticle');
+    async execute(context) {
+      const magazineConfig = requireWorkflowData<MagazineConfig>(context, 'magazineConfig');
+      const articlePreview = requireWorkflowData<string>(context, 'articlePreview');
       const destination = magazineConfig.publishingDestinations[0] ?? createDryRunDestination();
       const publishPreview = await options.publisher.publish({
-        draft: createContentDraft(generatedArticle, magazineConfig.language),
+        draft: createContentDraft(articlePreview, magazineConfig.language),
         destination
       });
 
-      return success('Publish Preview', {
+      return {
         ...context,
         data: {
           ...context.data,
           publishPreview
         }
-      });
+      };
     }
-  };
-}
-
-function success(stepName: string, context: WorkflowContext): WorkflowStepResult {
-  return {
-    stepName,
-    status: 'success',
-    context
-  };
-}
-
-function requireData<TValue>(context: WorkflowContext, key: string): TValue {
-  const value = context.data[key];
-
-  if (value === undefined) {
-    throw new Error(`Missing workflow data: ${key}`);
-  }
-
-  return value as TValue;
+  });
 }
 
 function createContentDraft(body: string, language: string): ContentDraft {
@@ -192,8 +177,4 @@ function createDryRunDestination(): PublishingDestination {
     enabled: false,
     dryRunOnly: true
   };
-}
-
-export function getResearchResults(context: WorkflowContext): ResearchResult[] | undefined {
-  return context.data.researchResults as ResearchResult[] | undefined;
 }

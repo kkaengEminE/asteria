@@ -51,11 +51,24 @@ Current dry-run flow:
 1. Load Cat Magazine configuration.
 2. Load and render article and SEO prompts.
 3. Resolve mock research, AI, and publisher providers through `ProviderRegistry`.
-4. Execute workflow steps through `SequentialWorkflowEngine`.
-5. Return a `DryRunResult`.
-6. Print a readable CLI report with `npm run dry-run`.
+4. Build workflow execution through `DryRunWorkflowFactory`.
+5. Execute workflow steps through `SequentialWorkflowEngine`.
+6. Return a shared `DryRunResult`.
+7. Print a readable CLI report with `npm run dry-run`.
 
 No real AI generation, research, publishing, secrets, or files are produced.
+
+## Shared Dry-Run Workflow Foundation
+
+Shared dry-run services extract only the generic pieces proven by Cat Magazine:
+
+- Workflow step helper creation.
+- Required workflow data lookup.
+- Workflow engine construction.
+- Dry-run workflow execution.
+- Dry-run result shaping for status, executed steps, rendered prompt preview, article preview, SEO preview, and publish preview.
+
+Magazine modules remain responsible for config selection, prompt choices, provider tokens, mock providers, and magazine-specific step composition.
 
 ## Dry-Run First
 

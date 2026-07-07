@@ -22,6 +22,8 @@ The Provider Registry lives in `src/providers` and owns provider registration, l
 
 `src/services` is reserved for application services that combine core interfaces into useful operations, such as content planning, editorial validation, prompt rendering, and asset preparation.
 
+`src/services/dryRun` contains the shared dry-run workflow foundation. It owns reusable dry-run result shaping, workflow construction, workflow execution helpers, and dry-run step helpers that are proven by the Cat Magazine dry run.
+
 ### Workflows
 
 `src/workflows` is reserved for workflow definitions and orchestration code. Workflows should coordinate steps and persist state, but not embed provider-specific details.
@@ -34,7 +36,7 @@ Future provider-backed features such as AI generation, research, WordPress publi
 
 `src/magazines` is reserved for magazine-specific modules when configuration alone is not enough.
 
-The first magazine-specific module is `src/magazines/cat`, which contains the Cat Magazine dry-run composition root. It wires together config loading, prompt rendering, mock provider resolution, workflow steps, and dry-run result formatting without real external providers.
+The first magazine-specific module is `src/magazines/cat`, which contains Cat-specific dry-run composition. It wires together Cat config loading, Cat prompt choices, Cat mock provider tokens, and Cat mock providers while using the shared dry-run workflow foundation for generic workflow execution and result shaping.
 
 ### Prompts
 
@@ -97,6 +99,8 @@ AI providers should receive rendered prompt text from the Prompt Management Syst
 
 ## Dry-Run Composition Boundary
 
-Dry-run workflows should be composed at the application or magazine boundary. Composition code may load config, load prompts, register mock providers, resolve provider interfaces, construct workflow steps, and execute the Workflow Engine.
+Dry-run workflows should be composed at the application or magazine boundary. Composition code may load config, load prompts, register mock providers, resolve provider interfaces, construct workflow steps, and execute the Workflow Engine through shared dry-run workflow services.
 
 This keeps the Workflow Engine provider-agnostic while still allowing end-to-end architecture verification.
+
+Shared dry-run code should only contain concepts already proven by a magazine dry run. Magazine-specific provider tokens, mock provider behavior, config choices, prompt keys, and content assumptions should remain in the magazine module.
