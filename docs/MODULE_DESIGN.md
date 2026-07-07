@@ -55,6 +55,15 @@ Current provider registry foundation:
 
 The registry supports provider registration, resolution, duplicate protection, lookup, removal, and category-filtered listing. Only mock providers should be used until real provider adapter sprints begin.
 
+Current publisher adapter draft:
+
+- `providers/publisher/wordpress/WordPressPublisher`
+- `providers/publisher/wordpress/WordPressPublisherConfig`
+- `providers/publisher/wordpress/WordPressPostPayload`
+- `providers/publisher/wordpress/WordPressPublishResult`
+
+The WordPress adapter implements `Publisher` and returns dry-run preview results only. It performs local validation and does not call WordPress APIs.
+
 ## `src/services`
 
 Contains reusable application services that do not know about specific magazines or vendors.
@@ -129,7 +138,7 @@ Current Cat Magazine dry-run module:
 - `dryRunSteps`
 - `runCatMagazineDryRun`
 
-The dry-run module is a composition root for the first end-to-end architecture check. It uses only mock providers and does not publish files or call external APIs. Generic dry-run workflow execution and result shaping are delegated to `src/services/dryRun`.
+The dry-run module is a composition root for the first end-to-end architecture check. It uses mock research and AI providers, and resolves the WordPress publisher adapter in dry-run mode. It does not publish files or call external APIs. Generic dry-run workflow execution and result shaping are delegated to `src/services/dryRun`.
 
 ## `magazines`
 

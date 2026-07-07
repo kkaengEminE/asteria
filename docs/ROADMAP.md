@@ -36,6 +36,8 @@ Status: Implemented with `src/services/dryRun`, shared dry-run result type, step
 
 Implement a WordPress publisher adapter behind the `Publisher` interface.
 
+Status: Draft implemented with local payload validation, Provider Registry token, dry-run preview result, Cat dry-run registration, and tests. Real API calls, secrets, SDK usage, and production publishing remain deferred.
+
 ## Phase 7: Google Drive Image Library
 
 Implement an image library adapter for curated assets stored in Google Drive.

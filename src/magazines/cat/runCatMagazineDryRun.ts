@@ -1,7 +1,8 @@
 import { ProviderNotFoundError, ProviderRegistry } from '../../providers/index.ts';
+import { WordPressPublisher } from '../../providers/publisher/wordpress/index.ts';
 import { DryRunWorkflowFactory, type DryRunResult } from '../../services/dryRun/index.ts';
 import { createCatDryRunSteps } from './dryRunSteps.ts';
-import { createMockAIProvider, createMockPublisher, createMockResearchProvider } from './mockProviders.ts';
+import { createMockAIProvider, createMockResearchProvider } from './mockProviders.ts';
 import { mockAiProviderToken, mockPublisherToken, mockResearchProviderToken } from './providerTokens.ts';
 
 export interface CatMagazineDryRunOptions {
@@ -76,7 +77,14 @@ export function registerCatDryRunMockProviders(registry: ProviderRegistry): void
   }
 
   if (!registry.has(mockPublisherToken)) {
-    registry.register(mockPublisherToken, () => createMockPublisher());
+    registry.register(
+      mockPublisherToken,
+      () =>
+        new WordPressPublisher({
+          siteUrl: 'https://example.test',
+          dryRun: true
+        })
+    );
   }
 }
 

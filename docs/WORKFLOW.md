@@ -58,6 +58,8 @@ Current dry-run flow:
 
 No real AI generation, research, publishing, secrets, or files are produced.
 
+The publisher in this flow is resolved through `ProviderRegistry` and currently uses the WordPress publisher adapter in dry-run mode. The adapter returns a preview result only.
+
 ## Shared Dry-Run Workflow Foundation
 
 Shared dry-run services extract only the generic pieces proven by Cat Magazine:
@@ -106,6 +108,8 @@ Future providers plug into workflows through composed steps:
 5. Tests can replace providers or steps with mock implementations.
 
 The registry should stay at the composition boundary. Workflow steps may receive provider interfaces as constructor inputs, but the Workflow Engine should never instantiate or resolve providers directly.
+
+Publisher provider steps should receive the shared `Publisher` interface. WordPress-specific validation and preview mapping happen inside the WordPress adapter, not in the Workflow Engine.
 
 ## Prompt Integration Direction
 

@@ -2,10 +2,9 @@ import type {
   AIProvider,
   AIProviderRequest,
   AIProviderResponse,
-  Publisher,
   ResearchProvider
 } from '../../core/index.ts';
-import type { PublishingPayload, PublishingResult, ResearchQuery, ResearchResult } from '../../core/types.ts';
+import type { ResearchQuery, ResearchResult } from '../../core/types.ts';
 
 export function createMockResearchProvider(): ResearchProvider {
   return {
@@ -36,20 +35,6 @@ export function createMockAIProvider(): AIProvider {
   };
 }
 
-export function createMockPublisher(): Publisher {
-  return {
-    name: 'mock-publisher',
-    async publish(payload: PublishingPayload): Promise<PublishingResult> {
-      return {
-        status: 'draft',
-        destination: payload.destination,
-        externalId: `dry-run-${payload.draft.slug ?? 'cat-article'}`,
-        message: `Dry-run preview created for ${payload.draft.title}. Nothing was published.`
-      };
-    }
-  };
-}
-
 function createMockArticle(prompt: string): string {
   return [
     'Title: Mock Cat Care Article',
@@ -72,4 +57,3 @@ function createMockSeo(prompt: string): string {
     `Prompt preview: ${prompt.slice(0, 80)}`
   ].join('\n');
 }
-
