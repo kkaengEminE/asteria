@@ -3,6 +3,7 @@ import type { MagazineConfig } from '../../core/MagazineConfig.ts';
 import type { AIProvider, Publisher, ResearchProvider } from '../../core/index.ts';
 import type { ContentDraft, PublishingDestination } from '../../core/types.ts';
 import type { ImageDomainLibrary, ImageSelectionCriteria } from '../../domain/image/index.ts';
+import type { MonetizationProvider, ProductSearchQuery } from '../../domain/monetization/index.ts';
 import { PromptManager } from '../../prompts/index.ts';
 import { DryRunStepFactory, requireWorkflowData } from '../../services/dryRun/index.ts';
 import type { WorkflowStep } from '../../workflows/index.ts';
@@ -15,6 +16,7 @@ export interface CatDryRunStepOptions {
   aiProvider: AIProvider;
   publisher: Publisher;
   imageLibrary: ImageDomainLibrary;
+  monetizationProvider: MonetizationProvider;
 }
 
 export function createCatDryRunSteps(options: CatDryRunStepOptions): WorkflowStep[] {
@@ -27,6 +29,7 @@ export function createCatDryRunSteps(options: CatDryRunStepOptions): WorkflowSte
     createSelectImageStep(stepFactory, options),
     createGenerateArticleStep(stepFactory, options),
     createGenerateSeoStep(stepFactory, options),
+    createGenerateMonetizationPreviewStep(stepFactory, options),
     createPublishPreviewStep(stepFactory, options)
   ];
 }
@@ -181,6 +184,41 @@ function createGenerateSeoStep(stepFactory: DryRunStepFactory, options: CatDryRu
   });
 }
 
+function createGenerateMonetizationPreviewStep(
+  stepFactory: DryRunStepFactory,
+  options: CatDryRunStepOptions
+): WorkflowStep {
+  return stepFactory.createStep({
+    name: 'Generate Monetization Preview',
+    async execute(context) {
+      const query = createCatProductSearchQuery(options.topic);
+      const recommendations = await options.monetizationProvider.recommendProducts(query);
+      const monetizationResult = await options.monetizationProvider.previewRecommendation(options.topic, recommendations);
+      const affiliateLinks = recommendations
+        .map((recommendation) => recommendation.affiliateLink)
+        .filter((link): link is NonNullable<typeof link> => Boolean(link));
+
+      for (const link of affiliateLinks) {
+        if (!link.url.startsWith('mock://')) {
+          throw new Error('Cat Magazine dry run only allows mock affiliate links.');
+        }
+      }
+
+      return {
+        ...context,
+        data: {
+          ...context.data,
+          productSearchQuery: query,
+          recommendations,
+          affiliateLinks,
+          monetizationPreview: monetizationResult.preview,
+          affiliateDisclosure: createAffiliateDisclosure(affiliateLinks.length)
+        }
+      };
+    }
+  });
+}
+
 function createPublishPreviewStep(stepFactory: DryRunStepFactory, options: CatDryRunStepOptions): WorkflowStep {
   return stepFactory.createStep({
     name: 'Publish Preview',
@@ -229,11 +267,45 @@ function createCatImageSelectionCriteria(topic: string): ImageSelectionCriteria 
   };
 }
 
+function createCatProductSearchQuery(topic: string): ProductSearchQuery {
+  const topicTags = extractCatTopicTags(topic);
+
+  return {
+    topic: topicTags[0] ?? 'cat',
+    category: 'cat-care',
+    tags: ['cat', ...topicTags],
+    minimumRating: 4,
+    limit: 3
+  };
+}
+
 function extractCatTopicTags(topic: string): string[] {
-  const knownTags = ['sleep', 'food', 'play', 'toy', 'cute', 'window', 'health', 'enrichment'];
+  const knownTags = [
+    'sleep',
+    'food',
+    'play',
+    'toy',
+    'cute',
+    'window',
+    'health',
+    'enrichment',
+    'fountain',
+    'water',
+    'litter',
+    'scratcher',
+    'grooming',
+    'brush',
+    'indoor'
+  ];
   const normalizedTopic = topic.toLowerCase();
 
   return knownTags.filter((tag) => normalizedTopic.includes(tag));
+}
+
+function createAffiliateDisclosure(linkCount: number): string {
+  return linkCount === 0
+    ? 'Affiliate disclosure placeholder. No mock affiliate links were generated.'
+    : 'Affiliate disclosure placeholder. Mock affiliate links are shown for dry-run review only.';
 }
 
 function createDryRunDestination(): PublishingDestination {

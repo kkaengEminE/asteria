@@ -1,13 +1,20 @@
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
 import type { PublishingResult, ResearchResult } from '../../core/types.ts';
 import type { ImageAsset } from '../../domain/image/index.ts';
+import type { AffiliateLink, Recommendation } from '../../domain/monetization/index.ts';
 import {
   SequentialWorkflowEngine,
   type WorkflowContext,
   type WorkflowResult,
   type WorkflowStep
 } from '../../workflows/index.ts';
-import { type DryRunImageSelectionReason, type DryRunResult, summarizeImage, summarizeMagazine } from './DryRunResult.ts';
+import {
+  type DryRunImageSelectionReason,
+  type DryRunResult,
+  summarizeImage,
+  summarizeMagazine,
+  summarizeRecommendations
+} from './DryRunResult.ts';
 
 export interface BuildDryRunWorkflowOptions {
   workflowName: string;
@@ -31,6 +38,10 @@ export interface CreateDryRunResultOptions {
   researchKey?: string;
   selectedImageKey?: string;
   imageSelectionReasonKey?: string;
+  recommendationsKey?: string;
+  affiliateLinksKey?: string;
+  monetizationPreviewKey?: string;
+  affiliateDisclosureKey?: string;
   magazineConfigKey?: string;
   previewLength?: number;
 }
@@ -68,6 +79,7 @@ export class DryRunWorkflowFactory {
     const context = options.workflowResult.context;
     const magazineConfig = context.data[options.magazineConfigKey ?? 'magazineConfig'] as MagazineConfig | undefined;
     const selectedImage = context.data[options.selectedImageKey ?? 'selectedImage'] as ImageAsset | undefined;
+    const recommendations = context.data[options.recommendationsKey ?? 'recommendations'] as Recommendation[] | undefined;
 
     return {
       magazine: magazineConfig ? summarizeMagazine(magazineConfig) : undefined,
@@ -84,6 +96,10 @@ export class DryRunWorkflowFactory {
         | DryRunImageSelectionReason
         | undefined,
       imagePreview: selectedImage?.uri,
+      recommendedProducts: recommendations ? summarizeRecommendations(recommendations) : undefined,
+      affiliateLinks: context.data[options.affiliateLinksKey ?? 'affiliateLinks'] as AffiliateLink[] | undefined,
+      monetizationPreview: context.data[options.monetizationPreviewKey ?? 'monetizationPreview'] as string | undefined,
+      affiliateDisclosure: context.data[options.affiliateDisclosureKey ?? 'affiliateDisclosure'] as string | undefined,
       error: options.workflowResult.status === 'failed' ? options.workflowResult.message : undefined
     };
   }

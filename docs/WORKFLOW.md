@@ -50,18 +50,21 @@ Current dry-run flow:
 
 1. Load Cat Magazine configuration.
 2. Load and render article and SEO prompts.
-3. Resolve mock research, AI, image, and publisher providers through `ProviderRegistry`.
+3. Resolve mock research, AI, image, monetization, and publisher providers through `ProviderRegistry`.
 4. Select an image with the mock Google Drive image library.
-5. Build workflow execution through `DryRunWorkflowFactory`.
-6. Execute workflow steps through `SequentialWorkflowEngine`.
-7. Return a shared `DryRunResult`.
-8. Print a readable CLI report with `npm run dry-run`.
+5. Generate monetization preview with the mock Coupang affiliate adapter.
+6. Build workflow execution through `DryRunWorkflowFactory`.
+7. Execute workflow steps through `SequentialWorkflowEngine`.
+8. Return a shared `DryRunResult`.
+9. Print a readable CLI report with `npm run dry-run`.
 
 No real AI generation, research, publishing, secrets, or files are produced.
 
 The publisher in this flow is resolved through `ProviderRegistry` and currently uses the WordPress publisher adapter in dry-run mode. The adapter returns a preview result only.
 
 The image library in this flow is resolved through `ProviderRegistry` and currently uses the Google Drive image library adapter in dry-run mode. The adapter uses mock records only and returns storage-agnostic image assets.
+
+The monetization provider in this flow is resolved through `ProviderRegistry` and currently uses the Coupang affiliate adapter in dry-run mode. The adapter uses mock product records only and returns provider-agnostic recommendations with `mock://` affiliate links.
 
 ## Shared Dry-Run Workflow Foundation
 
@@ -71,7 +74,7 @@ Shared dry-run services extract only the generic pieces proven by Cat Magazine:
 - Required workflow data lookup.
 - Workflow engine construction.
 - Dry-run workflow execution.
-- Dry-run result shaping for status, executed steps, rendered prompt preview, article preview, SEO preview, and publish preview.
+- Dry-run result shaping for status, executed steps, rendered prompt preview, article preview, SEO preview, image preview, monetization preview, and publish preview.
 
 Magazine modules remain responsible for config selection, prompt choices, provider tokens, mock providers, and magazine-specific step composition.
 
@@ -146,7 +149,7 @@ Expected monetization flow:
 
 Coupang, Amazon, Temu, tracking parameters, API credentials, commission logic, and product feed details remain provider adapter concerns.
 
-The current Coupang affiliate adapter can be registered through `ProviderRegistry` and resolved as a `MonetizationProvider`. It uses mock product records, returns domain `Product` and `Recommendation` values, and generates `mock://` affiliate links only. It is not yet part of the Cat Magazine dry run and does not publish monetized content.
+The current Coupang affiliate adapter is registered in the Cat Magazine dry run through `ProviderRegistry` and resolved as a `MonetizationProvider`. It uses mock product records, returns domain `Product` and `Recommendation` values, and generates `mock://` affiliate links only. The dry run prints recommended products, recommendation reasons, mock links, and plain disclosure preview text without publishing monetized content.
 
 ## Prompt Integration Direction
 

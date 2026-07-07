@@ -126,7 +126,7 @@ Current dry-run service foundation:
 - `DryRunStepFactory`
 - `DryRunWorkflowFactory`
 
-The dry-run services provide shared workflow construction, workflow execution, step helper utilities, and dry-run result shaping. They include generic image preview fields, but do not know about Cat Magazine prompts or provider implementations.
+The dry-run services provide shared workflow construction, workflow execution, step helper utilities, and dry-run result shaping. They include generic image and monetization preview fields, but do not know about Cat Magazine prompts or provider implementations.
 
 ## `src/prompts`
 
@@ -179,7 +179,7 @@ Current Cat Magazine dry-run module:
 - `dryRunSteps`
 - `runCatMagazineDryRun`
 
-The dry-run module is a composition root for the first end-to-end architecture check. It uses mock research and AI providers, resolves the WordPress publisher adapter in dry-run mode, and resolves the mock Google Drive image library for image selection. It does not publish files, access real image storage, or call external APIs. Generic dry-run workflow execution and result shaping are delegated to `src/services/dryRun`.
+The dry-run module is a composition root for the first end-to-end architecture check. It uses mock research and AI providers, resolves the WordPress publisher adapter in dry-run mode, resolves the mock Google Drive image library for image selection, and resolves the mock Coupang affiliate adapter for monetization preview. It does not publish files, access real image storage, generate production affiliate links, or call external APIs. Generic dry-run workflow execution and result shaping are delegated to `src/services/dryRun`.
 
 ## `magazines`
 

@@ -62,6 +62,12 @@ Implement an affiliate provider adapter for Coupang while keeping affiliate enri
 
 Status: Draft implemented with local mock Coupang-style records, Product domain mapping, ranked recommendations, mock affiliate link generation, Provider Registry token, and tests. Coupang APIs, SDK usage, secrets, production links, and monetized publishing remain deferred.
 
+## Phase 8.5: Monetization Workflow Integration
+
+Integrate mock affiliate recommendations into Cat Magazine dry run.
+
+Status: Implemented with mock Coupang provider registration, Generate Monetization Preview workflow step, topic/tag/category/relevance-based recommendations, generic recommended product and affiliate link fields in DryRunResult, CLI output, and tests. All links remain `mock://`; no monetized content is published.
+
 ## Phase 8.0: Monetization Domain
 
 Define the provider-agnostic product, affiliate link, recommendation, and monetization result model that all future affiliate providers must support.

@@ -1,10 +1,22 @@
 import { ProviderNotFoundError, ProviderRegistry } from '../../providers/index.ts';
 import { GoogleDriveImageLibrary } from '../../providers/image/googleDrive/index.ts';
+import { CoupangAffiliateProvider } from '../../providers/monetization/coupang/index.ts';
 import { WordPressPublisher } from '../../providers/publisher/wordpress/index.ts';
 import { DryRunWorkflowFactory, type DryRunResult } from '../../services/dryRun/index.ts';
 import { createCatDryRunSteps } from './dryRunSteps.ts';
-import { createMockAIProvider, createMockResearchProvider, mockCatImageRecords } from './mockProviders.ts';
-import { mockAiProviderToken, mockImageLibraryToken, mockPublisherToken, mockResearchProviderToken } from './providerTokens.ts';
+import {
+  createMockAIProvider,
+  createMockResearchProvider,
+  mockCatCoupangProductRecords,
+  mockCatImageRecords
+} from './mockProviders.ts';
+import {
+  mockAiProviderToken,
+  mockImageLibraryToken,
+  mockMonetizationProviderToken,
+  mockPublisherToken,
+  mockResearchProviderToken
+} from './providerTokens.ts';
 
 export interface CatMagazineDryRunOptions {
   topic?: string;
@@ -39,6 +51,10 @@ export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {
       magazineSlug: 'cat',
       dryRun: true
     });
+    const monetizationProvider = await registry.resolve(mockMonetizationProviderToken, {
+      magazineSlug: 'cat',
+      dryRun: true
+    });
 
     const steps = createCatDryRunSteps({
       topic,
@@ -47,7 +63,8 @@ export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {
       researchProvider,
       aiProvider,
       publisher,
-      imageLibrary
+      imageLibrary,
+      monetizationProvider
     });
     const workflowFactory = new DryRunWorkflowFactory();
 
@@ -101,6 +118,18 @@ export function registerCatDryRunMockProviders(registry: ProviderRegistry): void
           name: 'cat-google-drive-images',
           dryRun: true,
           records: mockCatImageRecords
+        })
+    );
+  }
+
+  if (!registry.has(mockMonetizationProviderToken)) {
+    registry.register(
+      mockMonetizationProviderToken,
+      () =>
+        new CoupangAffiliateProvider({
+          name: 'cat-coupang-affiliate',
+          dryRun: true,
+          records: mockCatCoupangProductRecords
         })
     );
   }

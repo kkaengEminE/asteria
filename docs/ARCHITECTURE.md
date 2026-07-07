@@ -48,7 +48,7 @@ Future provider-backed features such as AI generation, research, WordPress publi
 
 The first magazine-specific module is `src/magazines/cat`, which contains Cat-specific dry-run composition. It wires together Cat config loading, Cat prompt choices, Cat mock provider tokens, and Cat mock providers while using the shared dry-run workflow foundation for generic workflow execution and result shaping.
 
-Cat Magazine dry run now includes image selection. The magazine composition registers a mock Google Drive image library provider, resolves it through Provider Registry, and passes the storage-agnostic image library interface into the workflow step.
+Cat Magazine dry run now includes image selection and monetization preview. The magazine composition registers mock Google Drive and Coupang providers, resolves them through Provider Registry, and passes storage-agnostic image and monetization interfaces into workflow steps.
 
 ### Prompts
 
@@ -140,3 +140,5 @@ This keeps the Workflow Engine provider-agnostic while still allowing end-to-end
 Shared dry-run code should only contain concepts already proven by a magazine dry run. Magazine-specific provider tokens, mock provider behavior, config choices, prompt keys, and content assumptions should remain in the magazine module.
 
 Image preview fields in dry-run results should expose domain-level image information such as filename, tags, category, score, and preview URI. Provider-specific identifiers such as Google Drive file IDs must remain inside adapter records or source metadata.
+
+Monetization preview fields in dry-run results should expose domain-level product recommendations, generic affiliate links, preview text, and disclosure text. Provider-specific identifiers such as Coupang product IDs must remain inside adapter records or product metadata.

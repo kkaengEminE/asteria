@@ -23,6 +23,21 @@ function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagazineDryR
     'SEO Preview:',
     result.seoPreview ?? 'Unavailable',
     '',
+    'Monetization Preview:',
+    result.recommendedProducts && result.recommendedProducts.length > 0
+      ? [
+          ...result.recommendedProducts.map((product, index) =>
+            [
+              `${index + 1}. ${product.name}`,
+              `Reason: ${product.reason}`,
+              `Score: ${product.score}`,
+              `Mock Link: ${result.affiliateLinks?.[index]?.url ?? 'Unavailable'}`
+            ].join('\n')
+          ),
+          `Disclosure: ${result.affiliateDisclosure ?? 'Unavailable'}`
+        ].join('\n\n')
+      : result.monetizationPreview ?? 'Unavailable',
+    '',
     'Selected Image:',
     result.selectedImage
       ? [

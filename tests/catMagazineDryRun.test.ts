@@ -9,7 +9,11 @@ import {
   registerCatDryRunMockProviders,
   runCatMagazineDryRun
 } from '../src/magazines/cat/index.ts';
-import { mockAiProviderToken, mockImageLibraryToken } from '../src/magazines/cat/providerTokens.ts';
+import {
+  mockAiProviderToken,
+  mockImageLibraryToken,
+  mockMonetizationProviderToken
+} from '../src/magazines/cat/providerTokens.ts';
 
 test('cat magazine dry run succeeds', async () => {
   const result = await runCatMagazineDryRun({ topic: 'indoor enrichment' });
@@ -23,6 +27,7 @@ test('cat magazine dry run succeeds', async () => {
     'Select Image',
     'Generate Article',
     'Generate SEO',
+    'Generate Monetization Preview',
     'Publish Preview'
   ]);
   assert.match(result.renderedPromptPreview ?? '', /indoor enrichment/);
@@ -31,6 +36,7 @@ test('cat magazine dry run succeeds', async () => {
   assert.equal(result.publishPreview?.status, 'draft');
   assert.equal(result.selectedImage?.filename, 'cat-window-enrichment.jpg');
   assert.match(result.imagePreview ?? '', /^mock:\/\//);
+  assert.match(result.monetizationPreview ?? '', /Interactive Cat Enrichment Toy/);
 });
 
 test('cat magazine dry run fails when config is missing', async () => {
@@ -123,6 +129,55 @@ test('cat magazine dry run image preview makes no external api call', async () =
 
   assert.match(result.imagePreview ?? '', /^mock:\/\//);
   assert.equal(result.selectedImage?.id, 'cat-window-enrichment');
+});
+
+test('cat magazine dry run includes monetization preview', async () => {
+  const result = await runCatMagazineDryRun({ topic: 'indoor enrichment' });
+
+  assert.equal(result.workflowStatus, 'success');
+  assert.ok((result.recommendedProducts?.length ?? 0) > 0);
+  assert.match(result.monetizationPreview ?? '', /Interactive Cat Enrichment Toy/);
+  assert.match(result.affiliateDisclosure ?? '', /Mock affiliate links/);
+});
+
+test('cat magazine dry run recommendations use topic and tags', async () => {
+  const result = await runCatMagazineDryRun({ topic: 'indoor enrichment toy play' });
+
+  assert.equal(result.workflowStatus, 'success');
+  assert.equal(result.recommendedProducts?.[0].name, 'Interactive Cat Enrichment Toy');
+  assert.ok(result.recommendedProducts?.[0].tags.includes('enrichment'));
+  assert.ok(result.recommendedProducts?.[0].tags.includes('toy'));
+});
+
+test('cat magazine dry run generates mock affiliate links', async () => {
+  const result = await runCatMagazineDryRun({ topic: 'indoor enrichment' });
+
+  assert.ok((result.affiliateLinks?.length ?? 0) > 0);
+  assert.ok(result.affiliateLinks?.every((link) => link.url.startsWith('mock://')));
+  assert.ok(result.affiliateLinks?.every((link) => link.metadata?.dryRun === true));
+});
+
+test('cat magazine dry run fails gracefully when monetization provider is missing', async () => {
+  const registry = new ProviderRegistry();
+  registerCatDryRunMockProviders(registry);
+  registry.remove(mockMonetizationProviderToken);
+
+  const result = await runCatMagazineDryRun({
+    topic: 'indoor enrichment',
+    registry,
+    registerMockProviders: false
+  });
+
+  assert.equal(result.workflowStatus, 'failed');
+  assert.deepEqual(result.executedSteps, []);
+  assert.match(result.error ?? '', /Provider not found/);
+});
+
+test('cat magazine dry run monetization makes no external api call', async () => {
+  const result = await runCatMagazineDryRun({ topic: 'indoor enrichment' });
+
+  assert.ok(result.affiliateLinks?.every((link) => link.url.startsWith('mock://')));
+  assert.doesNotMatch(result.affiliateLinks?.[0].url ?? '', /^https?:\/\//);
 });
 
 function createFailingAIProvider(): AIProvider {
