@@ -31,7 +31,7 @@ The engine is not responsible for:
 2. Select topic or editorial plan item.
 3. Load and render the relevant prompt.
 4. Research the topic.
-5. Generate content draft.
+5. Generate or normalize content into the Content Domain.
 6. Select image candidates.
 7. Choose the best image.
 8. Add affiliate recommendations when configured.
@@ -121,6 +121,8 @@ Publisher provider steps should receive the shared `Publisher` interface. WordPr
 
 AI provider steps should receive the shared AI provider interface from `src/providers/ai`. Prompt loading and rendering happen before provider calls, and providers receive only rendered prompt content.
 
+Content generation steps should normalize provider output into the Content Domain before publishing. The canonical generation output is `ContentGenerationResult`, containing validated article, SEO, FAQ, and metadata fields.
+
 ## Image Selection Direction
 
 Future image workflows should use the Image Asset Domain before calling storage-specific adapters.
@@ -165,3 +167,17 @@ Prompt lookup order:
 2. Load magazine prompts.
 3. Let magazine prompts override shared prompts with the same key.
 4. Render the selected prompt with required variables.
+
+## Content Generation Direction
+
+Future real article and SEO generation should produce or be parsed into `ContentGenerationResult`.
+
+Expected content flow:
+
+1. Render prompts through `PromptManager`.
+2. Send rendered prompt content to an AI provider.
+3. Parse or map provider output into `Article`, `SEO`, and optional `FAQ` values.
+4. Validate the result with the Content Domain.
+5. Pass validated content into publishing, social, monetization, or review steps.
+
+The Content Domain remains independent from OpenAI, Claude, Gemini, WordPress, workflows, and prompt files.

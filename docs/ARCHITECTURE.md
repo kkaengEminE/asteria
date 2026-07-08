@@ -12,6 +12,8 @@ AI Publishing OS follows clean architecture principles. Domain concepts and appl
 
 `src/domain` contains magazine, article, media, campaign, and publishing concepts. Domain objects should stay independent from API clients and external SDKs.
 
+`src/domain/content` contains the provider-agnostic Content Domain. It defines canonical article, SEO, FAQ, category, tag, status, metadata, and content generation result models that future AI providers should produce.
+
 `src/domain/image` contains the storage-agnostic Image Asset Domain. It defines image assets, metadata, tags, categories, search queries, selection criteria, and scoring helpers that future image storage providers must support.
 
 `src/domain/monetization` contains the provider-agnostic Monetization Domain. It defines products, affiliate links, recommendations, recommendation reasons, product search queries, monetization results, and a mock monetization provider contract for future affiliate adapters.
@@ -116,6 +118,12 @@ AI providers receive rendered prompts only. They must not know about workflow or
 The AI Provider Foundation defines shared request and response models for future OpenAI, Claude, Gemini, OpenRouter, and local LLM adapters. Provider adapters should report usage and structured errors through the shared AI contracts before workflow steps consume generation results.
 
 The current Mock AI provider is deterministic and dry-run only. It returns predictable content, usage metadata, token counts, stream-compatible output, and health check results without network calls.
+
+## Content Domain Boundary
+
+The Content Domain does not know about OpenAI, Claude, Gemini, WordPress, workflows, prompt files, or provider adapters. It defines the canonical shape of generated content after provider output is parsed or normalized.
+
+Future AI-backed generation should produce or be transformed into `ContentGenerationResult`, which can include an article, SEO metadata, FAQ entries, and provider-agnostic metadata. Publishing adapters should receive content after it has passed domain validation rather than relying on provider-specific output strings.
 
 ## Image Domain Boundary
 

@@ -34,6 +34,20 @@ Holds domain types that describe magazine publishing concepts. Future candidates
 - PodcastEpisode
 - AnalyticsSnapshot
 
+Current content domain foundation:
+
+- `domain/content/Article`
+- `domain/content/ArticleMetadata`
+- `domain/content/ArticleSection`
+- `domain/content/SEO`
+- `domain/content/FAQ`
+- `domain/content/Category`
+- `domain/content/Tag`
+- `domain/content/ContentGenerationResult`
+- `domain/content/ContentStatus`
+
+The content domain defines canonical generated content models and validation helpers. It does not know about AI providers, prompt files, workflows, WordPress, or publishing adapters.
+
 Current image domain foundation:
 
 - `domain/image/ImageAsset`

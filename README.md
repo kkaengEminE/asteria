@@ -4,7 +4,7 @@ Asteria is the foundation for an extensible AI Publishing OS: a reusable content
 
 ## Current Sprint
 
-Sprint 15 adds the AI Provider Foundation. It verifies provider-agnostic AI request, response, usage, error, health check, token counting, streaming shape, deterministic mock generation, Provider Registry resolution, and Cat Magazine dry-run integration without external APIs.
+Sprint 16 adds the Content Domain Foundation. It defines canonical Article, SEO, FAQ, Category, Tag, ContentStatus, and ContentGenerationResult models with validation, slug generation, and metadata normalization without external APIs.
 
 ## Commands
 

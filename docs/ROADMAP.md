@@ -82,38 +82,44 @@ Define provider-agnostic AI contracts before real AI integrations.
 
 Status: Implemented with AI request, response, message, model, usage, error, health check, token counting, streaming interface, deterministic Mock AI provider, Provider Registry compatibility, Cat dry-run integration, and tests. No real AI APIs are called.
 
-### Sprint 16: OpenAI Adapter
+### Sprint 16: Content Domain Foundation
+
+Define the canonical content model that every future AI provider must produce.
+
+Status: Implemented with Article, ArticleMetadata, ArticleSection, SEO, FAQ, Category, Tag, ContentStatus, ContentGenerationResult, validation helpers, slug generation, metadata normalization, and tests. No real AI APIs are called.
+
+### Sprint 17: OpenAI Adapter
 
 Implement the first real AI provider adapter behind the AI provider foundation.
 
-### Sprint 17: Real Article Generation
+### Sprint 18: Real Article Generation
 
 Use the OpenAI adapter to generate real article drafts through the workflow while preserving dry-run safeguards.
 
-### Sprint 18: Real SEO Generation
+### Sprint 19: Real SEO Generation
 
 Use the AI provider foundation for real SEO metadata generation.
 
-### Sprint 19: Real WordPress Publishing
+### Sprint 20: Real WordPress Publishing
 
 Replace WordPress dry-run preview with guarded production publishing.
 
-### Sprint 20: Real Google Drive Integration
+### Sprint 21: Real Google Drive Integration
 
 Connect the Google Drive image library adapter to real Drive metadata and assets.
 
-### Sprint 21: Real Coupang Integration
+### Sprint 22: Real Coupang Integration
 
 Connect the Coupang affiliate adapter to real product and affiliate link workflows.
 
-### Sprint 22: Instagram Generation
+### Sprint 23: Instagram Generation
 
 Generate Instagram-ready captions, hashtags, and image selection metadata from article content.
 
-### Sprint 23: Podcast / TTS
+### Sprint 24: Podcast / TTS
 
 Add text-to-speech generation and podcast publishing workflows behind replaceable interfaces.
 
-### Sprint 24: Scheduler
+### Sprint 25: Scheduler
 
 Enable real GitHub Actions scheduling only after real integrations have production safeguards.
