@@ -15,3 +15,17 @@ export {
   mockAIProviderToken
 } from './MockAIProvider.ts';
 export type { MockAIProviderOptions } from './MockAIProvider.ts';
+export {
+  OpenAIProvider,
+  createOpenAIConfigFromEnv,
+  openAIProviderToken,
+  validateOpenAIConfig
+} from './openai/index.ts';
+export type {
+  OpenAIConfig,
+  OpenAIEnvironment,
+  OpenAIProviderOptions,
+  OpenAITransport,
+  OpenAITransportRequest,
+  OpenAITransportResponse
+} from './openai/index.ts';

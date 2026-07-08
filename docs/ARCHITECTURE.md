@@ -26,6 +26,8 @@ The Provider Registry lives in `src/providers` and owns provider registration, l
 
 `src/providers/ai` contains the provider-agnostic AI Provider Foundation. It defines AI request, response, message, model, usage, and error contracts, plus a deterministic mock provider for dry runs and tests. It does not call real AI APIs.
 
+`src/providers/ai/openai` contains the optional OpenAI adapter. It implements the shared AI provider contract, reads configuration only from environment variables or explicit constructor inputs, and uses a transport abstraction so tests can mock all API behavior. It is not the default dry-run provider.
+
 `src/providers/publisher/wordpress` contains the WordPress publisher adapter draft. It implements the shared `Publisher` interface with mock-first dry-run behavior only. It validates payloads and returns structured preview results without calling WordPress APIs.
 
 `src/providers/image/googleDrive` contains the Google Drive image library adapter draft. It uses local mock metadata only, maps Google Drive-shaped records into the storage-agnostic Image Asset Domain, and does not call Google APIs.
@@ -118,6 +120,8 @@ AI providers receive rendered prompts only. They must not know about workflow or
 The AI Provider Foundation defines shared request and response models for future OpenAI, Claude, Gemini, OpenRouter, and local LLM adapters. Provider adapters should report usage and structured errors through the shared AI contracts before workflow steps consume generation results.
 
 The current Mock AI provider is deterministic and dry-run only. It returns predictable content, usage metadata, token counts, stream-compatible output, and health check results without network calls.
+
+The OpenAI adapter is the first real AI provider boundary. OpenAI-specific request mapping, response mapping, error mapping, transport behavior, environment configuration, and production enablement checks stay inside the adapter. Production calls are disabled unless the adapter is explicitly configured with an API key and `OPENAI_PRODUCTION_ENABLED=true`. Dry-run composition continues to resolve the deterministic Mock AI provider by default.
 
 ## Content Domain Boundary
 

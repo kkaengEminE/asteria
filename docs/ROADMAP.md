@@ -92,6 +92,8 @@ Status: Implemented with Article, ArticleMetadata, ArticleSection, SEO, FAQ, Cat
 
 Implement the first real AI provider adapter behind the AI provider foundation.
 
+Status: Implemented with an optional OpenAI provider, environment-based configuration, injectable transport abstraction, provider-neutral response and error mapping, Provider Registry compatibility, and mocked tests. Production calls are disabled by default, and the Cat dry run continues to use MockAIProvider.
+
 ### Sprint 18: Real Article Generation
 
 Use the OpenAI adapter to generate real article drafts through the workflow while preserving dry-run safeguards.

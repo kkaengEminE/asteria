@@ -62,6 +62,8 @@ No real AI generation, research, publishing, secrets, or files are produced.
 
 The AI provider in this flow is resolved through `ProviderRegistry` and currently uses the deterministic Mock AI provider from `src/providers/ai`. Workflow steps pass rendered prompt text to the provider and consume provider-agnostic AI responses.
 
+The OpenAI adapter exists as an optional provider but is not used by the Cat dry run by default. This keeps the end-to-end architecture check deterministic and free of required credentials.
+
 The publisher in this flow is resolved through `ProviderRegistry` and currently uses the WordPress publisher adapter in dry-run mode. The adapter returns a preview result only.
 
 The image library in this flow is resolved through `ProviderRegistry` and currently uses the Google Drive image library adapter in dry-run mode. The adapter uses mock records only and returns storage-agnostic image assets.
@@ -120,6 +122,8 @@ The registry should stay at the composition boundary. Workflow steps may receive
 Publisher provider steps should receive the shared `Publisher` interface. WordPress-specific validation and preview mapping happen inside the WordPress adapter, not in the Workflow Engine.
 
 AI provider steps should receive the shared AI provider interface from `src/providers/ai`. Prompt loading and rendering happen before provider calls, and providers receive only rendered prompt content.
+
+OpenAI-backed steps should be introduced through composition only. The workflow factory may resolve an OpenAI-backed `AIProvider` when production mode is explicitly enabled, but the Workflow Engine and Content Domain should continue to see only provider-neutral request, response, usage, and error models.
 
 Content generation steps should normalize provider output into the Content Domain before publishing. The canonical generation output is `ContentGenerationResult`, containing validated article, SEO, FAQ, and metadata fields.
 

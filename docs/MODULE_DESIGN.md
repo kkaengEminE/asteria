@@ -106,6 +106,15 @@ Current AI provider foundation:
 
 The AI provider foundation defines provider-agnostic generation contracts, usage metadata, health checks, token counting, streaming shape, and structured error categories. The mock provider is deterministic and makes no external calls.
 
+Current OpenAI adapter:
+
+- `providers/ai/openai/OpenAIProvider`
+- `providers/ai/openai/OpenAIConfig`
+- `providers/ai/openai/OpenAITransport`
+- `providers/ai/openai/OpenAIMapper`
+
+The OpenAI adapter implements `AIProvider` without becoming the default provider. It reads environment-based configuration, requires explicit production enablement before transport calls, maps OpenAI-shaped responses into provider-neutral `AIResponse` values, and supports mocked transports for tests.
+
 Current publisher adapter draft:
 
 - `providers/publisher/wordpress/WordPressPublisher`
