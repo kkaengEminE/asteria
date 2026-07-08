@@ -60,6 +60,8 @@ Current dry-run flow:
 
 No real AI generation, research, publishing, secrets, or files are produced.
 
+The AI provider in this flow is resolved through `ProviderRegistry` and currently uses the deterministic Mock AI provider from `src/providers/ai`. Workflow steps pass rendered prompt text to the provider and consume provider-agnostic AI responses.
+
 The publisher in this flow is resolved through `ProviderRegistry` and currently uses the WordPress publisher adapter in dry-run mode. The adapter returns a preview result only.
 
 The image library in this flow is resolved through `ProviderRegistry` and currently uses the Google Drive image library adapter in dry-run mode. The adapter uses mock records only and returns storage-agnostic image assets.
@@ -117,6 +119,8 @@ The registry should stay at the composition boundary. Workflow steps may receive
 
 Publisher provider steps should receive the shared `Publisher` interface. WordPress-specific validation and preview mapping happen inside the WordPress adapter, not in the Workflow Engine.
 
+AI provider steps should receive the shared AI provider interface from `src/providers/ai`. Prompt loading and rendering happen before provider calls, and providers receive only rendered prompt content.
+
 ## Image Selection Direction
 
 Future image workflows should use the Image Asset Domain before calling storage-specific adapters.
@@ -153,7 +157,7 @@ The current Coupang affiliate adapter is registered in the Cat Magazine dry run 
 
 ## Prompt Integration Direction
 
-Prompt rendering should happen before AI provider calls. A future content generation step can load the magazine config, ask `PromptManager` for the correct prompt, render it with typed variables, and pass only the final text to an `AIProvider`.
+Prompt rendering should happen before AI provider calls. A content generation step can load the magazine config, ask `PromptManager` for the correct prompt, render it with typed variables, and pass only the final text to an `AIProvider`.
 
 Prompt lookup order:
 

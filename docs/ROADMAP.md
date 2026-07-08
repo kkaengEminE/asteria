@@ -74,14 +74,46 @@ Define the provider-agnostic product, affiliate link, recommendation, and moneti
 
 Status: Implemented with product metadata, search query, recommendation model, recommendation reasons, mock affiliate link generation, mock monetization provider, preview results, Provider Registry compatibility, and tests. Coupang, Amazon, Temu, affiliate APIs, secrets, and external calls remain future adapters.
 
-## Phase 9: Instagram Content Generator
+## Next Sprint Sequence
+
+### Sprint 15: AI Provider Foundation
+
+Define provider-agnostic AI contracts before real AI integrations.
+
+Status: Implemented with AI request, response, message, model, usage, error, health check, token counting, streaming interface, deterministic Mock AI provider, Provider Registry compatibility, Cat dry-run integration, and tests. No real AI APIs are called.
+
+### Sprint 16: OpenAI Adapter
+
+Implement the first real AI provider adapter behind the AI provider foundation.
+
+### Sprint 17: Real Article Generation
+
+Use the OpenAI adapter to generate real article drafts through the workflow while preserving dry-run safeguards.
+
+### Sprint 18: Real SEO Generation
+
+Use the AI provider foundation for real SEO metadata generation.
+
+### Sprint 19: Real WordPress Publishing
+
+Replace WordPress dry-run preview with guarded production publishing.
+
+### Sprint 20: Real Google Drive Integration
+
+Connect the Google Drive image library adapter to real Drive metadata and assets.
+
+### Sprint 21: Real Coupang Integration
+
+Connect the Coupang affiliate adapter to real product and affiliate link workflows.
+
+### Sprint 22: Instagram Generation
 
 Generate Instagram-ready captions, hashtags, and image selection metadata from article content.
 
-## Phase 10: TTS + Podcast
+### Sprint 23: Podcast / TTS
 
 Add text-to-speech generation and podcast publishing workflows behind replaceable interfaces.
 
-## Phase 11: Analytics
+### Sprint 24: Scheduler
 
-Collect publication and performance analytics through provider adapters and feed results into future editorial planning.
+Enable real GitHub Actions scheduling only after real integrations have production safeguards.

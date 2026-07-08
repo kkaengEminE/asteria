@@ -79,6 +79,19 @@ Current provider registry foundation:
 
 The registry supports provider registration, resolution, duplicate protection, lookup, removal, and category-filtered listing. Only mock providers should be used until real provider adapter sprints begin.
 
+Current AI provider foundation:
+
+- `providers/ai/AIProvider`
+- `providers/ai/AIRequest`
+- `providers/ai/AIResponse`
+- `providers/ai/AIMessage`
+- `providers/ai/AIModel`
+- `providers/ai/AIUsage`
+- `providers/ai/AIError`
+- `providers/ai/MockAIProvider`
+
+The AI provider foundation defines provider-agnostic generation contracts, usage metadata, health checks, token counting, streaming shape, and structured error categories. The mock provider is deterministic and makes no external calls.
+
 Current publisher adapter draft:
 
 - `providers/publisher/wordpress/WordPressPublisher`
@@ -179,7 +192,7 @@ Current Cat Magazine dry-run module:
 - `dryRunSteps`
 - `runCatMagazineDryRun`
 
-The dry-run module is a composition root for the first end-to-end architecture check. It uses mock research and AI providers, resolves the WordPress publisher adapter in dry-run mode, resolves the mock Google Drive image library for image selection, and resolves the mock Coupang affiliate adapter for monetization preview. It does not publish files, access real image storage, generate production affiliate links, or call external APIs. Generic dry-run workflow execution and result shaping are delegated to `src/services/dryRun`.
+The dry-run module is a composition root for the first end-to-end architecture check. It uses mock research, resolves the provider-agnostic Mock AI provider, resolves the WordPress publisher adapter in dry-run mode, resolves the mock Google Drive image library for image selection, and resolves the mock Coupang affiliate adapter for monetization preview. It does not publish files, access real image storage, generate production affiliate links, or call external APIs. Generic dry-run workflow execution and result shaping are delegated to `src/services/dryRun`.
 
 ## `magazines`
 

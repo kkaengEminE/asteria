@@ -1,9 +1,4 @@
-import type {
-  AIProvider,
-  AIProviderRequest,
-  AIProviderResponse,
-  ResearchProvider
-} from '../../core/index.ts';
+import type { ResearchProvider } from '../../core/index.ts';
 import type { ResearchQuery, ResearchResult } from '../../core/types.ts';
 import type { GoogleDriveImageRecord } from '../../providers/image/googleDrive/index.ts';
 import type { CoupangProductRecord } from '../../providers/monetization/coupang/index.ts';
@@ -21,43 +16,6 @@ export function createMockResearchProvider(): ResearchProvider {
       ];
     }
   };
-}
-
-export function createMockAIProvider(): AIProvider {
-  return {
-    name: 'mock-ai',
-    async generate(request: AIProviderRequest): Promise<AIProviderResponse> {
-      const isSeoPrompt = request.prompt.toLowerCase().includes('seo metadata');
-
-      return {
-        text: isSeoPrompt ? createMockSeo(request.prompt) : createMockArticle(request.prompt),
-        model: 'mock-model'
-      };
-    }
-  };
-}
-
-function createMockArticle(prompt: string): string {
-  return [
-    'Title: Mock Cat Care Article',
-    '',
-    'Summary: A dry-run article draft generated from the rendered Cat Magazine prompt.',
-    '',
-    'Body:',
-    'This mock article verifies that configuration, prompts, providers, and workflows are connected.',
-    'It does not call an AI API and should only be used as a preview artifact.',
-    '',
-    `Prompt preview: ${prompt.slice(0, 120)}`
-  ].join('\n');
-}
-
-function createMockSeo(prompt: string): string {
-  return [
-    'Title Tag: Mock Cat Care Guide',
-    'Meta Description: A dry-run SEO preview for a Cat Magazine article.',
-    'Slug: mock-cat-care-guide',
-    `Prompt preview: ${prompt.slice(0, 80)}`
-  ].join('\n');
 }
 
 export const mockCatImageRecords: GoogleDriveImageRecord[] = [

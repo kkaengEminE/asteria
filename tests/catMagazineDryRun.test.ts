@@ -3,7 +3,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
-import type { AIProvider, AIProviderRequest, AIProviderResponse } from '../src/core/index.ts';
+import type { AIProvider, AIRequest, AIResponse, AIUsage } from '../src/providers/ai/index.ts';
 import { ProviderRegistry } from '../src/providers/index.ts';
 import {
   registerCatDryRunMockProviders,
@@ -183,8 +183,25 @@ test('cat magazine dry run monetization makes no external api call', async () =>
 function createFailingAIProvider(): AIProvider {
   return {
     name: 'failing-ai',
-    async generate(_request: AIProviderRequest): Promise<AIProviderResponse> {
+    async generate(_request: AIRequest): Promise<AIResponse> {
       throw new Error('Mock AI failure.');
+    },
+    async *stream(_request: AIRequest): AsyncIterable<AIResponse> {
+      throw new Error('Mock AI failure.');
+    },
+    async countTokens(_request: AIRequest): Promise<AIUsage> {
+      return {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      };
+    },
+    async healthCheck() {
+      return {
+        ok: false,
+        provider: 'failing-ai',
+        message: 'Mock AI failure.'
+      };
     }
   };
 }

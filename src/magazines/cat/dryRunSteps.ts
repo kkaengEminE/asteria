@@ -1,9 +1,10 @@
 import { loadMagazineConfig } from '../../config/index.ts';
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
-import type { AIProvider, Publisher, ResearchProvider } from '../../core/index.ts';
+import type { Publisher, ResearchProvider } from '../../core/index.ts';
 import type { ContentDraft, PublishingDestination } from '../../core/types.ts';
 import type { ImageDomainLibrary, ImageSelectionCriteria } from '../../domain/image/index.ts';
 import type { MonetizationProvider, ProductSearchQuery } from '../../domain/monetization/index.ts';
+import type { AIProvider } from '../../providers/ai/index.ts';
 import { PromptManager } from '../../prompts/index.ts';
 import { DryRunStepFactory, requireWorkflowData } from '../../services/dryRun/index.ts';
 import type { WorkflowStep } from '../../workflows/index.ts';
@@ -153,13 +154,20 @@ function createGenerateArticleStep(stepFactory: DryRunStepFactory, options: CatD
     name: 'Generate Article',
     async execute(context) {
       const articlePrompt = requireWorkflowData<string>(context, 'articlePrompt');
-      const response = await options.aiProvider.generate({ prompt: articlePrompt });
+      const response = await options.aiProvider.generate({
+        userPrompt: articlePrompt,
+        metadata: {
+          dryRun: true,
+          contentType: 'article'
+        }
+      });
 
       return {
         ...context,
         data: {
           ...context.data,
-          articlePreview: response.text
+          articlePreview: response.content,
+          articleAIResponse: response
         }
       };
     }
@@ -171,13 +179,20 @@ function createGenerateSeoStep(stepFactory: DryRunStepFactory, options: CatDryRu
     name: 'Generate SEO',
     async execute(context) {
       const seoPrompt = requireWorkflowData<string>(context, 'seoPrompt');
-      const response = await options.aiProvider.generate({ prompt: seoPrompt });
+      const response = await options.aiProvider.generate({
+        userPrompt: seoPrompt,
+        metadata: {
+          dryRun: true,
+          contentType: 'seo'
+        }
+      });
 
       return {
         ...context,
         data: {
           ...context.data,
-          seoPreview: response.text
+          seoPreview: response.content,
+          seoAIResponse: response
         }
       };
     }

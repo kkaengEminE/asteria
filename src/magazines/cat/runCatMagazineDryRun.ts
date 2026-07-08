@@ -1,11 +1,11 @@
 import { ProviderNotFoundError, ProviderRegistry } from '../../providers/index.ts';
+import { MockAIProvider } from '../../providers/ai/index.ts';
 import { GoogleDriveImageLibrary } from '../../providers/image/googleDrive/index.ts';
 import { CoupangAffiliateProvider } from '../../providers/monetization/coupang/index.ts';
 import { WordPressPublisher } from '../../providers/publisher/wordpress/index.ts';
 import { DryRunWorkflowFactory, type DryRunResult } from '../../services/dryRun/index.ts';
 import { createCatDryRunSteps } from './dryRunSteps.ts';
 import {
-  createMockAIProvider,
   createMockResearchProvider,
   mockCatCoupangProductRecords,
   mockCatImageRecords
@@ -96,7 +96,14 @@ export function registerCatDryRunMockProviders(registry: ProviderRegistry): void
   }
 
   if (!registry.has(mockAiProviderToken)) {
-    registry.register(mockAiProviderToken, () => createMockAIProvider());
+    registry.register(
+      mockAiProviderToken,
+      () =>
+        new MockAIProvider({
+          name: 'mock-ai',
+          model: 'mock-model'
+        })
+    );
   }
 
   if (!registry.has(mockPublisherToken)) {

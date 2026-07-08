@@ -4,7 +4,7 @@ Asteria is the foundation for an extensible AI Publishing OS: a reusable content
 
 ## Current Sprint
 
-Sprint 14 integrates monetization preview into the Cat Magazine dry run. It verifies config loading, prompt rendering, mock provider resolution, image search/scoring/selection, mock product recommendations, mock affiliate links, workflow execution, mock article generation, SEO preview, monetization preview, selected image preview, and publish preview without external APIs.
+Sprint 15 adds the AI Provider Foundation. It verifies provider-agnostic AI request, response, usage, error, health check, token counting, streaming shape, deterministic mock generation, Provider Registry resolution, and Cat Magazine dry-run integration without external APIs.
 
 ## Commands
 

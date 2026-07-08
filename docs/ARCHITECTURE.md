@@ -22,6 +22,8 @@ AI Publishing OS follows clean architecture principles. Domain concepts and appl
 
 The Provider Registry lives in `src/providers` and owns provider registration, lookup, removal, and lifecycle factory boundaries. Workflows and the Workflow Engine must not instantiate concrete providers directly.
 
+`src/providers/ai` contains the provider-agnostic AI Provider Foundation. It defines AI request, response, message, model, usage, and error contracts, plus a deterministic mock provider for dry runs and tests. It does not call real AI APIs.
+
 `src/providers/publisher/wordpress` contains the WordPress publisher adapter draft. It implements the shared `Publisher` interface with mock-first dry-run behavior only. It validates payloads and returns structured preview results without calling WordPress APIs.
 
 `src/providers/image/googleDrive` contains the Google Drive image library adapter draft. It uses local mock metadata only, maps Google Drive-shaped records into the storage-agnostic Image Asset Domain, and does not call Google APIs.
@@ -106,6 +108,14 @@ Provider categories include:
 Publishers implement the `Publisher` interface and receive `PublishingPayload` values. Provider-specific payload mapping and validation belong inside the provider adapter. Workflow steps should depend on `Publisher`, not WordPress-specific classes.
 
 The current WordPress adapter is a dry-run draft. It does not use a WordPress SDK, credentials, network calls, or production publishing behavior.
+
+## AI Provider Boundary
+
+AI providers receive rendered prompts only. They must not know about workflow orchestration, prompt files, publishers, image libraries, monetization providers, magazine config loading, or publishing destinations.
+
+The AI Provider Foundation defines shared request and response models for future OpenAI, Claude, Gemini, OpenRouter, and local LLM adapters. Provider adapters should report usage and structured errors through the shared AI contracts before workflow steps consume generation results.
+
+The current Mock AI provider is deterministic and dry-run only. It returns predictable content, usage metadata, token counts, stream-compatible output, and health check results without network calls.
 
 ## Image Domain Boundary
 

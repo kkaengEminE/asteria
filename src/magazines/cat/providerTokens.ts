@@ -1,6 +1,7 @@
-import type { AIProvider, Publisher, ResearchProvider } from '../../core/index.ts';
+import type { Publisher, ResearchProvider } from '../../core/index.ts';
 import type { ImageDomainLibrary } from '../../domain/image/index.ts';
 import type { MonetizationProvider } from '../../domain/monetization/index.ts';
+import type { AIProvider } from '../../providers/ai/index.ts';
 import { createProviderToken } from '../../providers/index.ts';
 
 export const mockResearchProviderToken = createProviderToken<ResearchProvider>(
