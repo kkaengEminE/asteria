@@ -1,5 +1,6 @@
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
 import type { PublishingResult, ResearchResult } from '../../core/types.ts';
+import type { PublishingPackage } from '../../domain/content/index.ts';
 import type { ImageAsset } from '../../domain/image/index.ts';
 import type { AffiliateLink, Recommendation } from '../../domain/monetization/index.ts';
 import {
@@ -100,7 +101,12 @@ export class DryRunWorkflowFactory {
       affiliateLinks: context.data[options.affiliateLinksKey ?? 'affiliateLinks'] as AffiliateLink[] | undefined,
       monetizationPreview: context.data[options.monetizationPreviewKey ?? 'monetizationPreview'] as string | undefined,
       affiliateDisclosure: context.data[options.affiliateDisclosureKey ?? 'affiliateDisclosure'] as string | undefined,
-      error: options.workflowResult.status === 'failed' ? options.workflowResult.message : undefined
+      publishingPackage: context.data.publishingPackage as PublishingPackage | undefined,
+      contentGenerationMetadata: context.data.contentGenerationMetadata as DryRunResult['contentGenerationMetadata'],
+      error:
+        options.workflowResult.status === 'failed'
+          ? describeWorkflowError(options.workflowResult)
+          : undefined
     };
   }
 }
@@ -111,4 +117,14 @@ function preview(value: unknown, maxLength = 500): string | undefined {
   }
 
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function describeWorkflowError(workflowResult: WorkflowResult): string | undefined {
+  const failedStep = workflowResult.steps.find((step) => step.status === 'failed');
+
+  if (!failedStep) {
+    return workflowResult.message;
+  }
+
+  return [workflowResult.message, failedStep.error].filter(Boolean).join(': ');
 }

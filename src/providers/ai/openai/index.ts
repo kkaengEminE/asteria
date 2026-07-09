@@ -8,8 +8,10 @@ export {
 export type { OpenAIProviderOptions } from './OpenAIProvider.ts';
 export {
   extractOpenAIErrorMessage,
+  createOpenAIPublishingPackageRequest,
   isOpenAIResponsesBody,
   mapAIRequestToOpenAIRequest,
+  mapOpenAIContentToPublishingPackage,
   mapOpenAIResponseToAIResponse
 } from './OpenAIMapper.ts';
 export type { OpenAIResponsesBody, OpenAIResponsesRequestBody } from './OpenAIMapper.ts';

@@ -68,6 +68,77 @@ test('openai provider maps mocked successful generation', async () => {
   assert.equal(transport.calls[0].path, '/responses');
 });
 
+test('openai provider rejects invalid publishing package JSON', async () => {
+  const provider = createProvider(
+    new MockOpenAITransport({
+      status: 200,
+      body: {
+        output_text: 'not-json'
+      }
+    })
+  );
+
+  await assert.rejects(
+    () =>
+      provider.generatePublishingPackage({
+        topic: 'indoor enrichment'
+      }),
+    (error: unknown) => error instanceof AIProviderError && error.code === 'InvalidRequest'
+  );
+});
+
+test('openai provider maps fenced real generation output into publishing package', async () => {
+  const transport = new MockOpenAITransport({
+    status: 200,
+    body: {
+      id: 'response-real-package',
+      model: 'test-model',
+      output_text: [
+        'Here is the JSON:',
+        '```json',
+        JSON.stringify(createRealGenerationFixture()),
+        '```'
+      ].join('\n'),
+      usage: {
+        input_tokens: 100,
+        output_tokens: 220,
+        total_tokens: 320
+      }
+    }
+  });
+  const provider = createProvider(transport);
+  const result = await provider.generatePublishingPackage({
+    topic: 'indoor enrichment',
+    language: 'en-US',
+    createdAt: '2026-07-08T00:00:00.000Z',
+    metadata: {
+      renderedPrompt: 'Composed real prompt for indoor enrichment.',
+      promptId: 'content.article',
+      promptVersion: 'v1'
+    }
+  });
+  const requestBody = transport.calls[0].body as {
+    input: Array<{ content: string }>;
+    max_output_tokens?: number;
+    metadata?: Record<string, string>;
+  };
+
+  assert.equal(result.article.title, 'Indoor Enrichment for Cats');
+  assert.match(result.article.body, /Window perches/);
+  assert.equal(result.summary.text, 'Practical enrichment ideas for indoor cats.');
+  assert.equal(result.seo.metaTitle, 'Indoor Cat Enrichment Guide');
+  assert.ok(result.seo.keywords.includes('indoor cats'));
+  assert.ok(result.seo.keywords.includes('cat enrichment'));
+  assert.equal(result.faq[0].question, 'How often should cats play?');
+  assert.match(result.imagePrompt.prompt, /editorial photo/);
+  assert.match(result.productPrompt.prompt, /safe cat enrichment products/);
+  assert.equal(result.metadata?.provider, 'openai');
+  assert.equal((result.metadata?.usage as { totalTokens?: number }).totalTokens, 320);
+  assert.equal(requestBody.max_output_tokens, 4000);
+  assert.match(requestBody.input.map((item) => item.content).join('\n'), /Composed real prompt/);
+  assert.equal(requestBody.metadata?.promptVersion, 'v1');
+});
+
 test('openai provider maps mocked api failure', async () => {
   const provider = createProvider(
     new MockOpenAITransport({
@@ -196,6 +267,35 @@ const successResponse: OpenAITransportResponse = {
     }
   }
 };
+
+function createRealGenerationFixture() {
+  return {
+    article: {
+      title: 'Indoor Enrichment for Cats',
+      subtitle: 'Simple ways to keep indoor cats active',
+      summary: 'A practical guide to daily play and enrichment.',
+      content: 'Indoor cats thrive when their day includes climbing, chasing, puzzle feeding, and quiet observation. Window perches, wand toys, and food puzzles can help cats use natural behaviors in a safe home routine.',
+      slug: 'indoor-enrichment-for-cats',
+      language: 'en-US',
+      author: 'Asteria',
+      created_at: '2026-07-08T00:00:00.000Z'
+    },
+    summary: 'Practical enrichment ideas for indoor cats.',
+    seo: {
+      meta_title: 'Indoor Cat Enrichment Guide',
+      meta_description: 'A practical guide to enrichment ideas for indoor cats.',
+      keywords: 'indoor cats, cat enrichment'
+    },
+    faqs: [
+      {
+        q: 'How often should cats play?',
+        a: 'Most cats benefit from short daily play sessions.'
+      }
+    ],
+    image_search_prompt: 'Create an editorial photo prompt for an indoor cat near a window perch.',
+    product_recommendation_prompt: 'Find safe cat enrichment products such as puzzles, scratchers, and wand toys.'
+  };
+}
 
 function createProvider(transport: OpenAITransport = new MockOpenAITransport(successResponse)): OpenAIProvider {
   return new OpenAIProvider({

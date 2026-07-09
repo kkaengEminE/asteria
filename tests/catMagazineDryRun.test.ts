@@ -3,7 +3,16 @@ import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
-import type { AIProvider, AIRequest, AIResponse, AIUsage } from '../src/providers/ai/index.ts';
+import type {
+  AIProvider,
+  AIRequest,
+  AIResponse,
+  AIUsage,
+  OpenAIConfig,
+  OpenAITransport,
+  OpenAITransportRequest,
+  OpenAITransportResponse
+} from '../src/providers/ai/index.ts';
 import { ProviderRegistry } from '../src/providers/index.ts';
 import {
   registerCatDryRunMockProviders,
@@ -24,6 +33,7 @@ test('cat magazine dry run succeeds', async () => {
     'Load Config',
     'Load Prompt',
     'Research',
+    'Generate Publishing Package',
     'Select Image',
     'Generate Article',
     'Generate SEO',
@@ -37,6 +47,98 @@ test('cat magazine dry run succeeds', async () => {
   assert.equal(result.selectedImage?.filename, 'cat-window-enrichment.jpg');
   assert.match(result.imagePreview ?? '', /^mock:\/\//);
   assert.match(result.monetizationPreview ?? '', /Interactive Cat Enrichment Toy/);
+});
+
+test('cat magazine dry run keeps mock ai as default', async () => {
+  const result = await runCatMagazineDryRun({ topic: 'indoor enrichment' });
+
+  assert.equal(result.workflowStatus, 'success');
+  assert.equal(result.contentGenerationMetadata?.providerName, 'mock-ai');
+  assert.equal(result.contentGenerationMetadata?.modelName, 'mock-model');
+  assert.equal(typeof result.contentGenerationMetadata?.reviewScore, 'number');
+  assert.match(result.contentGenerationMetadata?.reviewSummary ?? '', /Editorial review/);
+  assert.equal(typeof result.contentGenerationMetadata?.realGenerationReview, 'object');
+  assert.match(result.contentGenerationMetadata?.realGenerationThresholdResult ?? '', /PASS|WARNING|FAIL/);
+  assert.equal(typeof result.contentGenerationMetadata?.approvalResult, 'object');
+  assert.match(result.contentGenerationMetadata?.approvalDecision ?? '', /APPROVED|NEEDS_REVIEW|REJECTED/);
+});
+
+test('cat magazine dry run production ai is disabled by default', async () => {
+  const transport = new MockOpenAITransport({
+    status: 200,
+    body: {
+      output_text: JSON.stringify(createOpenAIPackageFixture())
+    }
+  });
+  const result = await runCatMagazineDryRun({
+    topic: 'indoor enrichment',
+    aiMode: 'openai',
+    openAIEnv: {},
+    openAITransport: transport
+  });
+
+  assert.equal(result.workflowStatus, 'failed');
+  assert.match(result.error ?? '', /OpenAI production mode is disabled/);
+  assert.equal(transport.calls.length, 0);
+});
+
+test('cat magazine dry run production ai requires api key', async () => {
+  const transport = new MockOpenAITransport({
+    status: 200,
+    body: {
+      output_text: JSON.stringify(createOpenAIPackageFixture())
+    }
+  });
+  const result = await runCatMagazineDryRun({
+    topic: 'indoor enrichment',
+    aiMode: 'openai',
+    openAIEnv: {
+      OPENAI_PRODUCTION_ENABLED: 'true'
+    },
+    openAITransport: transport
+  });
+
+  assert.equal(result.workflowStatus, 'failed');
+  assert.match(result.error ?? '', /OpenAI API key is missing/);
+  assert.equal(transport.calls.length, 0);
+});
+
+test('cat magazine dry run passes rendered prompt assets to openai provider', async () => {
+  const transport = new MockOpenAITransport({
+    status: 200,
+    body: {
+      id: 'response-cat-openai',
+      model: 'test-model',
+      output_text: JSON.stringify(createOpenAIPackageFixture()),
+      usage: {
+        input_tokens: 5,
+        output_tokens: 7,
+        total_tokens: 12
+      }
+    }
+  });
+  const result = await runCatMagazineDryRun({
+    topic: 'indoor enrichment',
+    aiMode: 'openai',
+    openAIEnv: {
+      OPENAI_API_KEY: 'test-key',
+      OPENAI_MODEL: 'test-model',
+      OPENAI_BASE_URL: 'https://api.openai.test/v1',
+      OPENAI_PRODUCTION_ENABLED: 'true'
+    },
+    openAITransport: transport
+  });
+  const requestBody = transport.calls[0].body as {
+    input: Array<{ content: string }>;
+  };
+
+  assert.equal(result.workflowStatus, 'success');
+  assert.equal(result.contentGenerationMetadata?.providerName, 'openai');
+  assert.equal(result.contentGenerationMetadata?.modelName, 'test-model');
+  assert.equal((result.contentGenerationMetadata?.tokenUsage as { totalTokens?: number }).totalTokens, 12);
+  assert.match(requestBody.input.map((item) => item.content).join('\n'), /content\.task@v1/);
+  assert.match(requestBody.input.map((item) => item.content).join('\n'), /content\.outputSchema@v1/);
+  assert.match(requestBody.input.map((item) => item.content).join('\n'), /indoor enrichment/);
 });
 
 test('cat magazine dry run fails when config is missing', async () => {
@@ -86,8 +188,8 @@ test('cat magazine dry run returns workflow failure when a step provider fails',
   });
 
   assert.equal(result.workflowStatus, 'failed');
-  assert.deepEqual(result.executedSteps, ['Load Config', 'Load Prompt', 'Research', 'Select Image', 'Generate Article']);
-  assert.match(result.error ?? '', /Generate Article/);
+  assert.deepEqual(result.executedSteps, ['Load Config', 'Load Prompt', 'Research', 'Generate Publishing Package']);
+  assert.match(result.error ?? '', /Generate Publishing Package/);
 });
 
 test('cat magazine dry run image selection uses topic and tags', async () => {
@@ -183,6 +285,9 @@ test('cat magazine dry run monetization makes no external api call', async () =>
 function createFailingAIProvider(): AIProvider {
   return {
     name: 'failing-ai',
+    async generatePublishingPackage() {
+      throw new Error('Mock AI failure.');
+    },
     async generate(_request: AIRequest): Promise<AIResponse> {
       throw new Error('Mock AI failure.');
     },
@@ -204,4 +309,56 @@ function createFailingAIProvider(): AIProvider {
       };
     }
   };
+}
+
+function createOpenAIPackageFixture() {
+  return {
+    article: {
+      title: 'OpenAI Cat Article',
+      summary: 'A provider-neutral article summary.',
+      body: 'A provider-neutral article body.',
+      slug: 'openai-cat-article',
+      language: 'en-US',
+      author: 'Asteria',
+      createdAt: '2026-07-08T00:00:00.000Z',
+      metadata: {
+        status: 'draft',
+        tags: []
+      }
+    },
+    summary: {
+      text: 'A provider-neutral dry-run summary.'
+    },
+    seo: {
+      metaTitle: 'OpenAI Cat Article',
+      metaDescription: 'A provider-neutral SEO description.',
+      keywords: ['cat', 'openai']
+    },
+    faq: [
+      {
+        question: 'Is this published?',
+        answer: 'No. This is still a dry-run package.'
+      }
+    ],
+    imagePrompt: {
+      prompt: 'Find an editorial cat image.'
+    },
+    productPrompt: {
+      prompt: 'Find safe cat product ideas.'
+    }
+  };
+}
+
+class MockOpenAITransport implements OpenAITransport {
+  readonly calls: OpenAITransportRequest[] = [];
+  private readonly response: OpenAITransportResponse;
+
+  constructor(response: OpenAITransportResponse) {
+    this.response = response;
+  }
+
+  async request(_config: OpenAIConfig, request: OpenAITransportRequest): Promise<OpenAITransportResponse> {
+    this.calls.push(request);
+    return this.response;
+  }
 }

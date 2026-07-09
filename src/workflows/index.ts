@@ -5,4 +5,5 @@ export type { SequentialWorkflowEngineOptions, WorkflowEngine, WorkflowLogger } 
 export type { WorkflowResult, WorkflowStepResult } from './WorkflowResult.ts';
 export type { WorkflowStatus } from './WorkflowStatus.ts';
 export type { WorkflowStep } from './WorkflowStep.ts';
-
+export { ContentGenerationWorkflow } from './contentGeneration/index.ts';
+export type { ContentGenerationMetadata, ContentGenerationWorkflowOptions } from './contentGeneration/index.ts';

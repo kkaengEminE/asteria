@@ -1,7 +1,11 @@
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
 import type { PublishingResult, ResearchResult } from '../../core/types.ts';
+import type { ApprovalResult } from '../../domain/approval/index.ts';
+import type { PublishingPackage } from '../../domain/content/index.ts';
+import type { EditorialReview, ReviewIssue, ReviewResult } from '../../domain/editorialReview/index.ts';
 import type { ImageAsset } from '../../domain/image/index.ts';
 import type { AffiliateLink, Recommendation } from '../../domain/monetization/index.ts';
+import type { RealGenerationReview } from '../realGenerationReview/index.ts';
 import type { WorkflowResult } from '../../workflows/index.ts';
 
 export interface DryRunMagazineSummary {
@@ -27,7 +31,37 @@ export interface DryRunResult {
   affiliateLinks?: AffiliateLink[];
   monetizationPreview?: string;
   affiliateDisclosure?: string;
+  publishingPackage?: PublishingPackage;
+  contentGenerationMetadata?: DryRunContentGenerationMetadata;
   error?: string;
+}
+
+export interface DryRunContentGenerationMetadata {
+  providerName?: string;
+  modelName?: string;
+  tokenUsage?: unknown;
+  promptProfile?: string;
+  promptId?: string;
+  promptIds?: string[];
+  promptVersion?: string;
+  renderedVariables?: Record<string, unknown>;
+  renderedPromptPreview?: string;
+  composedPromptPreview?: string;
+  retryCount?: number;
+  validationResult?: string;
+  validationErrors?: string[];
+  qualityScore?: number;
+  qualityReport?: unknown;
+  editorialReview?: EditorialReview;
+  reviewScore?: number;
+  reviewResult?: ReviewResult;
+  reviewSummary?: string;
+  reviewIssues?: ReviewIssue[];
+  realGenerationReview?: RealGenerationReview;
+  realGenerationThresholdResult?: RealGenerationReview['thresholdResult'];
+  approvalResult?: ApprovalResult;
+  approvalDecision?: ApprovalResult['decision'];
+  generationDurationMs?: number;
 }
 
 export interface DryRunSelectedImage {

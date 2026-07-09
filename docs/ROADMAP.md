@@ -94,34 +94,80 @@ Implement the first real AI provider adapter behind the AI provider foundation.
 
 Status: Implemented with an optional OpenAI provider, environment-based configuration, injectable transport abstraction, provider-neutral response and error mapping, Provider Registry compatibility, and mocked tests. Production calls are disabled by default, and the Cat dry run continues to use MockAIProvider.
 
-### Sprint 18: Real Article Generation
+### Sprint 18: Content Generation Pipeline
 
-Use the OpenAI adapter to generate real article drafts through the workflow while preserving dry-run safeguards.
+Create a provider-agnostic pipeline that turns a topic into a complete publishing package while preserving dry-run safeguards.
 
-### Sprint 19: Real SEO Generation
+Status: Implemented with `ContentGenerationWorkflow`, `ContentRequest`, `PublishingPackage`, summary, SEO metadata, FAQ item, image prompt, and product prompt models. MockAIProvider generates deterministic dry-run packages, OpenAIProvider maps AI JSON output into the same domain model through its adapter, and `npm run dry-run` prints the assembled package. No publishing is implemented.
 
-Use the AI provider foundation for real SEO metadata generation.
+### Sprint 19: Structured AI Output
 
-### Sprint 20: Real WordPress Publishing
+Harden the AI output layer so content generation can recover from malformed output before production usage.
+
+Status: Implemented with `StructuredOutputParser`, `StructuredOutputValidator`, `StructuredOutputError`, configurable retry handling in `ContentGenerationWorkflow`, prompt version metadata, normalization of whitespace and duplicate FAQ items, and dry-run output for prompt version, retry count, validation result, and generation duration. Publishing remains disabled.
+
+### Sprint 20: Prompt Asset System
+
+Separate prompt definitions from workflow logic with versioned prompt assets.
+
+Status: Implemented with `PromptAssetRegistry`, prompt asset models, explicit and latest version resolution, template variable rendering, prompt metadata exposure, content prompt assets for article, summary, SEO, FAQ, image prompt, and product prompt, and dry-run display of prompt id, version, rendered variables, and rendered prompt preview.
+
+### Sprint 21: Production AI Integration
+
+Connect the Prompt Asset System and Structured Output Pipeline to production-enabled OpenAI generation while preserving mock-first dry runs.
+
+Status: Implemented with explicit Cat dry-run AI mode selection, default MockAIProvider behavior, OpenAI production safeguards, missing API key errors, rendered prompt asset propagation into OpenAIProvider, provider/model/token usage metadata, and structured output validation on the OpenAI generation path. Publishing remains disabled.
+
+### Sprint 22: Content Quality Pipeline
+
+Improve generated publishing package quality through prompt composition, prompt profiles, provider-neutral quality validation, quality scoring, and richer dry-run review output.
+
+Status: Implemented with composed prompt stacks, `default`/`blog`/`magazine` prompt profiles, content quality validation, 0-100 quality scoring, quality metadata propagation, and dry-run output for prompt profile, prompt stack, composed prompt preview, validation report, and quality report. Publishing remains disabled.
+
+### Sprint 23: Editorial Review Layer
+
+Introduce a provider-neutral editorial review layer that evaluates generated publishing packages before future publication readiness decisions.
+
+Status: Implemented with Editorial Review Domain models, `EditorialReviewService`, review result classification, issue category/severity/recommendation output, separate 0-100 review score, ContentGenerationWorkflow metadata integration, and dry-run display of review summary and issues. Publishing remains disabled.
+
+### Sprint 24: Real AI Content Generation
+
+Generate complete publishing packages through production-enabled OpenAI while preserving provider-neutral content, quality, and editorial review boundaries.
+
+Status: Implemented with prompt-driven OpenAI publishing package generation, fenced JSON recovery, response text extraction, common AI field alias normalization, complete PublishingPackage mapping, token usage metadata propagation, structured output validation, quality scoring, editorial review metadata, and mock-first dry-run compatibility. Publishing remains disabled.
+
+### Sprint 25: Real Article and SEO Review
+
+Use production-enabled AI generation to tune real article and SEO output quality through the existing Content Generation Pipeline and review metadata.
+
+Status: Implemented with `RealGenerationReviewService`, configurable review-only thresholds, article word and character counts, SEO completeness checks, article structure review, FAQ usefulness review, summary usefulness review, threshold result metadata, dry-run display, and tests. Publishing remains disabled.
+
+### Sprint 26: Editorial Approval Gate
+
+Determine whether a generated PublishingPackage is ready for future publishing without publishing anything.
+
+Status: Implemented with Approval Domain models, `EditorialApprovalService`, `APPROVED` / `NEEDS_REVIEW` / `REJECTED` decisions, structured approval reasons, recommendations, blocking issues, non-blocking issues, ContentGenerationWorkflow metadata integration, dry-run display, and tests. Publishing remains disabled.
+
+### Sprint 27: Real WordPress Publishing
 
 Replace WordPress dry-run preview with guarded production publishing.
 
-### Sprint 21: Real Google Drive Integration
+### Sprint 28: Real Google Drive Integration
 
 Connect the Google Drive image library adapter to real Drive metadata and assets.
 
-### Sprint 22: Real Coupang Integration
+### Sprint 29: Real Coupang Integration
 
 Connect the Coupang affiliate adapter to real product and affiliate link workflows.
 
-### Sprint 23: Instagram Generation
+### Sprint 30: Instagram Generation
 
 Generate Instagram-ready captions, hashtags, and image selection metadata from article content.
 
-### Sprint 24: Podcast / TTS
+### Sprint 31: Podcast / TTS
 
 Add text-to-speech generation and podcast publishing workflows behind replaceable interfaces.
 
-### Sprint 25: Scheduler
+### Sprint 32: Scheduler
 
 Enable real GitHub Actions scheduling only after real integrations have production safeguards.

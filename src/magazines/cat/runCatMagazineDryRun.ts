@@ -1,5 +1,10 @@
 import { ProviderNotFoundError, ProviderRegistry } from '../../providers/index.ts';
-import { MockAIProvider } from '../../providers/ai/index.ts';
+import {
+  MockAIProvider,
+  OpenAIProvider,
+  type OpenAIEnvironment,
+  type OpenAITransport
+} from '../../providers/ai/index.ts';
 import { GoogleDriveImageLibrary } from '../../providers/image/googleDrive/index.ts';
 import { CoupangAffiliateProvider } from '../../providers/monetization/coupang/index.ts';
 import { WordPressPublisher } from '../../providers/publisher/wordpress/index.ts';
@@ -22,16 +27,25 @@ export interface CatMagazineDryRunOptions {
   topic?: string;
   rootDir?: string;
   promptKey?: string;
+  aiMode?: CatDryRunAIMode;
+  openAIEnv?: OpenAIEnvironment;
+  openAITransport?: OpenAITransport;
   registry?: ProviderRegistry;
   registerMockProviders?: boolean;
 }
+
+export type CatDryRunAIMode = 'mock' | 'openai';
 
 export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {}): Promise<DryRunResult> {
   const topic = options.topic ?? 'indoor enrichment for cats';
   const registry = options.registry ?? new ProviderRegistry();
 
   if (options.registerMockProviders ?? true) {
-    registerCatDryRunMockProviders(registry);
+    registerCatDryRunMockProviders(registry, {
+      aiMode: options.aiMode,
+      openAIEnv: options.openAIEnv,
+      openAITransport: options.openAITransport
+    });
   }
 
   try {
@@ -90,20 +104,34 @@ export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {
   }
 }
 
-export function registerCatDryRunMockProviders(registry: ProviderRegistry): void {
+export interface RegisterCatDryRunMockProviderOptions {
+  aiMode?: CatDryRunAIMode;
+  openAIEnv?: OpenAIEnvironment;
+  openAITransport?: OpenAITransport;
+}
+
+export function registerCatDryRunMockProviders(
+  registry: ProviderRegistry,
+  options: RegisterCatDryRunMockProviderOptions = {}
+): void {
   if (!registry.has(mockResearchProviderToken)) {
     registry.register(mockResearchProviderToken, () => createMockResearchProvider());
   }
 
   if (!registry.has(mockAiProviderToken)) {
-    registry.register(
-      mockAiProviderToken,
-      () =>
-        new MockAIProvider({
-          name: 'mock-ai',
-          model: 'mock-model'
-        })
-    );
+    registry.register(mockAiProviderToken, () => {
+      if (options.aiMode === 'openai') {
+        return new OpenAIProvider({
+          env: options.openAIEnv,
+          transport: options.openAITransport
+        });
+      }
+
+      return new MockAIProvider({
+        name: 'mock-ai',
+        model: 'mock-model'
+      });
+    });
   }
 
   if (!registry.has(mockPublisherToken)) {

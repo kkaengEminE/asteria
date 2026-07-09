@@ -1,4 +1,5 @@
 import { AIProviderError, type AIErrorCode } from '../AIError.ts';
+import type { ContentRequest, PublishingPackage } from '../../../domain/content/index.ts';
 import type { AIProvider, AIHealthCheckResult } from '../AIProvider.ts';
 import { getAIRequestText, validateAIRequest, type AIRequest } from '../AIRequest.ts';
 import type { AIResponse } from '../AIResponse.ts';
@@ -13,8 +14,10 @@ import {
 } from './OpenAIConfig.ts';
 import {
   extractOpenAIErrorMessage,
+  createOpenAIPublishingPackageRequest,
   isOpenAIResponsesBody,
   mapAIRequestToOpenAIRequest,
+  mapOpenAIContentToPublishingPackage,
   mapOpenAIResponseToAIResponse
 } from './OpenAIMapper.ts';
 import { FetchOpenAITransport, type OpenAITransport } from './OpenAITransport.ts';
@@ -68,6 +71,30 @@ export class OpenAIProvider implements AIProvider {
     }
 
     return mapOpenAIResponseToAIResponse(response.body, this.config);
+  }
+
+  async generatePublishingPackage(request: ContentRequest): Promise<PublishingPackage> {
+    const response = await this.generate(createOpenAIPublishingPackageRequest(request, this.config));
+
+    try {
+      const publishingPackage = mapOpenAIContentToPublishingPackage(response.content, request);
+
+      return {
+        ...publishingPackage,
+        metadata: {
+          ...publishingPackage.metadata,
+          provider: this.name,
+          model: response.model,
+          usage: response.usage,
+          openAIResponseId: response.metadata?.openAIResponseId
+        }
+      };
+    } catch (error) {
+      throw new AIProviderError('InvalidRequest', error instanceof Error ? error.message : String(error), {
+        provider: this.name,
+        retryable: false
+      });
+    }
   }
 
   async *stream(_request: AIRequest): AsyncIterable<AIResponse> {

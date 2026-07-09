@@ -32,15 +32,16 @@ The engine is not responsible for:
 3. Load and render the relevant prompt.
 4. Research the topic.
 5. Generate or normalize content into the Content Domain.
-6. Select image candidates.
-7. Choose the best image.
-8. Add affiliate recommendations when configured.
-9. Prepare publishing payload.
-10. Run editorial checks.
-11. Publish or create a dry-run preview.
-12. Generate social derivatives when enabled.
-13. Generate TTS and podcast output when enabled.
-14. Record analytics metadata.
+6. Run content quality validation.
+7. Run editorial review.
+8. Select image candidates.
+9. Choose the best image.
+10. Add affiliate recommendations when configured.
+11. Prepare publishing payload.
+12. Publish or create a dry-run preview.
+13. Generate social derivatives when enabled.
+14. Generate TTS and podcast output when enabled.
+15. Record analytics metadata.
 
 ## Cat Magazine Dry Run
 
@@ -127,6 +128,8 @@ OpenAI-backed steps should be introduced through composition only. The workflow 
 
 Content generation steps should normalize provider output into the Content Domain before publishing. The canonical generation output is `ContentGenerationResult`, containing validated article, SEO, FAQ, and metadata fields.
 
+Editorial review should run after structured output parsing and content quality validation. Review output is provider-neutral metadata only: result, score, summary, and issues with category, severity, message, and recommendation.
+
 ## Image Selection Direction
 
 Future image workflows should use the Image Asset Domain before calling storage-specific adapters.
@@ -182,6 +185,12 @@ Expected content flow:
 2. Send rendered prompt content to an AI provider.
 3. Parse or map provider output into `Article`, `SEO`, and optional `FAQ` values.
 4. Validate the result with the Content Domain.
-5. Pass validated content into publishing, social, monetization, or review steps.
+5. Add structural quality metadata.
+6. Add editorial review metadata.
+7. Pass validated content into publishing, social, monetization, or review steps.
 
 The Content Domain remains independent from OpenAI, Claude, Gemini, WordPress, workflows, and prompt files.
+
+## Editorial Review Direction
+
+Current editorial review output is informational. It does not publish, block publishing, or approve content automatically. Future human approval gates can consume this review metadata without changing AI providers, content models, or the Workflow Engine.

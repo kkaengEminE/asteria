@@ -45,8 +45,15 @@ Current content domain foundation:
 - `domain/content/Tag`
 - `domain/content/ContentGenerationResult`
 - `domain/content/ContentStatus`
+- `domain/content/ContentRequest`
+- `domain/content/PublishingPackage`
+- `domain/content/Summary`
+- `domain/content/SeoMetadata`
+- `domain/content/FaqItem`
+- `domain/content/ImagePrompt`
+- `domain/content/ProductPrompt`
 
-The content domain defines canonical generated content models and validation helpers. It does not know about AI providers, prompt files, workflows, WordPress, or publishing adapters.
+The content domain defines canonical generated content models, publishing package models, and validation helpers. It does not know about OpenAI, prompt files, workflows, WordPress, or publishing adapters.
 
 Current image domain foundation:
 
@@ -71,6 +78,25 @@ Current monetization domain foundation:
 - `domain/monetization/MonetizationProvider`
 
 The monetization domain defines provider-agnostic products, recommendations, affiliate links, preview results, and a mock provider. It does not know about Coupang, Amazon, Temu, or affiliate APIs.
+
+Current editorial review domain foundation:
+
+- `domain/editorialReview/EditorialReview`
+- `domain/editorialReview/ReviewResult`
+- `domain/editorialReview/ReviewIssue`
+- `domain/editorialReview/ReviewSeverity`
+- `domain/editorialReview/ReviewCategory`
+
+The editorial review domain defines provider-neutral review output for generated publishing packages. It captures review result, score, summary, issue category, issue severity, message, and recommendation. It does not know about AI providers, publishers, or workflow execution.
+
+Current approval domain foundation:
+
+- `domain/approval/ApprovalDecision`
+- `domain/approval/ApprovalStatus`
+- `domain/approval/ApprovalReason`
+- `domain/approval/ApprovalResult`
+
+The approval domain defines provider-neutral readiness output. It captures approval decision, status, reasons, recommendations, blocking issues, and non-blocking issues. It does not publish and does not know about WordPress.
 
 ## `src/providers`
 
@@ -106,6 +132,8 @@ Current AI provider foundation:
 
 The AI provider foundation defines provider-agnostic generation contracts, usage metadata, health checks, token counting, streaming shape, and structured error categories. The mock provider is deterministic and makes no external calls.
 
+AI providers also expose `generatePublishingPackage(ContentRequest)` for the content generation pipeline. Implementations must return the provider-neutral `PublishingPackage` domain model. MockAIProvider returns a deterministic dry-run package, and OpenAIProvider maps mocked or real AI JSON output into the same domain model.
+
 Current OpenAI adapter:
 
 - `providers/ai/openai/OpenAIProvider`
@@ -114,6 +142,8 @@ Current OpenAI adapter:
 - `providers/ai/openai/OpenAIMapper`
 
 The OpenAI adapter implements `AIProvider` without becoming the default provider. It reads environment-based configuration, requires explicit production enablement before transport calls, maps OpenAI-shaped responses into provider-neutral `AIResponse` values, and supports mocked transports for tests.
+
+For publishing package generation, OpenAIProvider consumes rendered prompt asset text from `ContentRequest.metadata`, calls the transport only when production safeguards pass, maps real OpenAI JSON output into `PublishingPackage`, and attaches provider, model, usage, and response metadata for workflow inspection. The mapper recovers fenced JSON, ignores surrounding explanation text, and normalizes common AI field aliases such as `meta_title`, `faqs`, `image_search_prompt`, and `product_recommendation_prompt`.
 
 Current publisher adapter draft:
 
@@ -164,17 +194,77 @@ Current dry-run service foundation:
 
 The dry-run services provide shared workflow construction, workflow execution, step helper utilities, and dry-run result shaping. They include generic image and monetization preview fields, but do not know about Cat Magazine prompts or provider implementations.
 
+Current structured output service foundation:
+
+- `StructuredOutputParser`
+- `StructuredOutputValidator`
+- `StructuredOutputError`
+
+The structured output layer validates required `PublishingPackage` sections, normalizes whitespace and duplicate FAQ items, extracts fenced JSON when possible, reports descriptive validation errors, and marks recoverable output failures for workflow retry. It operates on provider-neutral content models only.
+
+Current content quality service foundation:
+
+- `ContentQualityValidator`
+
+The content quality service evaluates provider-neutral `PublishingPackage` values for completeness, minimum article length, summary length, duplicate FAQ entries, missing SEO fields, and empty sections. It returns a validation report and simple 0-100 quality score for workflow metadata and dry-run review.
+
+Current editorial review service foundation:
+
+- `EditorialReviewService`
+
+The editorial review service evaluates provider-neutral `PublishingPackage` values for editorial readiness. It reviews completeness, readability, SEO coverage, duplicate FAQ entries, missing metadata, title quality, and summary quality. It returns a structured review report with `PASS`, `WARNING`, or `FAIL`, a separate 0-100 review score, and actionable issue recommendations.
+
+Current real generation review service foundation:
+
+- `RealGenerationReviewService`
+
+The real generation review service evaluates generated `PublishingPackage` values against configurable review-only thresholds. It compares quality score, editorial review score, article length, required SEO fields, article structure, FAQ usefulness, and summary usefulness. It returns article title, word count, character count, SEO title, SEO description, FAQ count, threshold result, threshold issues, and the thresholds used. It does not publish or block publishing.
+
+Current editorial approval service foundation:
+
+- `EditorialApprovalService`
+
+The editorial approval service evaluates validation result, content quality report, editorial review, and real generation review. It returns `APPROVED`, `NEEDS_REVIEW`, or `REJECTED` with structured reasons, recommendations, blocking issues, and non-blocking issues. It is an approval metadata layer only and does not publish.
+
 ## `src/prompts`
 
 Contains prompt management logic:
 
 - `PromptLoader`
 - `PromptRegistry`
+- `PromptAssetRegistry`
+- `PromptAsset`
+- `PromptComposer`
+- `PromptDefinition`
+- `PromptMetadata`
+- `PromptId`
+- `PromptProfile`
 - `PromptTemplate`
 - `PromptVariables`
 - `PromptManager`
+- `PromptVersion`
 
-The module loads markdown prompt files, registers them by key, validates required template variables, and renders final prompt text. It does not know about concrete AI providers.
+The module loads markdown prompt files, registers legacy key-based prompts, registers versioned prompt assets, resolves explicit or latest prompt versions, validates required template variables, renders final prompt text, and exposes prompt metadata. It does not know about concrete AI providers.
+
+Current content prompt assets:
+
+- `content.article`
+- `content.summary`
+- `content.seo`
+- `content.faq`
+- `content.imagePrompt`
+- `content.productPrompt`
+- `content.system`
+- `content.persona`
+- `content.style.default`
+- `content.style.blog`
+- `content.style.magazine`
+- `content.task`
+- `content.outputSchema`
+
+Prompt asset files live under `prompts/assets/content` and can evolve by adding new versions without changing workflow code.
+
+Prompt profiles compose multiple prompt assets before provider generation. The current profiles are `default`, `blog`, and `magazine`; each profile resolves a system, persona, style, task, and output schema stack.
 
 ## `src/workflows`
 
@@ -189,8 +279,11 @@ Current workflow core:
 - `WorkflowEngine`
 - `SequentialWorkflowEngine`
 - `WorkflowLogger`
+- `contentGeneration/ContentGenerationWorkflow`
 
 `SequentialWorkflowEngine` is intentionally minimal. It registers steps, executes them in order, supports cancellation between steps, stops on failure, and returns structured results.
+
+`ContentGenerationWorkflow` is an application workflow for building a validated publishing package from one topic through an `AIProvider`. It is intentionally separate from publishing workflows and does not know about WordPress. It uses the Prompt Asset System for profile-based composed prompt input, the structured output layer for validation and normalization, the content quality service for structural quality metadata, the editorial review service for publication-readiness metadata, the real generation review service for review-only threshold calibration, and the editorial approval service for readiness decision metadata.
 
 Future workflows:
 
@@ -216,6 +309,8 @@ Current Cat Magazine dry-run module:
 - `runCatMagazineDryRun`
 
 The dry-run module is a composition root for the first end-to-end architecture check. It uses mock research, resolves the provider-agnostic Mock AI provider, resolves the WordPress publisher adapter in dry-run mode, resolves the mock Google Drive image library for image selection, and resolves the mock Coupang affiliate adapter for monetization preview. It does not publish files, access real image storage, generate production affiliate links, or call external APIs. Generic dry-run workflow execution and result shaping are delegated to `src/services/dryRun`.
+
+Cat dry-run now supports explicit AI mode selection. Mock mode remains the default. OpenAI mode can be selected for production AI generation only when environment safeguards are satisfied; publishing still remains disabled.
 
 ## `magazines`
 

@@ -7,6 +7,7 @@ import type { MonetizationProvider, ProductSearchQuery } from '../../domain/mone
 import type { AIProvider } from '../../providers/ai/index.ts';
 import { PromptManager } from '../../prompts/index.ts';
 import { DryRunStepFactory, requireWorkflowData } from '../../services/dryRun/index.ts';
+import { ContentGenerationWorkflow } from '../../workflows/contentGeneration/index.ts';
 import type { WorkflowStep } from '../../workflows/index.ts';
 
 export interface CatDryRunStepOptions {
@@ -27,12 +28,75 @@ export function createCatDryRunSteps(options: CatDryRunStepOptions): WorkflowSte
     createLoadConfigStep(stepFactory, options),
     createLoadPromptStep(stepFactory, options),
     createResearchStep(stepFactory, options),
+    createGeneratePublishingPackageStep(stepFactory, options),
     createSelectImageStep(stepFactory, options),
     createGenerateArticleStep(stepFactory, options),
     createGenerateSeoStep(stepFactory, options),
     createGenerateMonetizationPreviewStep(stepFactory, options),
     createPublishPreviewStep(stepFactory, options)
   ];
+}
+
+function createGeneratePublishingPackageStep(
+  stepFactory: DryRunStepFactory,
+  options: CatDryRunStepOptions
+): WorkflowStep {
+  return stepFactory.createStep({
+    name: 'Generate Publishing Package',
+    async execute(context) {
+      const magazineConfig = requireWorkflowData<MagazineConfig>(context, 'magazineConfig');
+      const workflow = new ContentGenerationWorkflow({
+        aiProvider: options.aiProvider
+      });
+      const publishingPackage = await workflow.execute({
+        topic: options.topic,
+        language: magazineConfig.language,
+        audience: magazineConfig.audience,
+        tone: magazineConfig.tone,
+        magazineName: magazineConfig.name,
+        createdAt: '2026-07-08T00:00:00.000Z',
+        metadata: {
+          dryRun: true,
+          magazineSlug: magazineConfig.slug
+        }
+      });
+
+      return {
+        ...context,
+        data: {
+          ...context.data,
+          publishingPackage,
+          contentGenerationMetadata: {
+            providerName: publishingPackage.metadata?.providerName,
+            modelName: publishingPackage.metadata?.modelName,
+            tokenUsage: publishingPackage.metadata?.tokenUsage,
+            promptProfile: publishingPackage.metadata?.promptProfile,
+            promptId: publishingPackage.metadata?.promptId,
+            promptIds: publishingPackage.metadata?.promptIds,
+            promptVersion: publishingPackage.metadata?.promptVersion,
+            renderedVariables: publishingPackage.metadata?.renderedVariables,
+            renderedPromptPreview: publishingPackage.metadata?.renderedPromptPreview,
+            composedPromptPreview: publishingPackage.metadata?.composedPromptPreview,
+            retryCount: publishingPackage.metadata?.retryCount,
+            validationResult: publishingPackage.metadata?.validationResult,
+            validationErrors: publishingPackage.metadata?.validationErrors,
+            qualityScore: publishingPackage.metadata?.qualityScore,
+            qualityReport: publishingPackage.metadata?.qualityReport,
+            editorialReview: publishingPackage.metadata?.editorialReview,
+            reviewScore: publishingPackage.metadata?.reviewScore,
+            reviewResult: publishingPackage.metadata?.reviewResult,
+            reviewSummary: publishingPackage.metadata?.reviewSummary,
+            reviewIssues: publishingPackage.metadata?.reviewIssues,
+            realGenerationReview: publishingPackage.metadata?.realGenerationReview,
+            realGenerationThresholdResult: publishingPackage.metadata?.realGenerationThresholdResult,
+            approvalResult: publishingPackage.metadata?.approvalResult,
+            approvalDecision: publishingPackage.metadata?.approvalDecision,
+            generationDurationMs: publishingPackage.metadata?.generationDurationMs
+          }
+        }
+      };
+    }
+  });
 }
 
 function createSelectImageStep(stepFactory: DryRunStepFactory, options: CatDryRunStepOptions): WorkflowStep {

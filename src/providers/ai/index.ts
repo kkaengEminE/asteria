@@ -12,6 +12,7 @@ export {
   MockAIProvider,
   countApproximateTokens,
   createDeterministicContent,
+  createMockPublishingPackage,
   mockAIProviderToken
 } from './MockAIProvider.ts';
 export type { MockAIProviderOptions } from './MockAIProvider.ts';
