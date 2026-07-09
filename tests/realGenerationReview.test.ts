@@ -36,6 +36,62 @@ test('real generation review warns for weak structure without failing thresholds
   assert.ok(review.issues.some((issue) => issue.category === 'article' && issue.severity === 'warning'));
 });
 
+test('real generation review recognizes structured markdown blocks', () => {
+  const review = reviewPackage({
+    ...createPackageFixture(),
+    article: {
+      ...createPackageFixture().article,
+      body: [
+        '# 야간 우다다의 이유',
+        '고양이는 해질녘과 새벽에 활동성이 높아질 수 있습니다.',
+        '',
+        '## 보호자가 할 수 있는 일',
+        '- 잠들기 전 짧은 사냥 놀이를 합니다.',
+        '- 식사 루틴을 예측 가능하게 맞춥니다.',
+        '',
+        '1. 낮 동안 놀이 시간을 나눕니다.',
+        '2. 밤에는 조용한 환경을 유지합니다.'
+      ].join('\n')
+    }
+  }, new RealGenerationReviewService({
+    minimumArticleWords: 5,
+    minimumQualityScore: 80,
+    minimumReviewScore: 80
+  }));
+
+  assert.ok(review.articleStructure.paragraphCount >= 2);
+  assert.ok(!review.issues.some((issue) =>
+    issue.category === 'article' &&
+    issue.severity === 'warning' &&
+    /fewer than 2 paragraphs/.test(issue.message)
+  ));
+});
+
+test('real generation review recognizes Korean sentence and numbered section structure', () => {
+  const review = reviewPackage({
+    ...createPackageFixture(),
+    article: {
+      ...createPackageFixture().article,
+      body: [
+        '고양이가 밤에 뛰어다니는 이유는 대부분 자연스러운 활동 리듬과 관련이 있습니다. 특히 저녁 이후에는 사냥 본능과 남은 에너지가 함께 나타날 수 있습니다.',
+        '1. 낮 동안 충분히 놀지 못하면 밤에 에너지가 남습니다.',
+        '2. 자기 전 짧은 사냥 놀이를 하면 활동을 더 안정적으로 마무리할 수 있습니다.'
+      ].join('\n')
+    }
+  }, new RealGenerationReviewService({
+    minimumArticleWords: 5,
+    minimumQualityScore: 80,
+    minimumReviewScore: 80
+  }));
+
+  assert.ok(review.articleStructure.paragraphCount >= 2);
+  assert.ok(!review.issues.some((issue) =>
+    issue.category === 'article' &&
+    issue.severity === 'warning' &&
+    /fewer than 2 paragraphs/.test(issue.message)
+  ));
+});
+
 test('real generation review fails when scores and article length miss thresholds', () => {
   const review = reviewPackage({
     ...createPackageFixture(),
@@ -151,4 +207,3 @@ function createPackageFixture(): PublishingPackage {
     }
   });
 }
-

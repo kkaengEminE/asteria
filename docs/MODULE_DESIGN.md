@@ -145,6 +145,19 @@ The OpenAI adapter implements `AIProvider` without becoming the default provider
 
 For publishing package generation, OpenAIProvider consumes rendered prompt asset text from `ContentRequest.metadata`, calls the transport only when production safeguards pass, maps real OpenAI JSON output into `PublishingPackage`, and attaches provider, model, usage, and response metadata for workflow inspection. The mapper recovers fenced JSON, ignores surrounding explanation text, and normalizes common AI field aliases such as `meta_title`, `faqs`, `image_search_prompt`, and `product_recommendation_prompt`.
 
+Current Gemini adapter:
+
+- `providers/ai/gemini/GeminiProvider`
+- `providers/ai/gemini/GeminiConfig`
+- `providers/ai/gemini/GeminiTransport`
+- `providers/ai/gemini/GeminiMapper`
+
+The Gemini adapter implements `AIProvider` without becoming the default provider. It reads environment-based configuration, requires explicit production enablement before transport calls, maps Gemini candidate responses into provider-neutral `AIResponse` values, and supports mocked transports for tests.
+
+For publishing package generation, GeminiProvider consumes rendered prompt asset text from `ContentRequest.metadata`, calls the transport only when Gemini safeguards pass, maps Gemini JSON output into `PublishingPackage`, and attaches provider, model, usage, and finish reason metadata for workflow inspection. Gemini-specific API paths, request bodies, response candidates, and errors stay inside the adapter.
+
+GeminiMapper strengthens publishing-package requests with strict JSON-only instructions, requests JSON MIME output when possible, extracts JSON from fenced or surrounded text, and applies limited repair for raw newlines, unescaped quotes, and unterminated trailing strings. If parsing still fails, GeminiProvider returns a clear provider/model/parse-error message with a truncated raw response preview.
+
 Current publisher adapter draft:
 
 - `providers/publisher/wordpress/WordPressPublisher`
@@ -194,6 +207,8 @@ Current dry-run service foundation:
 
 The dry-run services provide shared workflow construction, workflow execution, step helper utilities, and dry-run result shaping. They include generic image and monetization preview fields, but do not know about Cat Magazine prompts or provider implementations.
 
+Dry-run CLI rendering prefers `PublishingPackage` article and SEO data over legacy article/SEO preview fields. This keeps real provider output, summaries, FAQ, SEO metadata, and package metadata aligned in one visible report.
+
 Current structured output service foundation:
 
 - `StructuredOutputParser`
@@ -220,11 +235,20 @@ Current real generation review service foundation:
 
 The real generation review service evaluates generated `PublishingPackage` values against configurable review-only thresholds. It compares quality score, editorial review score, article length, required SEO fields, article structure, FAQ usefulness, and summary usefulness. It returns article title, word count, character count, SEO title, SEO description, FAQ count, threshold result, threshold issues, and the thresholds used. It does not publish or block publishing.
 
+Article structure detection treats Markdown headings, bullet lists, numbered lists, and blank-line paragraphs as structure blocks. This keeps well-formed Markdown articles from being incorrectly flagged as single-paragraph output.
+
 Current editorial approval service foundation:
 
 - `EditorialApprovalService`
 
 The editorial approval service evaluates validation result, content quality report, editorial review, and real generation review. It returns `APPROVED`, `NEEDS_REVIEW`, or `REJECTED` with structured reasons, recommendations, blocking issues, and non-blocking issues. It is an approval metadata layer only and does not publish.
+
+Current publishing workflow foundation:
+
+- `PublishingWorkflow`
+- `PublishingWorkflowConfig`
+
+The publishing workflow is provider-neutral. It requires `APPROVED` approval metadata before invoking a `Publisher`, maps `PublishingPackage` values into `PublishingPayload`, returns skipped results when publishing is disabled or approval is missing, and keeps dry-run preview behavior separate from real publishing enablement.
 
 ## `src/prompts`
 
@@ -284,6 +308,8 @@ Current workflow core:
 `SequentialWorkflowEngine` is intentionally minimal. It registers steps, executes them in order, supports cancellation between steps, stops on failure, and returns structured results.
 
 `ContentGenerationWorkflow` is an application workflow for building a validated publishing package from one topic through an `AIProvider`. It is intentionally separate from publishing workflows and does not know about WordPress. It uses the Prompt Asset System for profile-based composed prompt input, the structured output layer for validation and normalization, the content quality service for structural quality metadata, the editorial review service for publication-readiness metadata, the real generation review service for review-only threshold calibration, and the editorial approval service for readiness decision metadata.
+
+CLI language options are passed into `ContentGenerationWorkflow` as Content Request language. The value is rendered into prompt variables, carried through composed prompt metadata, and attached to PublishingPackage metadata for dry-run inspection.
 
 Future workflows:
 

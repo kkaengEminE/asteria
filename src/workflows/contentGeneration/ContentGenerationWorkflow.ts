@@ -42,6 +42,7 @@ export interface ContentGenerationWorkflowOptions {
 export interface ContentGenerationMetadata {
   providerName: string;
   modelName?: string;
+  language?: string;
   tokenUsage?: unknown;
   promptProfile: string;
   promptVersion: PromptVersion;
@@ -140,6 +141,7 @@ export class ContentGenerationWorkflow {
         return attachGenerationMetadata(parsed.publishingPackage, {
           providerName: stringMetadata(parsed.publishingPackage.metadata?.provider) ?? this.aiProvider.name,
           modelName: stringMetadata(parsed.publishingPackage.metadata?.model),
+          language: normalizedRequest.language,
           tokenUsage: parsed.publishingPackage.metadata?.usage,
           promptProfile: composedPrompt.profile,
           promptVersion: this.promptVersion,
@@ -187,6 +189,7 @@ export function attachGenerationMetadata(
       ...publishingPackage.metadata,
       providerName: metadata.providerName,
       modelName: metadata.modelName,
+      language: metadata.language,
       tokenUsage: metadata.tokenUsage,
       promptProfile: metadata.promptProfile,
       promptId: metadata.promptId,

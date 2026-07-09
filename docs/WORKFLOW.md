@@ -37,11 +37,12 @@ The engine is not responsible for:
 8. Select image candidates.
 9. Choose the best image.
 10. Add affiliate recommendations when configured.
-11. Prepare publishing payload.
-12. Publish or create a dry-run preview.
-13. Generate social derivatives when enabled.
-14. Generate TTS and podcast output when enabled.
-15. Record analytics metadata.
+11. Check editorial approval.
+12. Prepare publishing payload.
+13. Publish or create a dry-run preview only when safeguards pass.
+14. Generate social derivatives when enabled.
+15. Generate TTS and podcast output when enabled.
+16. Record analytics metadata.
 
 ## Cat Magazine Dry Run
 
@@ -65,7 +66,7 @@ The AI provider in this flow is resolved through `ProviderRegistry` and currentl
 
 The OpenAI adapter exists as an optional provider but is not used by the Cat dry run by default. This keeps the end-to-end architecture check deterministic and free of required credentials.
 
-The publisher in this flow is resolved through `ProviderRegistry` and currently uses the WordPress publisher adapter in dry-run mode. The adapter returns a preview result only.
+The publisher in this flow is resolved through `ProviderRegistry` and currently uses the WordPress publisher adapter in dry-run mode. The provider-neutral publishing workflow checks approval metadata before invoking the adapter. If the package is not `APPROVED`, the dry run records a skipped publishing preview and does not call the publisher.
 
 The image library in this flow is resolved through `ProviderRegistry` and currently uses the Google Drive image library adapter in dry-run mode. The adapter uses mock records only and returns storage-agnostic image assets.
 
@@ -121,6 +122,8 @@ Future providers plug into workflows through composed steps:
 The registry should stay at the composition boundary. Workflow steps may receive provider interfaces as constructor inputs, but the Workflow Engine should never instantiate or resolve providers directly.
 
 Publisher provider steps should receive the shared `Publisher` interface. WordPress-specific validation and preview mapping happen inside the WordPress adapter, not in the Workflow Engine.
+
+Publishing workflow steps should receive a provider-neutral `PublishingWorkflow` or equivalent service. Approval checks, disabled-by-default configuration, and dry-run preview policy happen before a publisher adapter is invoked.
 
 AI provider steps should receive the shared AI provider interface from `src/providers/ai`. Prompt loading and rendering happen before provider calls, and providers receive only rendered prompt content.
 
@@ -194,3 +197,9 @@ The Content Domain remains independent from OpenAI, Claude, Gemini, WordPress, w
 ## Editorial Review Direction
 
 Current editorial review output is informational. It does not publish, block publishing, or approve content automatically. Future human approval gates can consume this review metadata without changing AI providers, content models, or the Workflow Engine.
+
+## Publishing Direction
+
+Publishing is guarded by a provider-neutral workflow after editorial approval. The workflow requires approval metadata, skips non-approved packages, maps approved `PublishingPackage` values into `PublishingPayload`, and calls only the shared `Publisher` interface.
+
+Real publishing remains disabled by default. A future production publishing sprint must require explicit configuration, preserve approval checks, and keep provider-specific WordPress API details inside the WordPress adapter.

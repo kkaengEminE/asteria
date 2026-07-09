@@ -115,7 +115,7 @@ export class OpenAIProvider implements AIProvider {
         ok: false,
         provider: this.name,
         model: this.config.model,
-        message: 'OpenAI production mode is disabled.',
+        message: 'OpenAI production mode is disabled. Set OPENAI_PRODUCTION_ENABLED=true.',
         metadata: {
           productionEnabled: false
         }
@@ -127,7 +127,7 @@ export class OpenAIProvider implements AIProvider {
         ok: false,
         provider: this.name,
         model: this.config.model,
-        message: 'OpenAI API key is missing.',
+        message: 'OpenAI API key is missing. Set OPENAI_API_KEY.',
         metadata: {
           productionEnabled: true
         }
@@ -147,14 +147,14 @@ export class OpenAIProvider implements AIProvider {
 
   private assertReadyForExternalRequest(): void {
     if (!this.config.productionEnabled) {
-      throw new AIProviderError('ProviderUnavailable', 'OpenAI production mode is disabled.', {
+      throw new AIProviderError('ProviderUnavailable', 'OpenAI production mode is disabled. Set OPENAI_PRODUCTION_ENABLED=true.', {
         provider: this.name,
         retryable: false
       });
     }
 
     if (!this.config.apiKey) {
-      throw new AIProviderError('Authentication', 'OpenAI API key is missing.', {
+      throw new AIProviderError('Authentication', 'OpenAI API key is missing. Set OPENAI_API_KEY.', {
         provider: this.name,
         retryable: false
       });

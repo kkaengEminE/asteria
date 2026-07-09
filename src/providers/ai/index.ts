@@ -30,3 +30,17 @@ export type {
   OpenAITransportRequest,
   OpenAITransportResponse
 } from './openai/index.ts';
+export {
+  GeminiProvider,
+  createGeminiConfigFromEnv,
+  geminiProviderToken,
+  validateGeminiConfig
+} from './gemini/index.ts';
+export type {
+  GeminiConfig,
+  GeminiEnvironment,
+  GeminiProviderOptions,
+  GeminiTransport,
+  GeminiTransportRequest,
+  GeminiTransportResponse
+} from './gemini/index.ts';

@@ -186,7 +186,79 @@ function countWords(value: string): number {
 }
 
 function countParagraphs(value: string): number {
-  return value.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean).length;
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return 0;
+  }
+
+  const lines = normalized.split(/\r?\n/);
+  let count = 0;
+  let inParagraph = false;
+  let inList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      inParagraph = false;
+      inList = false;
+      continue;
+    }
+
+    if (isMarkdownHeading(trimmed)) {
+      count += 1;
+      inParagraph = false;
+      inList = false;
+      continue;
+    }
+
+    if (isMarkdownListItem(trimmed)) {
+      if (!inList) {
+        count += 1;
+      }
+
+      inParagraph = false;
+      inList = true;
+      continue;
+    }
+
+    if (isKoreanSectionHeading(trimmed)) {
+      count += 1;
+      inParagraph = false;
+      inList = false;
+      continue;
+    }
+
+    if (!inParagraph) {
+      count += 1;
+    }
+
+    inParagraph = true;
+    inList = false;
+  }
+
+  return Math.max(count, countKoreanSentenceBlocks(normalized));
+}
+
+function isMarkdownHeading(value: string): boolean {
+  return /^#{1,6}\s+\S/.test(value);
+}
+
+function isMarkdownListItem(value: string): boolean {
+  return /^[-*+]\s+\S/.test(value) || /^\d+[.)]\s+\S/.test(value);
+}
+
+function isKoreanSectionHeading(value: string): boolean {
+  return /^(첫째|둘째|셋째|넷째|다섯째|마지막|결론|요약|원인|해결|방법|주의|팁)[,:：\s]/.test(value) ||
+    /^[가-힣A-Za-z0-9\s]{2,30}[：:]$/.test(value);
+}
+
+function countKoreanSentenceBlocks(value: string): number {
+  const sentenceCount = (value.match(/[.!?。！？]|[다요죠니다]\./g) ?? []).length;
+  const koreanSentenceCount = (value.match(/[가-힣][^.!?。！？\n]{6,}?(?:다|요|죠|니다|세요|습니다)[.!?。！？]?/g) ?? []).length;
+
+  return Math.max(sentenceCount, koreanSentenceCount) >= 2 ? 2 : 1;
 }
 
 function failIssue(
@@ -214,4 +286,3 @@ function warningIssue(
     recommendation
   };
 }
-

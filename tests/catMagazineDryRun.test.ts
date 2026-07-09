@@ -43,7 +43,8 @@ test('cat magazine dry run succeeds', async () => {
   assert.match(result.renderedPromptPreview ?? '', /indoor enrichment/);
   assert.match(result.articlePreview ?? '', /Mock Cat Care Article/);
   assert.match(result.seoPreview ?? '', /Title Tag/);
-  assert.equal(result.publishPreview?.status, 'draft');
+  assert.equal(result.publishPreview?.status, 'skipped');
+  assert.match(result.publishPreview?.message ?? '', /requires APPROVED content/);
   assert.equal(result.selectedImage?.filename, 'cat-window-enrichment.jpg');
   assert.match(result.imagePreview ?? '', /^mock:\/\//);
   assert.match(result.monetizationPreview ?? '', /Interactive Cat Enrichment Toy/);

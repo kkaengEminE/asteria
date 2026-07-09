@@ -39,6 +39,7 @@ export interface DryRunResult {
 export interface DryRunContentGenerationMetadata {
   providerName?: string;
   modelName?: string;
+  language?: string;
   tokenUsage?: unknown;
   promptProfile?: string;
   promptId?: string;

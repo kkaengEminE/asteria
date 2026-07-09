@@ -1,17 +1,21 @@
 import { loadMagazineConfig } from '../../config/index.ts';
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
 import type { Publisher, ResearchProvider } from '../../core/index.ts';
-import type { ContentDraft, PublishingDestination } from '../../core/types.ts';
+import type { PublishingDestination } from '../../core/types.ts';
+import type { ApprovalResult } from '../../domain/approval/index.ts';
+import type { PublishingPackage } from '../../domain/content/index.ts';
 import type { ImageDomainLibrary, ImageSelectionCriteria } from '../../domain/image/index.ts';
 import type { MonetizationProvider, ProductSearchQuery } from '../../domain/monetization/index.ts';
 import type { AIProvider } from '../../providers/ai/index.ts';
 import { PromptManager } from '../../prompts/index.ts';
 import { DryRunStepFactory, requireWorkflowData } from '../../services/dryRun/index.ts';
+import { PublishingWorkflow } from '../../services/publishing/index.ts';
 import { ContentGenerationWorkflow } from '../../workflows/contentGeneration/index.ts';
 import type { WorkflowStep } from '../../workflows/index.ts';
 
 export interface CatDryRunStepOptions {
   topic: string;
+  language?: string;
   rootDir?: string;
   promptKey?: string;
   researchProvider: ResearchProvider;
@@ -45,12 +49,13 @@ function createGeneratePublishingPackageStep(
     name: 'Generate Publishing Package',
     async execute(context) {
       const magazineConfig = requireWorkflowData<MagazineConfig>(context, 'magazineConfig');
+      const language = options.language ?? magazineConfig.language;
       const workflow = new ContentGenerationWorkflow({
         aiProvider: options.aiProvider
       });
       const publishingPackage = await workflow.execute({
         topic: options.topic,
-        language: magazineConfig.language,
+        language,
         audience: magazineConfig.audience,
         tone: magazineConfig.tone,
         magazineName: magazineConfig.name,
@@ -69,6 +74,7 @@ function createGeneratePublishingPackageStep(
           contentGenerationMetadata: {
             providerName: publishingPackage.metadata?.providerName,
             modelName: publishingPackage.metadata?.modelName,
+            language: publishingPackage.metadata?.language,
             tokenUsage: publishingPackage.metadata?.tokenUsage,
             promptProfile: publishingPackage.metadata?.promptProfile,
             promptId: publishingPackage.metadata?.promptId,
@@ -199,7 +205,7 @@ function createResearchStep(stepFactory: DryRunStepFactory, options: CatDryRunSt
     async execute(context) {
       const researchResults = await options.researchProvider.search({
         topic: options.topic,
-        language: 'en-US'
+        language: options.language ?? 'en-US'
       });
 
       return {
@@ -303,11 +309,25 @@ function createPublishPreviewStep(stepFactory: DryRunStepFactory, options: CatDr
     name: 'Publish Preview',
     async execute(context) {
       const magazineConfig = requireWorkflowData<MagazineConfig>(context, 'magazineConfig');
-      const articlePreview = requireWorkflowData<string>(context, 'articlePreview');
+      const publishingPackage = requireWorkflowData<PublishingPackage>(context, 'publishingPackage');
       const destination = magazineConfig.publishingDestinations[0] ?? createDryRunDestination();
-      const publishPreview = await options.publisher.publish({
-        draft: createContentDraft(articlePreview, magazineConfig.language),
-        destination
+      const approvalResult = publishingPackage.metadata?.approvalResult as ApprovalResult | undefined;
+      const publishingWorkflow = new PublishingWorkflow({
+        publisher: options.publisher,
+        config: {
+          dryRun: true,
+          publishingEnabled: false,
+          requireApproval: true
+        }
+      });
+      const publishPreview = await publishingWorkflow.execute({
+        publishingPackage,
+        approvalResult,
+        destination,
+        metadata: {
+          magazineSlug: magazineConfig.slug,
+          dryRun: true
+        }
       });
 
       return {
@@ -319,18 +339,6 @@ function createPublishPreviewStep(stepFactory: DryRunStepFactory, options: CatDr
       };
     }
   });
-}
-
-function createContentDraft(body: string, language: string): ContentDraft {
-  return {
-    title: 'Mock Cat Care Article',
-    slug: 'mock-cat-care-article',
-    summary: 'Dry-run preview article generated with mock providers.',
-    body,
-    format: 'article',
-    language,
-    tags: ['cat', 'dry-run']
-  };
 }
 
 function createCatImageSelectionCriteria(topic: string): ImageSelectionCriteria {

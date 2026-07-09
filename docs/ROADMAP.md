@@ -152,22 +152,36 @@ Status: Implemented with Approval Domain models, `EditorialApprovalService`, `AP
 
 Replace WordPress dry-run preview with guarded production publishing.
 
-### Sprint 28: Real Google Drive Integration
+Status: Foundation implemented with provider-neutral `PublishingWorkflow`, disabled-by-default publishing config, approval-required publisher access, WordPress preview adapter integration, Cat dry-run publishing gate, and tests. Real WordPress API calls, SDK usage, credentials, and production publishing remain deferred.
+
+### Sprint 28: Gemini AI Provider Adapter
+
+Add Gemini as an optional AIProvider adapter while MockAIProvider remains the default.
+
+Status: Implemented with `GeminiProvider`, Gemini environment config, transport abstraction, request/response mapping, provider-neutral PublishingPackage mapping, Gemini dry-run mode selection, clear disabled/missing-key/malformed-response errors, and tests. Gemini production calls require `GEMINI_PRODUCTION_ENABLED=true` and `GEMINI_API_KEY`.
+
+Patch status: Implemented automatic `.env` loading with exported environment precedence, `--language` CLI propagation into prompt variables and PublishingPackage metadata, improved provider-specific dry-run article labels, clearer provider config errors, and Markdown-aware article structure detection.
+
+Patch 2 status: Implemented stricter Gemini JSON output instructions, JSON response MIME hinting, safe repair for common malformed Gemini JSON, provider/model/parse-error response previews, and tests for ko-KR malformed JSON recovery.
+
+Patch 3 status: Implemented dry-run output consolidation so article and SEO previews use PublishingPackage as the source of truth, plus improved Korean sentence, Markdown, numbered section, and list structure detection.
+
+### Sprint 29: Real Google Drive Integration
 
 Connect the Google Drive image library adapter to real Drive metadata and assets.
 
-### Sprint 29: Real Coupang Integration
+### Sprint 30: Real Coupang Integration
 
 Connect the Coupang affiliate adapter to real product and affiliate link workflows.
 
-### Sprint 30: Instagram Generation
+### Sprint 31: Instagram Generation
 
 Generate Instagram-ready captions, hashtags, and image selection metadata from article content.
 
-### Sprint 31: Podcast / TTS
+### Sprint 32: Podcast / TTS
 
 Add text-to-speech generation and podcast publishing workflows behind replaceable interfaces.
 
-### Sprint 32: Scheduler
+### Sprint 33: Scheduler
 
 Enable real GitHub Actions scheduling only after real integrations have production safeguards.

@@ -1,15 +1,29 @@
+import { pathToFileURL } from 'node:url';
+import { loadEnvFile } from '../src/config/index.ts';
 import { runCatMagazineDryRun } from '../src/magazines/cat/index.ts';
 import type { ReviewIssue } from '../src/domain/editorialReview/index.ts';
 
-const args = parseDryRunArgs(process.argv.slice(2));
-const result = await runCatMagazineDryRun({
-  topic: args.topic,
-  aiMode: args.aiMode
-});
+if (isMainModule()) {
+  await runDryRunCli(process.argv.slice(2));
+}
 
-console.log(formatDryRunReport(result));
+export async function runDryRunCli(argv: string[]): Promise<void> {
+  loadEnvFile();
+  const args = parseDryRunArgs(argv);
+  const result = await runCatMagazineDryRun({
+    topic: args.topic,
+    aiMode: args.aiMode,
+    language: args.language
+  });
 
-function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagazineDryRun>>): string {
+  console.log(formatDryRunReport(result));
+}
+
+export function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagazineDryRun>>): string {
+  const providerName = result.contentGenerationMetadata?.providerName;
+  const generatedArticle = formatGeneratedArticle(result);
+  const seoPreview = formatSeoPreview(result);
+
   return [
     'Asteria Dry Run',
     '',
@@ -21,11 +35,11 @@ function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagazineDryR
     'Rendered Prompt Preview:',
     result.renderedPromptPreview ?? 'Unavailable',
     '',
-    'Generated Mock Article:',
-    result.articlePreview ?? 'Unavailable',
+    `${providerName === 'mock-ai' || !providerName ? 'Generated Mock Article' : 'Generated Article'}:`,
+    generatedArticle,
     '',
     'SEO Preview:',
-    result.seoPreview ?? 'Unavailable',
+    seoPreview,
     '',
     'Publishing Package:',
     result.publishingPackage
@@ -97,21 +111,62 @@ function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagazineDryR
   ].join('\n');
 }
 
-function parseDryRunArgs(args: string[]): { topic?: string; aiMode: 'mock' | 'openai' } {
+function formatGeneratedArticle(result: Awaited<ReturnType<typeof runCatMagazineDryRun>>): string {
+  if (result.publishingPackage) {
+    return [
+      `Title: ${result.publishingPackage.article.title}`,
+      result.publishingPackage.article.subtitle ? `Subtitle: ${result.publishingPackage.article.subtitle}` : undefined,
+      '',
+      `Summary: ${result.publishingPackage.article.summary}`,
+      '',
+      'Body:',
+      result.publishingPackage.article.body
+    ].filter((line): line is string => line !== undefined).join('\n');
+  }
+
+  return result.articlePreview ?? 'Unavailable';
+}
+
+function formatSeoPreview(result: Awaited<ReturnType<typeof runCatMagazineDryRun>>): string {
+  if (result.publishingPackage) {
+    return [
+      `Title Tag: ${result.publishingPackage.seo.metaTitle}`,
+      `Meta Description: ${result.publishingPackage.seo.metaDescription}`,
+      `Keywords: ${result.publishingPackage.seo.keywords.join(', ') || 'Unavailable'}`,
+      result.publishingPackage.seo.canonical ? `Canonical: ${result.publishingPackage.seo.canonical}` : undefined
+    ].filter((line): line is string => line !== undefined).join('\n');
+  }
+
+  return result.seoPreview ?? 'Unavailable';
+}
+
+export function parseDryRunArgs(args: string[]): { topic?: string; aiMode: 'mock' | 'openai' | 'gemini'; language?: string } {
   const topicParts: string[] = [];
-  let aiMode = process.env.ASTERIA_AI_MODE === 'openai' ? 'openai' : 'mock';
+  let aiMode: 'mock' | 'openai' | 'gemini' = parseAIMode(process.env.ASTERIA_AI_MODE);
+  let language: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
 
     if (arg === '--ai') {
-      aiMode = args[index + 1] === 'openai' ? 'openai' : 'mock';
+      aiMode = parseAIMode(args[index + 1]);
       index += 1;
       continue;
     }
 
     if (arg.startsWith('--ai=')) {
-      aiMode = arg.slice('--ai='.length) === 'openai' ? 'openai' : 'mock';
+      aiMode = parseAIMode(arg.slice('--ai='.length));
+      continue;
+    }
+
+    if (arg === '--language') {
+      language = args[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--language=')) {
+      language = arg.slice('--language='.length);
       continue;
     }
 
@@ -120,8 +175,17 @@ function parseDryRunArgs(args: string[]): { topic?: string; aiMode: 'mock' | 'op
 
   return {
     topic: topicParts.join(' ') || undefined,
-    aiMode
+    aiMode,
+    language
   };
+}
+
+function parseAIMode(value: string | undefined): 'mock' | 'openai' | 'gemini' {
+  return value === 'openai' || value === 'gemini' ? value : 'mock';
+}
+
+function isMainModule(): boolean {
+  return process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
 }
 
 function formatTokenUsage(usage: unknown): string {
@@ -183,13 +247,7 @@ function formatReviewIssues(issues: ReviewIssue[] | undefined): string {
     .join('; ');
 }
 
-function formatRealGenerationReview(
-  review: Awaited<ReturnType<typeof runCatMagazineDryRun>>['contentGenerationMetadata'] extends infer Metadata
-    ? Metadata extends { realGenerationReview?: infer Review }
-      ? Review
-      : never
-    : never
-): string {
+function formatRealGenerationReview(review: unknown): string {
   if (!review || typeof review !== 'object') {
     return 'Unavailable';
   }
@@ -225,13 +283,7 @@ function formatRealGenerationReview(
   ].join(' | ');
 }
 
-function formatApprovalReport(
-  approval: Awaited<ReturnType<typeof runCatMagazineDryRun>>['contentGenerationMetadata'] extends infer Metadata
-    ? Metadata extends { approvalResult?: infer Approval }
-      ? Approval
-      : never
-    : never
-): string {
+function formatApprovalReport(approval: unknown): string {
   if (!approval || typeof approval !== 'object') {
     return 'Unavailable';
   }

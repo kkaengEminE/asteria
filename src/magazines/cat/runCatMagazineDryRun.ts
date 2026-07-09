@@ -1,5 +1,8 @@
 import { ProviderNotFoundError, ProviderRegistry } from '../../providers/index.ts';
 import {
+  GeminiProvider,
+  type GeminiEnvironment,
+  type GeminiTransport,
   MockAIProvider,
   OpenAIProvider,
   type OpenAIEnvironment,
@@ -25,16 +28,19 @@ import {
 
 export interface CatMagazineDryRunOptions {
   topic?: string;
+  language?: string;
   rootDir?: string;
   promptKey?: string;
   aiMode?: CatDryRunAIMode;
   openAIEnv?: OpenAIEnvironment;
   openAITransport?: OpenAITransport;
+  geminiEnv?: GeminiEnvironment;
+  geminiTransport?: GeminiTransport;
   registry?: ProviderRegistry;
   registerMockProviders?: boolean;
 }
 
-export type CatDryRunAIMode = 'mock' | 'openai';
+export type CatDryRunAIMode = 'mock' | 'openai' | 'gemini';
 
 export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {}): Promise<DryRunResult> {
   const topic = options.topic ?? 'indoor enrichment for cats';
@@ -44,7 +50,9 @@ export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {
     registerCatDryRunMockProviders(registry, {
       aiMode: options.aiMode,
       openAIEnv: options.openAIEnv,
-      openAITransport: options.openAITransport
+      openAITransport: options.openAITransport,
+      geminiEnv: options.geminiEnv,
+      geminiTransport: options.geminiTransport
     });
   }
 
@@ -72,6 +80,7 @@ export async function runCatMagazineDryRun(options: CatMagazineDryRunOptions = {
 
     const steps = createCatDryRunSteps({
       topic,
+      language: options.language,
       rootDir: options.rootDir,
       promptKey: options.promptKey,
       researchProvider,
@@ -108,6 +117,8 @@ export interface RegisterCatDryRunMockProviderOptions {
   aiMode?: CatDryRunAIMode;
   openAIEnv?: OpenAIEnvironment;
   openAITransport?: OpenAITransport;
+  geminiEnv?: GeminiEnvironment;
+  geminiTransport?: GeminiTransport;
 }
 
 export function registerCatDryRunMockProviders(
@@ -124,6 +135,13 @@ export function registerCatDryRunMockProviders(
         return new OpenAIProvider({
           env: options.openAIEnv,
           transport: options.openAITransport
+        });
+      }
+
+      if (options.aiMode === 'gemini') {
+        return new GeminiProvider({
+          env: options.geminiEnv,
+          transport: options.geminiTransport
         });
       }
 

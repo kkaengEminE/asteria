@@ -36,6 +36,12 @@ The Provider Registry lives in `src/providers` and owns provider registration, l
 
 In explicit OpenAI mode, the adapter consumes rendered Prompt Asset System output and requests a complete publishing package. It maps OpenAI-shaped responses, fenced JSON, surrounding text, and common field aliases into provider-neutral Content Domain models before workflow quality and editorial review metadata are attached.
 
+`src/providers/ai/gemini` contains the optional Gemini adapter. It implements the shared AI provider contract, reads Gemini configuration from environment variables or explicit constructor inputs, and uses a transport abstraction so tests can mock all API behavior. It is not the default dry-run provider.
+
+In explicit Gemini mode, the adapter consumes rendered Prompt Asset System output and requests a complete publishing package. Gemini-specific request bodies, response candidates, usage metadata, finish reasons, errors, and API paths remain inside the adapter before output is mapped into provider-neutral Content Domain models.
+
+Gemini publishing-package requests use strict JSON instructions and Gemini JSON response MIME hints. The adapter attempts safe repair for common malformed JSON issues such as raw newlines inside strings, unescaped quotes inside strings, and unterminated trailing strings before surfacing a parse error with a truncated response preview.
+
 `src/providers/publisher/wordpress` contains the WordPress publisher adapter draft. It implements the shared `Publisher` interface with mock-first dry-run behavior only. It validates payloads and returns structured preview results without calling WordPress APIs.
 
 `src/providers/image/googleDrive` contains the Google Drive image library adapter draft. It uses local mock metadata only, maps Google Drive-shaped records into the storage-agnostic Image Asset Domain, and does not call Google APIs.
@@ -58,6 +64,8 @@ In explicit OpenAI mode, the adapter consumes rendered Prompt Asset System outpu
 
 `src/services/editorialApproval` contains the Editorial Approval Gate. It evaluates validation, quality, editorial review, and threshold metadata to return `APPROVED`, `NEEDS_REVIEW`, or `REJECTED`. It records decisions and reasons only; it does not publish or call publishers.
 
+`src/services/publishing` contains the provider-neutral publishing workflow. It converts approved `PublishingPackage` values into `PublishingPayload`, enforces approval before publisher access, keeps real publishing disabled by default, and supports dry-run previews without network calls.
+
 ### Workflows
 
 `src/workflows` is reserved for workflow definitions and orchestration code. Workflows should coordinate steps and persist state, but not embed provider-specific details.
@@ -77,6 +85,8 @@ The workflow applies editorial review after quality validation. Review metadata 
 The workflow also attaches real generation review metadata. This is a calibration layer for OpenAI-generated content and mock dry runs alike; it describes threshold readiness without becoming a publication gate.
 
 The workflow attaches editorial approval metadata after review metadata is available. Approval decisions describe readiness for future publishing but do not trigger any publishing action.
+
+Provider-neutral publishing is a separate workflow boundary after approval. Only `APPROVED` packages may reach a `Publisher`; packages with `NEEDS_REVIEW`, `REJECTED`, or missing approval metadata return a skipped publishing result without invoking the provider adapter.
 
 Future provider-backed features such as AI generation, research, WordPress publishing, Instagram generation, TTS, podcast publishing, and analytics should plug into workflows through steps that depend on provider interfaces. The engine should never know which concrete provider is being used.
 
@@ -103,6 +113,8 @@ Prompt composition is profile-based. A profile such as `default`, `blog`, or `ma
 ### Config
 
 `src/config` is reserved for configuration loading, validation, and environment-safe defaults.
+
+The CLI loads `.env` through the config layer before dry-run execution. Exported shell environment variables take precedence over file values so local defaults cannot override intentional runtime configuration.
 
 ### Utils
 
@@ -149,6 +161,8 @@ Publishers implement the `Publisher` interface and receive `PublishingPayload` v
 
 The current WordPress adapter is a dry-run draft. It does not use a WordPress SDK, credentials, network calls, or production publishing behavior.
 
+Publishing workflow safeguards live outside provider adapters. Real publishing is disabled by default, requires explicit configuration such as `ASTERIA_PUBLISHING_ENABLED=true`, and still requires approval metadata before a payload can be sent to a publisher. Dry-run publishing previews may use preview-only adapters, but they must not bypass approval checks.
+
 ## AI Provider Boundary
 
 AI providers receive rendered prompts or provider-neutral content requests only. They must not know about workflow orchestration, prompt files, publishers, image libraries, monetization providers, magazine config loading, or publishing destinations.
@@ -159,9 +173,15 @@ The current Mock AI provider is deterministic and dry-run only. It returns predi
 
 The OpenAI adapter is the first real AI provider boundary. OpenAI-specific request mapping, response mapping, error mapping, transport behavior, environment configuration, production enablement checks, and response normalization stay inside the adapter. Production calls are disabled unless the adapter is explicitly configured with an API key and `OPENAI_PRODUCTION_ENABLED=true`. Dry-run composition continues to resolve the deterministic Mock AI provider by default.
 
+The Gemini adapter follows the same boundary. Gemini-specific request mapping, response mapping, error mapping, transport behavior, environment configuration, production enablement checks, and response normalization stay inside the adapter. Production calls are disabled unless the adapter is explicitly configured with an API key and `GEMINI_PRODUCTION_ENABLED=true`.
+
+Gemini JSON repair is intentionally limited to common syntax damage in provider output. It does not change provider-neutral domain models and does not hide validation failures after parsing.
+
 For the content generation pipeline, AI providers may also receive a provider-neutral `ContentRequest` and return a provider-neutral `PublishingPackage`. Provider-specific serialization, JSON prompting, parsing, response cleanup, alias mapping, and error mapping remain inside the provider adapter.
 
-Production AI mode is opt-in at the composition boundary. Cat dry-run defaults to `MockAIProvider`; OpenAI is used only when dry-run composition is explicitly configured with `aiMode: openai` or the CLI receives `--ai openai`. OpenAI still requires `OPENAI_PRODUCTION_ENABLED=true` and `OPENAI_API_KEY` before transport calls are allowed.
+Production AI mode is opt-in at the composition boundary. Cat dry-run defaults to `MockAIProvider`; OpenAI is used only when dry-run composition is explicitly configured with `aiMode: openai` or the CLI receives `--ai openai`, and Gemini is used only with `aiMode: gemini` or `--ai gemini`. OpenAI still requires `OPENAI_PRODUCTION_ENABLED=true` and `OPENAI_API_KEY`; Gemini requires `GEMINI_PRODUCTION_ENABLED=true` and `GEMINI_API_KEY` before transport calls are allowed.
+
+The CLI may pass a language option such as `--language ko-KR`. That value flows into the Content Request, Prompt Asset System variables, prompt composition metadata, AI provider request, article language, and PublishingPackage metadata.
 
 ## Content Domain Boundary
 
@@ -225,11 +245,15 @@ Real generation review runs after quality and editorial review metadata exist. I
 
 The threshold result can be `PASS`, `WARNING`, or `FAIL`, but it is informational only. Since publishing does not exist yet, this layer must not block, approve, publish, or mutate provider behavior.
 
+Article structure detection recognizes blank-line paragraphs, Markdown headings, bullet lists, and numbered lists so real AI Markdown output is reviewed by structure rather than raw blank-line count alone.
+
 ## Editorial Approval Boundary
 
 Editorial approval runs after validation, quality scoring, editorial review, and real generation review. It returns one of `APPROVED`, `NEEDS_REVIEW`, or `REJECTED`.
 
 Approval results include reasons, recommendations, blocking issues, and non-blocking issues. They are metadata only. The approval gate must not instantiate publishers, call WordPress, or publish content.
+
+The publishing workflow consumes approval metadata after it has been attached. This keeps approval evaluation separate from publishing execution while ensuring non-approved packages are skipped before provider adapters are called.
 
 ## Dry-Run Composition Boundary
 
@@ -242,3 +266,5 @@ Shared dry-run code should only contain concepts already proven by a magazine dr
 Image preview fields in dry-run results should expose domain-level image information such as filename, tags, category, score, and preview URI. Provider-specific identifiers such as Google Drive file IDs must remain inside adapter records or source metadata.
 
 Monetization preview fields in dry-run results should expose domain-level product recommendations, generic affiliate links, preview text, and disclosure text. Provider-specific identifiers such as Coupang product IDs must remain inside adapter records or product metadata.
+
+When a `PublishingPackage` is present, dry-run report rendering treats it as the source of truth for generated article and SEO preview sections. Legacy preview fields may still exist for workflow compatibility, but they should not override package content in user-facing output.
