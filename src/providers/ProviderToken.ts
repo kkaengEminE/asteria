@@ -3,6 +3,7 @@ export type ProviderCategory =
   | 'Research'
   | 'Publisher'
   | 'Image'
+  | 'Storage'
   | 'Affiliate'
   | 'TTS'
   | 'Podcast'
@@ -30,4 +31,3 @@ export function createProviderToken<TProvider>(
 export function providerTokenKey(token: ProviderToken<unknown>): string {
   return `${token.category}:${token.name}`;
 }
-

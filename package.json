@@ -6,6 +6,7 @@
   "description": "AI Publishing OS foundation for reusable magazine automation.",
   "scripts": {
     "dry-run": "node --experimental-strip-types scripts/dry-run.ts",
+    "quality-lab": "node --experimental-strip-types scripts/quality-lab.ts",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },

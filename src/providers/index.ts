@@ -9,4 +9,11 @@ export {
 export type { ProviderDescriptor, ProviderRegistration } from './ProviderRegistry.ts';
 export { createProviderToken, providerTokenKey } from './ProviderToken.ts';
 export type { ProviderCategory, ProviderToken } from './ProviderToken.ts';
-
+export {
+  GoogleDriveStorageProvider,
+  GoogleDriveStorageProviderError,
+  googleDriveStorageProviderToken,
+  LocalStoragePathError,
+  LocalStorageProvider,
+  localStorageProviderToken
+} from './storage/index.ts';

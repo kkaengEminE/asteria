@@ -7,11 +7,14 @@ import type {
 } from '../../core/types.ts';
 import type { ApprovalResult } from '../../domain/approval/index.ts';
 import type { PublishingPackage } from '../../domain/content/index.ts';
+import type { PublishingQueueResult } from '../../domain/publishingQueue/index.ts';
+import type { PublishingQueue } from '../publishingQueue/index.ts';
 import { createPublishingWorkflowConfig, type PublishingWorkflowConfig } from './PublishingWorkflowConfig.ts';
 
 export interface PublishingWorkflowOptions {
   publisher: Publisher;
   config?: Partial<PublishingWorkflowConfig>;
+  queue?: PublishingQueue;
 }
 
 export interface PublishingWorkflowInput {
@@ -24,14 +27,33 @@ export interface PublishingWorkflowInput {
 export class PublishingWorkflow {
   private readonly publisher: Publisher;
   private readonly config: PublishingWorkflowConfig;
+  private readonly queue?: PublishingQueue;
 
   constructor(options: PublishingWorkflowOptions) {
     this.publisher = options.publisher;
     this.config = createPublishingWorkflowConfig(options.config);
+    this.queue = options.queue;
   }
 
   async execute(input: PublishingWorkflowInput): Promise<PublishingResult> {
     const approvalDecision = input.approvalResult?.decision;
+
+    if (this.queue) {
+      const queueResult = await this.queue.enqueue({
+        publishingPackage: input.publishingPackage,
+        approvalResult: input.approvalResult,
+        destination: input.destination,
+        metadata: {
+          ...input.metadata,
+          provider: this.publisher.name,
+          dryRun: true
+        }
+      });
+
+      return createQueuedPublishingResult(input.destination, queueResult, {
+        provider: this.publisher.name
+      });
+    }
 
     if (this.config.requireApproval && approvalDecision !== 'APPROVED') {
       return createSkippedPublishingResult(
@@ -74,6 +96,26 @@ export function createPublishingPayload(input: PublishingWorkflowInput): Publish
       ...input.metadata,
       approvalDecision: input.approvalResult?.decision,
       publishingPackageMetadata: input.publishingPackage.metadata
+    }
+  };
+}
+
+function createQueuedPublishingResult(
+  destination: PublishingDestination,
+  queueResult: PublishingQueueResult,
+  metadata: Record<string, unknown>
+): PublishingResult {
+  return {
+    status: queueResult.status === 'queued' ? 'draft' : 'skipped',
+    destination,
+    message: queueResult.message,
+    externalId: queueResult.item?.id,
+    metadata: {
+      ...metadata,
+      dryRun: true,
+      published: false,
+      queued: queueResult.status === 'queued',
+      queueResult
     }
   };
 }

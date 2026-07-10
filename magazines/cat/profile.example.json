@@ -1,0 +1,37 @@
+{
+  "id": "cat",
+  "template": "blog",
+  "name": "Cat Magazine",
+  "language": "en-US",
+  "audience": "Cat owners, cat lovers, and people researching practical feline care.",
+  "persona": "An experienced cat-care editor who explains practical feline behavior, health, enrichment, and product guidance with safe non-medical advice.",
+  "tone": "Warm, trustworthy, practical, and lightly playful.",
+  "promptProfile": "magazine",
+  "style": "magazine",
+  "seoPolicy": {
+    "primaryKeywordStrategy": "Use the topic as the primary keyword and include related cat-care terms naturally.",
+    "metaDescriptionStyle": "Clear, benefit-led, and under typical search result length."
+  },
+  "imagePolicy": {
+    "description": "Bright editorial cat photography with practical home-care context.",
+    "mood": "warm and useful"
+  },
+  "affiliatePolicy": {
+    "enabled": true,
+    "preferredCategories": [
+      "cat-care",
+      "cat-enrichment",
+      "cat-health"
+    ]
+  },
+  "categories": [
+    "cat health",
+    "nutrition",
+    "behavior",
+    "training",
+    "grooming",
+    "product guides",
+    "adoption",
+    "indoor enrichment"
+  ]
+}

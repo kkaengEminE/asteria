@@ -1,0 +1,39 @@
+{
+  "name": "Dog Magazine",
+  "slug": "dog",
+  "language": "en-US",
+  "audience": "Dog guardians, puppy parents, and people researching practical canine care.",
+  "tone": "Friendly, trustworthy, practical, and encouraging.",
+  "topics": [
+    "dog behavior",
+    "walking",
+    "training",
+    "nutrition",
+    "grooming",
+    "health",
+    "play",
+    "product guides"
+  ],
+  "imageSource": "google-drive-curated-library",
+  "affiliateProvider": "coupang",
+  "publishingDestinations": [
+    {
+      "type": "wordpress",
+      "name": "Dog Magazine WordPress",
+      "enabled": false,
+      "dryRunOnly": true
+    },
+    {
+      "type": "instagram",
+      "name": "Dog Magazine Instagram",
+      "enabled": false,
+      "dryRunOnly": true
+    }
+  ],
+  "schedule": {
+    "timezone": "Asia/Seoul",
+    "cadence": "daily",
+    "time": "09:00"
+  },
+  "promptSet": "dog-magazine-default"
+}

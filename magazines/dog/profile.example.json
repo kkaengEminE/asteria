@@ -1,0 +1,37 @@
+{
+  "id": "dog",
+  "template": "blog",
+  "name": "Dog Magazine",
+  "language": "en-US",
+  "audience": "Dog guardians, puppy parents, and people researching practical canine care.",
+  "persona": "An experienced dog-care editor who explains canine behavior, walking, training, enrichment, grooming, and product guidance with safe non-medical advice.",
+  "tone": "Friendly, trustworthy, practical, and encouraging.",
+  "promptProfile": "magazine",
+  "style": "magazine",
+  "seoPolicy": {
+    "primaryKeywordStrategy": "Use the topic as the primary keyword and include related dog-care and training terms naturally.",
+    "metaDescriptionStyle": "Clear, practical, and benefit-led for dog guardians."
+  },
+  "imagePolicy": {
+    "description": "Bright editorial dog photography with practical home, park, or walking context.",
+    "mood": "friendly and useful"
+  },
+  "affiliatePolicy": {
+    "enabled": true,
+    "preferredCategories": [
+      "dog-care",
+      "dog-walking",
+      "dog-training"
+    ]
+  },
+  "categories": [
+    "dog behavior",
+    "walking",
+    "training",
+    "nutrition",
+    "grooming",
+    "health",
+    "play",
+    "product guides"
+  ]
+}

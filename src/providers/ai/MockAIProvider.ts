@@ -157,6 +157,7 @@ export function createMockPublishingPackage(
   const topic = normalized.topic;
   const language = normalized.language ?? 'ko-KR';
   const createdAt = normalized.createdAt ?? '2026-07-08T00:00:00.000Z';
+  const subjectTag = getMockSubjectTag(normalized);
 
   return createPublishingPackage({
     article: {
@@ -190,7 +191,7 @@ export function createMockPublishingPackage(
     seo: {
       metaTitle: `${topic} | Asteria Dry Run`,
       metaDescription: `A dry-run SEO description for ${topic}.`,
-      keywords: [topic, 'cat care', 'dry run']
+      keywords: [topic, subjectTag, 'dry run']
     },
     faq: [
       {
@@ -200,13 +201,13 @@ export function createMockPublishingPackage(
     ],
     imagePrompt: {
       prompt: `Create an editorial image search prompt for: ${topic}`,
-      suggestedTags: ['cat', 'editorial', 'dry-run'],
+      suggestedTags: [subjectTag.replace(/\s+care$/, ''), 'editorial', 'dry-run'],
       mood: 'warm and practical'
     },
     productPrompt: {
       prompt: `Find safe, relevant product recommendation ideas for: ${topic}`,
-      suggestedCategories: ['cat care'],
-      suggestedTags: ['cat', 'dry-run']
+      suggestedCategories: [subjectTag],
+      suggestedTags: [subjectTag.replace(/\s+care$/, ''), 'dry-run']
     },
     metadata: {
       dryRun: true,
@@ -216,4 +217,18 @@ export function createMockPublishingPackage(
       topic
     }
   });
+}
+
+function getMockSubjectTag(request: ContentRequest): string {
+  const slug = request.metadata?.magazineSlug;
+
+  if (slug === 'dog') {
+    return 'dog care';
+  }
+
+  if (slug === 'cat') {
+    return 'cat care';
+  }
+
+  return 'editorial care';
 }

@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import { loadEnvFile } from '../src/config/index.ts';
-import { runCatMagazineDryRun } from '../src/magazines/cat/index.ts';
+import { runMagazineDryRun } from '../src/magazines/runtime/index.ts';
 import type { ReviewIssue } from '../src/domain/editorialReview/index.ts';
 
 if (isMainModule()) {
@@ -10,8 +10,9 @@ if (isMainModule()) {
 export async function runDryRunCli(argv: string[]): Promise<void> {
   loadEnvFile();
   const args = parseDryRunArgs(argv);
-  const result = await runCatMagazineDryRun({
+  const result = await runMagazineDryRun({
     topic: args.topic,
+    magazineSlug: args.magazine,
     aiMode: args.aiMode,
     language: args.language
   });
@@ -19,7 +20,7 @@ export async function runDryRunCli(argv: string[]): Promise<void> {
   console.log(formatDryRunReport(result));
 }
 
-export function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagazineDryRun>>): string {
+export function formatDryRunReport(result: Awaited<ReturnType<typeof runMagazineDryRun>>): string {
   const providerName = result.contentGenerationMetadata?.providerName;
   const generatedArticle = formatGeneratedArticle(result);
   const seoPreview = formatSeoPreview(result);
@@ -102,6 +103,69 @@ export function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagaz
         ].join('\n')
       : 'Unavailable',
     '',
+    'Publishing Queue:',
+    result.queueResult
+      ? [
+          `Result: ${result.queueResult.status}`,
+          `Queue Item ID: ${result.queueResult.item?.id ?? 'Unavailable'}`,
+          `Queue Status: ${result.queueResult.item?.status ?? 'Unavailable'}`,
+          `Approval Decision: ${result.queueResult.approvalDecision}`,
+          `Destination: ${result.queueResult.item?.destination.name ?? result.publishPreview?.destination.name ?? 'Unavailable'}`,
+          `Reason: ${result.queueResult.failure?.reason ?? result.queueResult.message}`
+        ].join('\n')
+      : 'Unavailable',
+    '',
+    'Scheduler:',
+    result.schedulerResult
+      ? [
+          `Result: ${result.schedulerResult.status}`,
+          `Job ID: ${result.schedulerResult.job?.id ?? 'Unavailable'}`,
+          `Job Status: ${result.schedulerResult.job?.status ?? 'Unavailable'}`,
+          `Queue Item ID: ${result.schedulerResult.job?.queueItemId ?? result.queueResult?.item?.id ?? 'Unavailable'}`,
+          `Scheduled For: ${result.schedulerResult.job?.scheduledFor ?? 'Unavailable'}`,
+          `Reason: ${result.schedulerResult.message}`
+        ].join('\n')
+      : 'Unavailable',
+    '',
+    'Execution Preview:',
+    result.executionResult
+      ? [
+          `Scheduled Job ID: ${result.executionResult.job?.id ?? result.schedulerResult?.job?.id ?? 'Unavailable'}`,
+          `Due: ${result.executionResult.due}`,
+          `Execution Status: ${result.executionResult.status}`,
+          `Attempt Count: ${result.executionResult.attemptCount}`,
+          `Retry Count: ${result.executionResult.retryCount}`,
+          `Queue Status: ${result.executionResult.queueResult?.item?.status ?? result.queueResult?.item?.status ?? 'Unavailable'}`,
+          `Reason: ${result.executionResult.failure?.reason ?? result.executionResult.message}`
+        ].join('\n')
+      : 'Unavailable',
+    '',
+    'Audit Timeline:',
+    result.auditTimeline && result.auditTimeline.length > 0
+      ? result.auditTimeline.map((event, index) =>
+          [
+            `${index + 1}. ${event.type}`,
+            `At: ${event.createdAt}`,
+            `Actor: ${event.actor.name ?? event.actor.id}`,
+            `Entity: ${event.context.entityType ?? 'unknown'}:${event.context.entityId ?? 'unknown'}`,
+            `Message: ${event.message}`
+          ].join('\n')
+        ).join('\n\n')
+      : 'Unavailable',
+    '',
+    'Retry Metadata:',
+    result.retryMetadata
+      ? [
+          `Status: ${result.retryMetadata.status}`,
+          `Attempt Count: ${result.retryMetadata.attemptCount}`,
+          `Retry Count: ${result.retryMetadata.retryCount}`,
+          `Policy: maxAttempts=${result.retryMetadata.policy.maxAttempts}, fixedDelayMs=${result.retryMetadata.policy.delayMs}`,
+          `History: ${result.retryMetadata.attempts.map((attempt) =>
+            `#${attempt.attemptNumber}:${attempt.status}${attempt.reason ? `:${attempt.reason.code}` : ''}`
+          ).join(' -> ')}`
+        ].join('\n')
+      : 'Unavailable',
+    '',
     'Publish Preview:',
     result.publishPreview
       ? `${result.publishPreview.status}: ${result.publishPreview.message ?? 'Dry-run preview generated.'}`
@@ -111,7 +175,7 @@ export function formatDryRunReport(result: Awaited<ReturnType<typeof runCatMagaz
   ].join('\n');
 }
 
-function formatGeneratedArticle(result: Awaited<ReturnType<typeof runCatMagazineDryRun>>): string {
+function formatGeneratedArticle(result: Awaited<ReturnType<typeof runMagazineDryRun>>): string {
   if (result.publishingPackage) {
     return [
       `Title: ${result.publishingPackage.article.title}`,
@@ -127,7 +191,7 @@ function formatGeneratedArticle(result: Awaited<ReturnType<typeof runCatMagazine
   return result.articlePreview ?? 'Unavailable';
 }
 
-function formatSeoPreview(result: Awaited<ReturnType<typeof runCatMagazineDryRun>>): string {
+function formatSeoPreview(result: Awaited<ReturnType<typeof runMagazineDryRun>>): string {
   if (result.publishingPackage) {
     return [
       `Title Tag: ${result.publishingPackage.seo.metaTitle}`,
@@ -140,8 +204,14 @@ function formatSeoPreview(result: Awaited<ReturnType<typeof runCatMagazineDryRun
   return result.seoPreview ?? 'Unavailable';
 }
 
-export function parseDryRunArgs(args: string[]): { topic?: string; aiMode: 'mock' | 'openai' | 'gemini'; language?: string } {
+export function parseDryRunArgs(args: string[]): {
+  topic?: string;
+  magazine: string;
+  aiMode: 'mock' | 'openai' | 'gemini';
+  language?: string;
+} {
   const topicParts: string[] = [];
+  let magazine = process.env.ASTERIA_MAGAZINE || 'cat';
   let aiMode: 'mock' | 'openai' | 'gemini' = parseAIMode(process.env.ASTERIA_AI_MODE);
   let language: string | undefined;
 
@@ -156,6 +226,17 @@ export function parseDryRunArgs(args: string[]): { topic?: string; aiMode: 'mock
 
     if (arg.startsWith('--ai=')) {
       aiMode = parseAIMode(arg.slice('--ai='.length));
+      continue;
+    }
+
+    if (arg === '--magazine') {
+      magazine = parseMagazine(args[index + 1]);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--magazine=')) {
+      magazine = parseMagazine(arg.slice('--magazine='.length));
       continue;
     }
 
@@ -175,9 +256,14 @@ export function parseDryRunArgs(args: string[]): { topic?: string; aiMode: 'mock
 
   return {
     topic: topicParts.join(' ') || undefined,
+    magazine,
     aiMode,
     language
   };
+}
+
+function parseMagazine(value: string | undefined): string {
+  return value && value.trim().length > 0 ? value.trim() : 'cat';
 }
 
 function parseAIMode(value: string | undefined): 'mock' | 'openai' | 'gemini' {

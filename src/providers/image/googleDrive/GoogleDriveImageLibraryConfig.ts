@@ -1,9 +1,13 @@
 import type { GoogleDriveImageRecord } from './GoogleDriveImageRecord.ts';
+import type { StorageProvider } from '../../../domain/storage/index.ts';
+import type { AssetLibrary } from '../../../services/assetLibrary/index.ts';
 
 export interface GoogleDriveImageLibraryConfig {
   name?: string;
   dryRun: true;
   records: GoogleDriveImageRecord[];
+  assetLibrary?: AssetLibrary;
+  storageProvider?: StorageProvider;
 }
 
 export class GoogleDriveImageLibraryConfigError extends Error {
@@ -22,4 +26,3 @@ export function validateGoogleDriveImageLibraryConfig(config: GoogleDriveImageLi
     throw new GoogleDriveImageLibraryConfigError('Google Drive image library config requires records.');
   }
 }
-

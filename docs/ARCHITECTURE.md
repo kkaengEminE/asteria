@@ -24,6 +24,22 @@ The Content Domain now also defines the dry-run publishing package boundary: con
 
 `src/domain/approval` contains the provider-neutral Approval Domain. It defines approval decisions, status, reasons, and structured approval results used to determine readiness without publishing.
 
+`src/domain/magazineProfile` contains the provider-neutral Magazine Profile Domain. It defines the editorial identity and policy inputs for a magazine, including id, name, language, audience, persona, tone, style, SEO policy, image style, affiliate policy, and categories. Profiles are loaded from configuration files and should be used by workflows instead of hardcoded magazine values.
+
+`src/domain/magazineTemplate` contains reusable Magazine Templates. Templates define shared persona, tone, prompt profile, SEO policy, review policy, image policy, and affiliate policy. A Magazine Profile may extend a template, then override specific values without duplicating the full editorial configuration.
+
+`src/domain/storage` contains the provider-neutral Storage Domain. It defines `StorageProvider`, file metadata, file content, folder models, upload requests, download requests, list queries, and folder creation requests. Storage domain types must not know about Google Drive, S3, local file systems, Cloudinary, publishing workflows, or image selection rules.
+
+`src/domain/asset` contains the provider-neutral Asset Domain. It defines assets, filenames, MIME types, size, category, tags, metadata, and storage references. Asset models may reference where bytes live, but they do not know how a concrete storage provider retrieves those bytes.
+
+`src/domain/publishingQueue` contains the provider-neutral Publishing Queue Domain. It defines queue items, queue status, queue results, failures, and generic publishing destinations. Queue models do not know about WordPress, publisher adapters, scheduling providers, or network execution.
+
+`src/domain/scheduler` contains the provider-neutral Scheduler and Scheduled Job Execution Domain. It defines scheduled jobs, schedule policies, schedule results, schedule status, scheduled job executions, execution status, execution results, and execution failures. Scheduler and execution models do not know about GitHub Actions, cron services, WordPress, publisher adapters, persistence, or network execution.
+
+`src/domain/audit` contains the provider-neutral Audit Domain. It defines audit events, event types, actors, and context metadata for recording workflow and queue activity. Audit models do not know about persistence providers, external logging systems, schedulers, publishers, or vendor adapters.
+
+`src/domain/retry` contains the provider-neutral Retry Domain. It defines retry policies, attempts, results, and reasons for recoverable operations. Retry models do not know about AI providers, storage providers, publisher adapters, schedulers, or network clients.
+
 ### Providers
 
 `src/providers` is reserved for replaceable infrastructure adapters. Future examples include WordPress publishers, Google Drive image libraries, Coupang affiliate providers, and AI model providers.
@@ -48,11 +64,15 @@ Gemini publishing-package requests use strict JSON instructions and Gemini JSON 
 
 `src/providers/monetization/coupang` contains the Coupang affiliate adapter draft. It uses local mock Coupang-style product records only, maps them into the provider-agnostic Monetization Domain, and generates mock affiliate links without calling Coupang APIs.
 
+`src/providers/storage/local` contains the LocalStorageProvider. It implements the shared StorageProvider boundary for tests and local development-only file behavior. It supports upload, download, list, create folder, and metadata lookup against an explicit root directory while preventing paths from escaping that root. It is not a production storage adapter.
+
+`src/providers/storage/googleDrive` contains the Google Drive StorageProvider adapter. It implements the shared storage boundary with upload, download, list, folder creation, and metadata lookup. Google Drive-specific request shapes, response records, file IDs, folder IDs, app properties, and transport behavior stay inside the adapter. The provider is disabled by default and requires `GOOGLE_DRIVE_ENABLED=true`, `GOOGLE_DRIVE_CREDENTIALS`, and `GOOGLE_DRIVE_ROOT_FOLDER` before transport calls are allowed.
+
 ### Services
 
 `src/services` is reserved for application services that combine core interfaces into useful operations, such as content planning, editorial validation, prompt rendering, and asset preparation.
 
-`src/services/dryRun` contains the shared dry-run workflow foundation. It owns reusable dry-run result shaping, workflow construction, workflow execution helpers, and dry-run step helpers that are proven by the Cat Magazine dry run.
+`src/services/dryRun` contains the shared dry-run workflow foundation. It owns reusable dry-run result shaping, workflow construction, workflow execution helpers, and dry-run step helpers used by the magazine runtime.
 
 `src/services/structuredOutput` contains the provider-neutral structured output layer. It validates, normalizes, and parses `PublishingPackage` output after provider generation and before workflow results are exposed.
 
@@ -66,6 +86,16 @@ Gemini publishing-package requests use strict JSON instructions and Gemini JSON 
 
 `src/services/publishing` contains the provider-neutral publishing workflow. It converts approved `PublishingPackage` values into `PublishingPayload`, enforces approval before publisher access, keeps real publishing disabled by default, and supports dry-run previews without network calls.
 
+`src/services/assetLibrary` contains the Asset Library service. It uses `StorageProvider` internally for file upload, download, and metadata lookup while exposing asset-level operations to callers. This keeps storage providers invisible to image selection and future editorial workflows.
+
+`src/services/publishingQueue` contains the Publishing Queue service. It uses an in-memory storage implementation for the current foundation and exposes enqueue, lookup, list, guarded status update, cancellation, and failure recording. Persistence is replaceable behind a queue storage boundary.
+
+`src/services/scheduler` contains the Scheduler service and Scheduled Job Executor. Scheduler uses in-memory storage and exposes schedule, cancel, list, and get operations for approved queue items. The executor checks due scheduled jobs, skips invalid jobs, prevents duplicate execution, moves valid queue items to `PROCESSING`, runs only a supplied provider-neutral operation through RetryService, records preview results, and never executes publishing.
+
+`src/services/auditLog` contains the Audit Log service. It uses in-memory storage for the current foundation and exposes event append, event listing, entity filtering, and event type filtering. Persistence and external log sinks are future adapters behind the audit storage boundary.
+
+`src/services/retry` contains the Retry Service. It executes provider-neutral operations with configurable max attempts, simulated fixed delay metadata, retryable versus non-retryable classification, and retry history. It does not sleep in tests, call external services, or know which provider category is using it.
+
 ### Workflows
 
 `src/workflows` is reserved for workflow definitions and orchestration code. Workflows should coordinate steps and persist state, but not embed provider-specific details.
@@ -74,9 +104,13 @@ The Workflow Engine is the central orchestration layer for Asteria. It executes 
 
 `ContentGenerationWorkflow` is an application workflow that receives a topic-level content request, calls an `AIProvider`, validates the returned publishing package, and returns a provider-neutral Content Domain model. It does not publish, select destinations, or call WordPress.
 
-The workflow applies configurable retry policy for recoverable AI output failures such as empty responses, malformed JSON, and missing required sections. Retry and validation metadata are attached to the returned package for dry-run inspection.
+The workflow applies configurable retry policy through `RetryService` for recoverable AI output failures such as empty responses, malformed JSON, and missing required sections. Retry and validation metadata are attached to the returned package for dry-run inspection.
 
 The workflow resolves generation prompts through `PromptAssetRegistry`, composes profile-based prompt stacks, renders variables such as topic, language, audience, tone, and magazine name, and passes rendered prompt metadata through the provider-neutral request.
+
+Magazine profile values are the source for prompt composition. The composition boundary loads a `MagazineProfile`, passes its audience, tone, language, style, and name into the content request, and stores profile policy metadata for downstream review without exposing provider-specific details.
+
+Template inheritance is resolved before workflows receive a profile. Workflows consume only the merged Magazine Profile, so they do not need to understand template files or override rules.
 
 The workflow applies content quality validation after structured output parsing. Quality rules remain provider-neutral and attach review metadata to the returned publishing package; they do not publish content or alter provider boundaries.
 
@@ -86,7 +120,15 @@ The workflow also attaches real generation review metadata. This is a calibratio
 
 The workflow attaches editorial approval metadata after review metadata is available. Approval decisions describe readiness for future publishing but do not trigger any publishing action.
 
-Provider-neutral publishing is a separate workflow boundary after approval. Only `APPROVED` packages may reach a `Publisher`; packages with `NEEDS_REVIEW`, `REJECTED`, or missing approval metadata return a skipped publishing result without invoking the provider adapter.
+Provider-neutral publishing is a separate workflow boundary after approval. In dry-run queue mode, approved packages become queue items and non-approved packages return queue rejection results. Publisher adapters are not invoked by the queue preview path.
+
+Scheduling is another boundary after queue approval. The current dry-run scheduler preview can schedule an approved queue item by updating its status to `SCHEDULED`, but it does not execute jobs, trigger publishers, call external services, or persist schedules.
+
+Scheduled job execution is a separate boundary after scheduling. The executor owns execution orchestration only: it verifies that a scheduled job exists, the job is due, the job is not cancelled, and the queue item remains `SCHEDULED`. It may transition the queue item to `PROCESSING` for a preview execution, but successful previews do not transition to `PUBLISHED`.
+
+Content generation and approval events may be recorded into the Audit Log when an audit service is injected. Audit logging is observational only: it does not change workflow decisions, provider behavior, approval decisions, or publishing safeguards.
+
+Retry behavior can be composed into workflows or provider adapters through `RetryService` without changing domain models. ContentGenerationWorkflow uses RetryService for structured output recovery, and dry-run composition also uses a mock retry probe to expose retry metadata in reports.
 
 Future provider-backed features such as AI generation, research, WordPress publishing, Instagram generation, TTS, podcast publishing, and analytics should plug into workflows through steps that depend on provider interfaces. The engine should never know which concrete provider is being used.
 
@@ -94,9 +136,13 @@ Future provider-backed features such as AI generation, research, WordPress publi
 
 `src/magazines` is reserved for magazine-specific modules when configuration alone is not enough.
 
-The first magazine-specific module is `src/magazines/cat`, which contains Cat-specific dry-run composition. It wires together Cat config loading, Cat prompt choices, Cat mock provider tokens, and Cat mock providers while using the shared dry-run workflow foundation for generic workflow execution and result shaping.
+`src/magazines/runtime` contains the shared magazine dry-run runtime. It loads magazine config and profile data, resolves mock providers through Provider Registry, assembles workflow steps, and delegates generic result shaping to `src/services/dryRun`.
 
-Cat Magazine dry run now includes image selection and monetization preview. The magazine composition registers mock Google Drive and Coupang providers, resolves them through Provider Registry, and passes storage-agnostic image and monetization interfaces into workflow steps.
+`src/magazines/cat` and `src/magazines/dog` are thin magazine modules. Cat keeps backward-compatible `runCatMagazineDryRun` exports, while Dog exposes `runDogMagazineDryRun`; both delegate to `runMagazineDryRun`.
+
+The shared magazine dry run includes image selection and monetization preview with local mock fixtures only. It registers mock Google Drive and Coupang-style providers, resolves them through Provider Registry, and passes storage-agnostic image and monetization interfaces into workflow steps.
+
+Cat Magazine and Dog Magazine are the first `MagazineProfile` examples under `magazines/cat/profile.example.json` and `magazines/dog/profile.example.json`. Both extend the shared `blog` template under `magazines/templates/blog.example.json`, and editorial prompt inputs come from the merged profile/template system.
 
 ### Prompts
 
@@ -151,6 +197,7 @@ Provider categories include:
 - Publisher
 - Image
 - Affiliate
+- Storage
 - TTS
 - Podcast
 - Analytics
@@ -162,6 +209,49 @@ Publishers implement the `Publisher` interface and receive `PublishingPayload` v
 The current WordPress adapter is a dry-run draft. It does not use a WordPress SDK, credentials, network calls, or production publishing behavior.
 
 Publishing workflow safeguards live outside provider adapters. Real publishing is disabled by default, requires explicit configuration such as `ASTERIA_PUBLISHING_ENABLED=true`, and still requires approval metadata before a payload can be sent to a publisher. Dry-run publishing previews may use preview-only adapters, but they must not bypass approval checks.
+
+## Publishing Queue Boundary
+
+The Publishing Queue manages approved `PublishingPackage` values before future publishing execution. It records queue status, destination, approval decision, and failure information without calling publisher adapters.
+
+Only packages with `APPROVED` approval may enter the ready-to-publish queue path. Packages with `NEEDS_REVIEW`, `REJECTED`, or missing approval metadata return a queue rejection result.
+
+Queue status transitions are explicitly guarded:
+
+- `PENDING` may move to `APPROVED`, `CANCELLED`, or `FAILED`.
+- `APPROVED` may move to `SCHEDULED`, `PROCESSING`, `CANCELLED`, or `FAILED`.
+- `SCHEDULED` may move to `PROCESSING`, `CANCELLED`, or `FAILED`.
+- `PROCESSING` may move to `PUBLISHED` or `FAILED`.
+- `FAILED` may move to `CANCELLED`, or to `PENDING` only with an explicit retry transition.
+- `PUBLISHED` and `CANCELLED` are terminal.
+
+The current queue storage is in-memory. Future persistence should implement the queue storage boundary without changing workflow or queue domain models.
+
+## Scheduler Boundary
+
+The Scheduler manages provider-neutral scheduled jobs for queue items that have already passed editorial approval and entered the Publishing Queue.
+
+Scheduler may interact with Publishing Queue status, but it must not publish content, invoke publisher adapters, call WordPress, run background workers, or depend on a concrete scheduling platform.
+
+The Scheduled Job Executor processes due scheduled jobs through a supplied provider-neutral operation. It must not import concrete publisher adapters, must not know about WordPress network execution, and must not publish content. Retry behavior is composed through RetryService and remains simulated/no-wait for the current foundation.
+
+The current scheduler storage is in-memory. Future persistence or platform execution should sit behind scheduler storage/executor boundaries without changing scheduler domain models.
+
+## Audit Log Boundary
+
+The Audit Log records important workflow events such as content generation, quality evaluation, editorial review completion, approval decisions, queue creation, queue rejection, queue cancellation, queue failure, job scheduling, job cancellation, job execution start, job execution success, job execution failure, and job execution skip.
+
+Audit events use provider-neutral actors, context, entity identifiers, event types, messages, timestamps, and metadata. They must not contain secrets or provider SDK response objects.
+
+The current audit storage is in-memory and intended for dry-run visibility and tests. Future persistence or external logging should implement an AuditStore-style storage port without changing workflow, queue, or audit domain models. AuditLog remains the application-facing service; persistence should sit behind the storage port rather than inside workflows.
+
+## Retry Boundary
+
+The Retry Service is a provider-neutral execution helper for recoverable operations. It supports max-attempt policy, fixed delay metadata, retryable and non-retryable reasons, and attempt history.
+
+Retry delays are simulated as metadata for the current foundation. Tests do not wait, and no scheduler or background worker is introduced.
+
+AI providers, storage providers, publisher adapters, and future scheduler operations may opt into the Retry Service through composition. ContentGenerationWorkflow already uses it for provider-neutral structured output recovery. Domain models and workflow engines should not embed provider-specific retry rules.
 
 ## AI Provider Boundary
 
@@ -179,7 +269,7 @@ Gemini JSON repair is intentionally limited to common syntax damage in provider 
 
 For the content generation pipeline, AI providers may also receive a provider-neutral `ContentRequest` and return a provider-neutral `PublishingPackage`. Provider-specific serialization, JSON prompting, parsing, response cleanup, alias mapping, and error mapping remain inside the provider adapter.
 
-Production AI mode is opt-in at the composition boundary. Cat dry-run defaults to `MockAIProvider`; OpenAI is used only when dry-run composition is explicitly configured with `aiMode: openai` or the CLI receives `--ai openai`, and Gemini is used only with `aiMode: gemini` or `--ai gemini`. OpenAI still requires `OPENAI_PRODUCTION_ENABLED=true` and `OPENAI_API_KEY`; Gemini requires `GEMINI_PRODUCTION_ENABLED=true` and `GEMINI_API_KEY` before transport calls are allowed.
+Production AI mode is opt-in at the composition boundary. Magazine dry-run defaults to `MockAIProvider`; OpenAI is used only when dry-run composition is explicitly configured with `aiMode: openai` or the CLI receives `--ai openai`, and Gemini is used only with `aiMode: gemini` or `--ai gemini`. OpenAI still requires `OPENAI_PRODUCTION_ENABLED=true` and `OPENAI_API_KEY`; Gemini requires `GEMINI_PRODUCTION_ENABLED=true` and `GEMINI_API_KEY` before transport calls are allowed.
 
 The CLI may pass a language option such as `--language ko-KR`. That value flows into the Content Request, Prompt Asset System variables, prompt composition metadata, AI provider request, article language, and PublishingPackage metadata.
 
@@ -200,6 +290,20 @@ The Image Asset Domain does not know about Google Drive, S3, local files, Cloudi
 Image selection should be based on domain-level metadata such as topic, mood, tags, category, orientation, aspect ratio, rating, favorite status, source reference, and checksum. Provider-specific IDs may be stored only as source metadata, not as workflow assumptions.
 
 The current Google Drive image library adapter is a mock-first draft. Drive file IDs and mock URIs stay inside adapter records or domain source metadata. OAuth, Google SDK usage, real Drive access, and network calls are deferred.
+
+Image selection now receives image-domain assets projected from Asset Library. The Google Drive image library keeps Drive-shaped mock records inside its adapter, registers them through Asset Library, and exposes only `ImageAsset` values to workflow steps.
+
+## Storage Provider Boundary
+
+Storage providers expose file operations through `StorageProvider`. Application composition may resolve a storage provider from Provider Registry and pass it into services that need file storage. Domain models and workflows should not instantiate concrete storage providers directly.
+
+The current LocalStorageProvider is for tests and development foundation work only. The Google Drive StorageProvider is the first cloud storage adapter behind the boundary, but its tests use mocked transport and no SDK models leave the adapter. Future S3 or other cloud storage adapters should follow the same rule: map provider-specific identifiers and metadata inside their adapter before returning provider-neutral storage models.
+
+## Asset Library Boundary
+
+Asset Library is the layer above storage. Callers register and retrieve `Asset` values without seeing `StorageProvider`. Storage-specific paths, provider names, and external IDs remain in `storageReference` metadata.
+
+Future asset-backed features should depend on Asset Library, not directly on Google Drive, S3, or LocalStorageProvider. Image workflows may convert assets into image-domain projections, but the Image Domain should remain independent from storage providers.
 
 ## Monetization Domain Boundary
 

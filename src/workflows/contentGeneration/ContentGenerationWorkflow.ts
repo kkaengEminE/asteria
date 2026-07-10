@@ -3,6 +3,7 @@ import {
   type ContentRequest,
   type PublishingPackage
 } from '../../domain/content/index.ts';
+import type { AuditContext } from '../../domain/audit/index.ts';
 import type { ApprovalResult } from '../../domain/approval/index.ts';
 import type { EditorialReview } from '../../domain/editorialReview/index.ts';
 import { AIProviderError, type AIProvider } from '../../providers/ai/index.ts';
@@ -19,6 +20,8 @@ import { ContentQualityValidator, type ContentQualityReport } from '../../servic
 import { EditorialApprovalService } from '../../services/editorialApproval/index.ts';
 import { EditorialReviewService } from '../../services/editorialReview/index.ts';
 import { RealGenerationReviewService, type RealGenerationReview } from '../../services/realGenerationReview/index.ts';
+import type { AuditLog } from '../../services/auditLog/index.ts';
+import { RetryService, type RetryServiceExecuteOptions } from '../../services/retry/index.ts';
 import {
   StructuredOutputError,
   StructuredOutputParser,
@@ -37,6 +40,8 @@ export interface ContentGenerationWorkflowOptions {
   realGenerationReviewService?: RealGenerationReviewService;
   editorialApprovalService?: EditorialApprovalService;
   parser?: StructuredOutputParser;
+  auditLog?: AuditLog;
+  retryService?: RetryService;
 }
 
 export interface ContentGenerationMetadata {
@@ -80,6 +85,8 @@ export class ContentGenerationWorkflow {
   private readonly realGenerationReviewService: RealGenerationReviewService;
   private readonly editorialApprovalService: EditorialApprovalService;
   private readonly parser: StructuredOutputParser;
+  private readonly auditLog?: AuditLog;
+  private readonly retryService: RetryService;
 
   constructor(options: ContentGenerationWorkflowOptions) {
     this.aiProvider = options.aiProvider;
@@ -91,8 +98,12 @@ export class ContentGenerationWorkflow {
     this.qualityValidator = options.qualityValidator ?? new ContentQualityValidator();
     this.editorialReviewService = options.editorialReviewService ?? new EditorialReviewService();
     this.realGenerationReviewService = options.realGenerationReviewService ?? new RealGenerationReviewService();
-    this.editorialApprovalService = options.editorialApprovalService ?? new EditorialApprovalService();
+    this.auditLog = options.auditLog;
+    this.editorialApprovalService = options.editorialApprovalService ?? new EditorialApprovalService({
+      auditLog: options.auditLog
+    });
     this.parser = options.parser ?? new StructuredOutputParser();
+    this.retryService = options.retryService ?? new RetryService();
   }
 
   async execute(request: ContentRequest): Promise<PublishingPackage> {
@@ -117,14 +128,61 @@ export class ContentGenerationWorkflow {
         composedPromptPreview: previewComposedPrompt(composedPrompt)
       }
     });
-    let lastError: unknown;
+    const auditContext = createContentGenerationAuditContext(normalizedRequest);
 
-    for (let attempt = 0; attempt <= this.maxRetries; attempt += 1) {
-      try {
+    const retryResult = await this.retryService.execute(
+      async (attemptNumber) => {
+        const retryCount = attemptNumber - 1;
         const generated = await this.aiProvider.generatePublishingPackage(normalizedRequest);
         const parsed = this.parser.parsePublishingPackage(generated);
+        this.auditLog?.append({
+          type: 'CONTENT_GENERATED',
+          actor: {
+            type: 'workflow',
+            id: 'content-generation',
+            name: 'ContentGenerationWorkflow'
+          },
+          context: auditContext,
+          message: `Content generated for topic: ${normalizedRequest.topic}.`,
+          metadata: {
+            providerName: parsed.publishingPackage.metadata?.provider ?? this.aiProvider.name,
+            modelName: parsed.publishingPackage.metadata?.model,
+            retryCount
+          }
+        });
         const qualityReport = this.qualityValidator.validate(parsed.publishingPackage);
+        this.auditLog?.append({
+          type: 'QUALITY_EVALUATED',
+          actor: {
+            type: 'service',
+            id: 'content-quality',
+            name: 'ContentQualityValidator'
+          },
+          context: auditContext,
+          message: `Quality evaluated with score ${qualityReport.score}.`,
+          metadata: {
+            score: qualityReport.score,
+            valid: qualityReport.valid,
+            errorCount: qualityReport.errors.length,
+            warningCount: qualityReport.warnings.length
+          }
+        });
         const editorialReview = this.editorialReviewService.review(parsed.publishingPackage);
+        this.auditLog?.append({
+          type: 'EDITORIAL_REVIEW_COMPLETED',
+          actor: {
+            type: 'service',
+            id: 'editorial-review',
+            name: 'EditorialReviewService'
+          },
+          context: auditContext,
+          message: `Editorial review completed with result ${editorialReview.result}.`,
+          metadata: {
+            result: editorialReview.result,
+            score: editorialReview.score,
+            issueCount: editorialReview.issues.length
+          }
+        });
         const realGenerationReview = this.realGenerationReviewService.review(
           parsed.publishingPackage,
           qualityReport,
@@ -135,7 +193,8 @@ export class ContentGenerationWorkflow {
           validationErrors: parsed.validation.errors,
           qualityReport,
           editorialReview,
-          realGenerationReview
+          realGenerationReview,
+          auditContext
         });
 
         return attachGenerationMetadata(parsed.publishingPackage, {
@@ -150,7 +209,7 @@ export class ContentGenerationWorkflow {
           renderedVariables: composedPrompt.variables,
           renderedPromptPreview: previewComposedPrompt(composedPrompt),
           composedPromptPreview: previewComposedPrompt(composedPrompt),
-          retryCount: attempt,
+          retryCount,
           validationResult: 'valid',
           validationErrors: parsed.validation.errors,
           qualityScore: qualityReport.score,
@@ -166,17 +225,58 @@ export class ContentGenerationWorkflow {
           approvalDecision: approvalResult.decision,
           generationDurationMs: Date.now() - startedAt
         });
-      } catch (error) {
-        lastError = error;
+      },
+      createContentGenerationRetryOptions(this.maxRetries)
+    );
 
-        if (attempt >= this.maxRetries || !isRecoverableContentGenerationError(error)) {
-          throw error;
-        }
-      }
+    if (retryResult.status === 'success' && retryResult.value) {
+      return retryResult.value;
     }
 
-    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+    throw retryResult.error instanceof Error ? retryResult.error : new Error(String(retryResult.error));
   }
+}
+
+function createContentGenerationRetryOptions(maxRetries: number): RetryServiceExecuteOptions {
+  return {
+    policy: {
+      maxAttempts: maxRetries + 1,
+      delayMs: 0
+    },
+    classifyError(error) {
+      return {
+        code: getRetryErrorCode(error),
+        message: error instanceof Error ? error.message : String(error),
+        retryable: isRecoverableContentGenerationError(error)
+      };
+    }
+  };
+}
+
+function getRetryErrorCode(error: unknown): string {
+  if (error && typeof error === 'object' && typeof (error as { code?: unknown }).code === 'string') {
+    return (error as { code: string }).code;
+  }
+
+  if (error instanceof Error && error.name !== 'Error') {
+    return error.name;
+  }
+
+  return 'unknown';
+}
+
+function createContentGenerationAuditContext(request: ContentRequest): AuditContext {
+  return {
+    entityId: String(request.metadata?.magazineSlug ?? request.topic),
+    entityType: 'publishingPackage',
+    magazineSlug: stringMetadata(request.metadata?.magazineSlug),
+    topic: request.topic,
+    metadata: {
+      language: request.language,
+      magazineName: request.magazineName,
+      dryRun: request.metadata?.dryRun
+    }
+  };
 }
 
 export function attachGenerationMetadata(

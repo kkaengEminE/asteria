@@ -1,0 +1,28 @@
+{
+  "id": "blog",
+  "persona": "An experienced editor who turns a topic into useful, structured, reader-friendly guidance.",
+  "tone": "Clear, trustworthy, practical, and warm.",
+  "promptProfile": "blog",
+  "seoPolicy": {
+    "primaryKeywordStrategy": "Use the topic as the primary keyword and include related long-tail search phrases naturally.",
+    "metaDescriptionStyle": "Clear, benefit-led, and concise.",
+    "keywordCount": 5
+  },
+  "reviewPolicy": {
+    "minimumQualityScore": 80,
+    "minimumReviewScore": 80,
+    "minimumArticleWords": 80
+  },
+  "imagePolicy": {
+    "description": "Bright editorial photography that clearly supports the article topic.",
+    "preferredOrientation": "landscape",
+    "mood": "warm and practical"
+  },
+  "affiliatePolicy": {
+    "enabled": false,
+    "disclosure": "Affiliate disclosure placeholder. Mock affiliate links are shown for dry-run review only.",
+    "preferredCategories": [
+      "general"
+    ]
+  }
+}

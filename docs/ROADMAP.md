@@ -166,22 +166,102 @@ Patch 2 status: Implemented stricter Gemini JSON output instructions, JSON respo
 
 Patch 3 status: Implemented dry-run output consolidation so article and SEO previews use PublishingPackage as the source of truth, plus improved Korean sentence, Markdown, numbered section, and list structure detection.
 
-### Sprint 29: Real Google Drive Integration
+### Sprint 29: Magazine Profile System
 
-Connect the Google Drive image library adapter to real Drive metadata and assets.
+Introduce provider-neutral magazine profiles so the content generation pipeline no longer assumes Cat Magazine as the only magazine.
 
-### Sprint 30: Real Coupang Integration
+Status: Implemented with `MagazineProfile`, `MagazineProfileRegistry`, profile validation, Cat profile configuration, `--magazine cat` dry-run support, profile-based prompt composition inputs, backward-compatible Cat dry runs, and tests.
+
+### Sprint 30: Magazine Template System
+
+Introduce reusable magazine templates so multiple magazines can share common editorial configuration without duplication.
+
+Status: Implemented with `MagazineTemplate`, `MagazineTemplateRegistry`, template validation, `blog` template configuration, profile template inheritance, override precedence, Cat profile refactor, prompt propagation, and tests.
+
+### Sprint 31: Second Magazine Profile
+
+Add a second magazine profile to prove MagazineTemplate and MagazineProfile reuse beyond Cat Magazine.
+
+Status: Implemented with Dog Magazine config/profile, blog template inheritance, Dog-specific editorial values, Dog dry-run support, Dog Quality Lab support, Dog mock image/product fixtures, Cat backward compatibility, missing magazine handling, and tests. Publishing and real Google Drive remain disabled.
+
+### Sprint 32: Magazine Runtime Extraction
+
+Remove Cat-specific runtime naming now that multiple magazines exist.
+
+Status: Implemented with `runMagazineDryRun`, shared `src/magazines/runtime` composition, thin Cat and Dog modules, backward-compatible Cat exports, CLI migration to the generic runtime, Quality Lab migration to the generic runtime, and Cat/Dog regression tests. Publishing and real Google Drive remain disabled.
+
+### Sprint 33: Storage Provider Foundation
+
+Introduce a provider-neutral storage boundary before real cloud storage integrations.
+
+Status: Implemented with `StorageProvider`, provider-neutral file and folder models, Provider Registry `Storage` category support, LocalStorageProvider for tests and development-only file operations, and storage provider tests. Google Drive, S3, OAuth, secrets, publishing, and network calls remain deferred.
+
+### Sprint 34: Google Drive Storage Provider
+
+Implement Google Drive behind the provider-neutral StorageProvider boundary.
+
+Status: Storage provider adapter implemented with `GoogleDriveStorageProvider`, environment-based safeguards, transport abstraction, Drive record mapping, upload, download, folder creation, listing, metadata lookup, Provider Registry token, and fully mocked tests. Real image-library integration, OAuth flow, SDK usage, and publishing remain deferred.
+
+### Sprint 35: Asset Library Foundation
+
+Introduce a provider-neutral Asset Library above StorageProvider so storage backends do not become the asset model.
+
+Status: Implemented with Asset Domain models, AssetLibrary service, StorageProvider-backed registration and retrieval, image asset projection, Google Drive image library refactor through AssetLibrary, and tests for asset registration, lookup, metadata, image retrieval, and storage adapter integration. Publishing remains disabled.
+
+### Sprint 36: Publishing Queue Foundation
+
+Introduce a provider-neutral queue for approved publishing packages before future publishing execution.
+
+Status: Implemented with Publishing Queue domain models, in-memory queue service, approval-based queue rejection, PublishingWorkflow queue integration, dry-run queue preview output, and tests. Real publishing, WordPress network execution, Coupang integration, and scheduling remain deferred.
+
+### Sprint 37: Audit Log Foundation
+
+Introduce a provider-neutral audit log that records important workflow and queue events before persistence, scheduler, and publishing execution work.
+
+Status: Implemented with Audit Domain models, in-memory AuditLog service, event append/list/filter operations, ContentGenerationWorkflow integration, EditorialApproval integration, PublishingQueue integration, dry-run audit timeline output, and tests. Persistence, scheduler integration, publishing, and external logging remain deferred.
+
+### Sprint 38: Retry Foundation
+
+Introduce a provider-neutral retry service for recoverable operations before wider production integrations.
+
+Status: Implemented with Retry Domain models, RetryService, max-attempt policy enforcement, fixed delay simulation, retryable/non-retryable classification, retry history, mocked workflow proof, dry-run retry metadata output, and tests. Scheduler, persistence, publishing, and production behavior changes remain deferred.
+
+### Sprint 39: Retry Migration
+
+Replace duplicated content generation retry logic with the shared RetryService while preserving behavior.
+
+Status: Implemented with ContentGenerationWorkflow migration to RetryService, provider-neutral retry classification, preserved retry metadata, structured output recovery regression coverage, and tests. Scheduler, persistence, publishing, and new feature work remain deferred.
+
+### Architecture Cleanup Patch 002
+
+Resolve immediate reliability and architecture issues from Architecture Review 002 before starting Sprint 40.
+
+Status: Implemented with explicit Publishing Queue transition rules, invalid transition results, queue rejection audit events, expanded architecture boundary guard, relative import cycle detection, direct domain import cleanup, and documentation refresh. No product features, persistence, publishing, scheduler, or Coupang integration were added.
+
+### Sprint 40: Scheduler Foundation
+
+Introduce a provider-neutral scheduler for queued publishing packages without persistence or execution.
+
+Status: Implemented with Scheduler Domain models, in-memory SchedulerService, schedule/get/list/cancel operations, duplicate scheduling prevention, Publishing Queue `SCHEDULED` integration, `JOB_SCHEDULED` and `JOB_CANCELLED` audit events, dry-run scheduler preview output, and tests. Persistence, real scheduling execution, publishing, and external scheduler platforms remain deferred.
+
+### Sprint 41: Scheduled Job Execution Foundation
+
+Introduce provider-neutral execution preview for due scheduled jobs without publishing.
+
+Status: Implemented with execution domain models, ScheduledJobExecutor, in-memory execution storage, due/future/cancelled/invalid job handling, duplicate execution prevention, RetryService integration, Publishing Queue `PROCESSING` preview transition, execution audit events, dry-run execution preview output, and tests. Real publishing, WordPress network calls, Coupang integration, persistence, and external scheduler execution remain deferred.
+
+### Sprint 42: Real Coupang Integration
 
 Connect the Coupang affiliate adapter to real product and affiliate link workflows.
 
-### Sprint 31: Instagram Generation
+### Sprint 43: Instagram Generation
 
 Generate Instagram-ready captions, hashtags, and image selection metadata from article content.
 
-### Sprint 32: Podcast / TTS
+### Sprint 44: Podcast / TTS
 
 Add text-to-speech generation and podcast publishing workflows behind replaceable interfaces.
 
-### Sprint 33: Scheduler
+### Sprint 45: Scheduler Operations
 
-Enable real GitHub Actions scheduling only after real integrations have production safeguards.
+Enable real scheduler execution, such as GitHub Actions or a future scheduler backend, only after publishing integrations have production safeguards.

@@ -38,7 +38,9 @@ test('cat magazine dry run succeeds', async () => {
     'Generate Article',
     'Generate SEO',
     'Generate Monetization Preview',
-    'Publish Preview'
+    'Publish Preview',
+    'Schedule Preview',
+    'Execution Preview'
   ]);
   assert.match(result.renderedPromptPreview ?? '', /indoor enrichment/);
   assert.match(result.articlePreview ?? '', /Mock Cat Care Article/);

@@ -3,11 +3,20 @@ import { test } from 'node:test';
 import { formatDryRunReport, parseDryRunArgs } from '../scripts/dry-run.ts';
 
 test('dry-run parser supports ai mode and language option', () => {
-  const parsed = parseDryRunArgs(['--ai', 'gemini', '--language', 'ko-KR', '고양이가 밤에 뛰어다니는 이유']);
+  const parsed = parseDryRunArgs(['--magazine', 'cat', '--ai', 'gemini', '--language', 'ko-KR', '고양이가 밤에 뛰어다니는 이유']);
 
+  assert.equal(parsed.magazine, 'cat');
   assert.equal(parsed.aiMode, 'gemini');
   assert.equal(parsed.language, 'ko-KR');
   assert.equal(parsed.topic, '고양이가 밤에 뛰어다니는 이유');
+});
+
+test('dry-run parser supports dog magazine mode', () => {
+  const parsed = parseDryRunArgs(['--magazine=dog', '--language=ko-KR', '강아지가 산책 중 냄새를 오래 맡는 이유']);
+
+  assert.equal(parsed.magazine, 'dog');
+  assert.equal(parsed.language, 'ko-KR');
+  assert.equal(parsed.topic, '강아지가 산책 중 냄새를 오래 맡는 이유');
 });
 
 test('dry-run report uses mock article label only for mock provider', () => {
@@ -45,6 +54,86 @@ test('dry-run report uses publishing package seo metadata as source of truth', (
   assert.match(report, /Meta Description: 고양이가 밤에 뛰어다니는 이유와 완화 방법/);
   assert.match(report, /Keywords: 고양이, 우다다/);
   assert.doesNotMatch(report, /Legacy English SEO/);
+});
+
+test('dry-run report displays retry metadata when available', () => {
+  const report = formatDryRunReport(createDryRunResultFixture('mock-ai', {
+    retryMetadata: {
+      status: 'success',
+      attemptCount: 2,
+      retryCount: 1,
+      policy: {
+        maxAttempts: 2,
+        delayMs: 25
+      },
+      attempts: [
+        {
+          attemptNumber: 1,
+          status: 'failed',
+          reason: {
+            code: 'dry_run_probe'
+          }
+        },
+        {
+          attemptNumber: 2,
+          status: 'success'
+        }
+      ]
+    }
+  }));
+
+  assert.match(report, /Retry Metadata:/);
+  assert.match(report, /Status: success/);
+  assert.match(report, /History: #1:failed:dry_run_probe -> #2:success/);
+});
+
+test('dry-run report displays scheduler information when available', () => {
+  const report = formatDryRunReport(createDryRunResultFixture('mock-ai', {
+    schedulerResult: {
+      status: 'scheduled',
+      job: {
+        id: 'schedule-1',
+        queueItemId: 'queue-1',
+        status: 'SCHEDULED',
+        policy: {
+          scheduledFor: '2026-07-10T09:00:00.000Z'
+        },
+        scheduledFor: '2026-07-10T09:00:00.000Z',
+        createdAt: '2026-07-10T00:00:00.000Z',
+        updatedAt: '2026-07-10T00:00:00.000Z'
+      },
+      message: 'Queue item queue-1 scheduled for 2026-07-10T09:00:00.000Z.'
+    }
+  }));
+
+  assert.match(report, /Scheduler:/);
+  assert.match(report, /Result: scheduled/);
+  assert.match(report, /Job ID: schedule-1/);
+});
+
+test('dry-run report displays execution preview information when available', () => {
+  const report = formatDryRunReport(createDryRunResultFixture('mock-ai', {
+    executionResult: {
+      status: 'SUCCEEDED',
+      due: true,
+      attemptCount: 1,
+      retryCount: 0,
+      job: {
+        id: 'schedule-1'
+      },
+      queueResult: {
+        item: {
+          status: 'PROCESSING'
+        }
+      },
+      message: 'Scheduled job schedule-1 execution preview succeeded. Publishing remains disabled.'
+    }
+  }));
+
+  assert.match(report, /Execution Preview:/);
+  assert.match(report, /Scheduled Job ID: schedule-1/);
+  assert.match(report, /Execution Status: SUCCEEDED/);
+  assert.match(report, /Queue Status: PROCESSING/);
 });
 
 function createDryRunResultFixture(providerName: string, overrides: Record<string, unknown> = {}): any {

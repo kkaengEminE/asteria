@@ -25,6 +25,7 @@ import {
   StructuredOutputParser,
   StructuredOutputValidator
 } from '../src/services/structuredOutput/index.ts';
+import { RetryService, type RetryServiceExecuteOptions } from '../src/services/retry/index.ts';
 import { PromptAssetRegistry } from '../src/prompts/index.ts';
 
 test('content generation workflow returns a publishing package', async () => {
@@ -181,6 +182,24 @@ test('content generation workflow retries and then succeeds', async () => {
   assert.equal(result.metadata?.validationResult, 'valid');
 });
 
+test('content generation workflow uses shared RetryService', async () => {
+  const retryService = new SpyRetryService();
+  const provider = new MockAIProvider({
+    publishingPackageResults: [new StructuredOutputError({ code: 'InvalidJson', message: 'Bad JSON.' })]
+  });
+  const workflow = new ContentGenerationWorkflow({
+    aiProvider: provider,
+    maxRetries: 1,
+    retryService
+  });
+
+  const result = await workflow.execute(createRequest());
+
+  assert.equal(retryService.calls, 1);
+  assert.equal(retryService.maxAttempts, 2);
+  assert.equal(result.metadata?.retryCount, 1);
+});
+
 test('content generation workflow reports retry exhaustion', async () => {
   const workflow = new ContentGenerationWorkflow({
     aiProvider: new MockAIProvider({
@@ -227,6 +246,37 @@ test('content generation workflow recovers from malformed openai JSON', async ()
   assert.equal(result.article.title, 'Night Zoomies Explained');
   assert.equal(result.metadata?.retryCount, 1);
   assert.equal(transport.calls.length, 2);
+});
+
+test('content generation workflow retry metadata is unchanged after retry migration', async () => {
+  const transport = new SequenceOpenAITransport([
+    {
+      status: 200,
+      body: {
+        output_text: 'not-json'
+      }
+    },
+    {
+      status: 200,
+      body: {
+        output_text: JSON.stringify(createPackageFixture())
+      }
+    }
+  ]);
+  const workflow = new ContentGenerationWorkflow({
+    aiProvider: new OpenAIProvider({
+      config: baseConfig,
+      transport
+    }),
+    maxRetries: 1
+  });
+
+  const result = await workflow.execute(createRequest());
+
+  assert.equal(result.metadata?.retryCount, 1);
+  assert.equal(result.metadata?.validationResult, 'valid');
+  assert.equal(result.metadata?.promptVersion, 'v1');
+  assert.equal(typeof result.metadata?.generationDurationMs, 'number');
 });
 
 test('content generation workflow propagates openai metadata', async () => {
@@ -310,7 +360,7 @@ test('cat dry-run execution includes publishing package', async () => {
 
   assert.equal(result.workflowStatus, 'success');
   assert.equal(result.publishingPackage?.article.title, 'Mock Article: 고양이가 밤에 뛰어다니는 이유');
-  assert.equal(result.contentGenerationMetadata?.promptProfile, 'default');
+  assert.equal(result.contentGenerationMetadata?.promptProfile, 'magazine');
   assert.equal(result.contentGenerationMetadata?.promptId, 'content.article');
   assert.ok(result.contentGenerationMetadata?.promptIds?.includes('content.outputSchema'));
   assert.equal(result.contentGenerationMetadata?.promptVersion, 'v1');
@@ -451,5 +501,20 @@ class InvalidPackageProvider implements AIProvider {
       ok: true,
       provider: this.name
     };
+  }
+}
+
+class SpyRetryService extends RetryService {
+  calls = 0;
+  maxAttempts?: number;
+
+  override async execute<T>(
+    operation: (attemptNumber: number) => Promise<T> | T,
+    options: RetryServiceExecuteOptions = {}
+  ) {
+    this.calls += 1;
+    this.maxAttempts = options.policy?.maxAttempts;
+
+    return super.execute(operation, options);
   }
 }

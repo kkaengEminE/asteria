@@ -1,7 +1,11 @@
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
 import type { PublishingResult, ResearchResult } from '../../core/types.ts';
+import type { AuditEvent } from '../../domain/audit/index.ts';
 import type { ApprovalResult } from '../../domain/approval/index.ts';
 import type { PublishingPackage } from '../../domain/content/index.ts';
+import type { PublishingQueueResult } from '../../domain/publishingQueue/index.ts';
+import type { RetryResult } from '../../domain/retry/index.ts';
+import type { JobExecutionResult, ScheduleResult } from '../../domain/scheduler/index.ts';
 import type { EditorialReview, ReviewIssue, ReviewResult } from '../../domain/editorialReview/index.ts';
 import type { ImageAsset } from '../../domain/image/index.ts';
 import type { AffiliateLink, Recommendation } from '../../domain/monetization/index.ts';
@@ -23,6 +27,11 @@ export interface DryRunResult {
   articlePreview?: string;
   seoPreview?: string;
   publishPreview?: PublishingResult;
+  queueResult?: PublishingQueueResult;
+  schedulerResult?: ScheduleResult;
+  executionResult?: JobExecutionResult;
+  auditTimeline?: AuditEvent[];
+  retryMetadata?: RetryResult;
   researchPreview?: ResearchResult[];
   selectedImage?: DryRunSelectedImage;
   imageSelectionReason?: DryRunImageSelectionReason;

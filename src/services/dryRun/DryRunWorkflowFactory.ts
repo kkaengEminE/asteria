@@ -1,6 +1,10 @@
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
 import type { PublishingResult, ResearchResult } from '../../core/types.ts';
+import type { AuditEvent } from '../../domain/audit/index.ts';
 import type { PublishingPackage } from '../../domain/content/index.ts';
+import type { PublishingQueueResult } from '../../domain/publishingQueue/index.ts';
+import type { RetryResult } from '../../domain/retry/index.ts';
+import type { JobExecutionResult, ScheduleResult } from '../../domain/scheduler/index.ts';
 import type { ImageAsset } from '../../domain/image/index.ts';
 import type { AffiliateLink, Recommendation } from '../../domain/monetization/index.ts';
 import {
@@ -36,6 +40,11 @@ export interface CreateDryRunResultOptions {
   articleKey?: string;
   seoKey?: string;
   publishKey?: string;
+  queueResultKey?: string;
+  schedulerResultKey?: string;
+  executionResultKey?: string;
+  auditTimelineKey?: string;
+  retryMetadataKey?: string;
   researchKey?: string;
   selectedImageKey?: string;
   imageSelectionReasonKey?: string;
@@ -91,6 +100,11 @@ export class DryRunWorkflowFactory {
       articlePreview: context.data[options.articleKey ?? 'articlePreview'] as string | undefined,
       seoPreview: context.data[options.seoKey ?? 'seoPreview'] as string | undefined,
       publishPreview: context.data[options.publishKey ?? 'publishPreview'] as PublishingResult | undefined,
+      queueResult: context.data[options.queueResultKey ?? 'queueResult'] as PublishingQueueResult | undefined,
+      schedulerResult: context.data[options.schedulerResultKey ?? 'schedulerResult'] as ScheduleResult | undefined,
+      executionResult: context.data[options.executionResultKey ?? 'executionResult'] as JobExecutionResult | undefined,
+      auditTimeline: context.data[options.auditTimelineKey ?? 'auditTimeline'] as AuditEvent[] | undefined,
+      retryMetadata: context.data[options.retryMetadataKey ?? 'retryMetadata'] as RetryResult | undefined,
       researchPreview: context.data[options.researchKey ?? 'researchResults'] as ResearchResult[] | undefined,
       selectedImage: selectedImage ? summarizeImage(selectedImage) : undefined,
       imageSelectionReason: context.data[options.imageSelectionReasonKey ?? 'imageSelectionReason'] as

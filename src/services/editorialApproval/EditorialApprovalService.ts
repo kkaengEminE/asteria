@@ -6,8 +6,10 @@ import {
   type ApprovalStatus
 } from '../../domain/approval/index.ts';
 import type { EditorialReview } from '../../domain/editorialReview/index.ts';
+import type { AuditContext } from '../../domain/audit/index.ts';
 import type { ContentQualityReport } from '../contentQuality/index.ts';
 import type { RealGenerationReview } from '../realGenerationReview/index.ts';
+import type { AuditLog } from '../auditLog/index.ts';
 
 export interface EditorialApprovalInput {
   validationResult: 'valid' | 'invalid' | string;
@@ -15,9 +17,20 @@ export interface EditorialApprovalInput {
   qualityReport: ContentQualityReport;
   editorialReview: EditorialReview;
   realGenerationReview: RealGenerationReview;
+  auditContext?: AuditContext;
+}
+
+export interface EditorialApprovalServiceOptions {
+  auditLog?: AuditLog;
 }
 
 export class EditorialApprovalService {
+  private readonly auditLog?: AuditLog;
+
+  constructor(options: EditorialApprovalServiceOptions = {}) {
+    this.auditLog = options.auditLog;
+  }
+
   evaluate(input: EditorialApprovalInput): ApprovalResult {
     const reasons = [
       ...reviewValidation(input),
@@ -29,7 +42,7 @@ export class EditorialApprovalService {
     const status = determineStatus(decision);
     const reviewedAt = new Date().toISOString();
 
-    return createApprovalResult({
+    const result = createApprovalResult({
       decision,
       status,
       reasons,
@@ -39,6 +52,26 @@ export class EditorialApprovalService {
       approvedAt: decision === 'APPROVED' ? reviewedAt : undefined,
       reviewedAt
     });
+
+    this.auditLog?.append({
+      type: 'APPROVAL_DECISION',
+      actor: {
+        type: 'service',
+        id: 'editorial-approval',
+        name: 'EditorialApprovalService'
+      },
+      context: input.auditContext,
+      message: `Approval decision: ${result.decision}.`,
+      metadata: {
+        decision: result.decision,
+        status: result.status,
+        reasonCount: result.reasons.length,
+        blockingIssueCount: result.blockingIssues.length,
+        nonBlockingIssueCount: result.nonBlockingIssues.length
+      }
+    });
+
+    return result;
   }
 }
 
@@ -173,4 +206,3 @@ function nonBlockingReason(
     recommendation
   };
 }
-

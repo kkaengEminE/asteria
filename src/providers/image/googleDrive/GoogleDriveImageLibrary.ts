@@ -1,5 +1,4 @@
 import {
-  createImageAsset,
   createImageMetadata,
   matchesImageSearchQuery,
   scoreImageAsset,
@@ -9,12 +8,16 @@ import {
   type ImageSearchQuery,
   type ImageSelectionCriteria
 } from '../../../domain/image/index.ts';
+import { AssetLibrary, mapAssetToImageAsset } from '../../../services/assetLibrary/index.ts';
+import { LocalStorageProvider } from '../../storage/index.ts';
 import { createProviderToken } from '../../ProviderToken.ts';
 import {
   validateGoogleDriveImageLibraryConfig,
   type GoogleDriveImageLibraryConfig
 } from './GoogleDriveImageLibraryConfig.ts';
 import type { GoogleDriveImageRecord } from './GoogleDriveImageRecord.ts';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 export const googleDriveImageLibraryToken = createProviderToken<ImageDomainLibrary>(
   'Image',
@@ -24,21 +27,30 @@ export const googleDriveImageLibraryToken = createProviderToken<ImageDomainLibra
 
 export class GoogleDriveImageLibrary implements ImageDomainLibrary {
   readonly name: string;
-  private readonly assets: ImageAsset[];
+  private readonly records: GoogleDriveImageRecord[];
+  private readonly assetLibrary: AssetLibrary;
+  private assetsReady?: Promise<void>;
 
   constructor(config: GoogleDriveImageLibraryConfig) {
     validateGoogleDriveImageLibraryConfig(config);
     this.name = config.name ?? 'google-drive';
-    this.assets = config.records.map(mapGoogleDriveRecordToImageAsset);
+    this.records = config.records;
+    this.assetLibrary = config.assetLibrary ?? new AssetLibrary({
+      storageProvider: config.storageProvider ?? new LocalStorageProvider({
+        rootDir: join(tmpdir(), 'asteria-google-drive-image-assets')
+      })
+    });
   }
 
   async search(query: ImageSearchQuery): Promise<ImageAsset[]> {
-    const matches = this.assets.filter((asset) => matchesImageSearchQuery(asset, query));
+    const assets = await this.listImageAssets();
+    const matches = assets.filter((asset) => matchesImageSearchQuery(asset, query));
     return typeof query.limit === 'number' ? matches.slice(0, query.limit) : matches;
   }
 
   async find(id: string): Promise<ImageAsset | null> {
-    return this.assets.find((asset) => asset.id === id) ?? null;
+    await this.ensureAssetsRegistered();
+    return this.assetLibrary.getImageAsset(id);
   }
 
   async random(query: ImageSearchQuery = {}): Promise<ImageAsset | null> {
@@ -59,10 +71,45 @@ export class GoogleDriveImageLibrary implements ImageDomainLibrary {
   async select(candidates: ImageAsset[], criteria: ImageSelectionCriteria): Promise<ImageAsset | null> {
     return selectHighestScoredImage(candidates, criteria);
   }
+
+  private async listImageAssets(): Promise<ImageAsset[]> {
+    await this.ensureAssetsRegistered();
+    const assets = await this.assetLibrary.listAssets();
+
+    return assets.map(mapAssetToImageAsset);
+  }
+
+  private async ensureAssetsRegistered(): Promise<void> {
+    this.assetsReady ??= Promise.all(
+      this.records.map((record) => this.assetLibrary.registerAsset({
+        id: record.id,
+        filename: record.filename,
+        mimeType: inferImageMimeType(record.filename),
+        category: record.category,
+        tags: record.tags,
+        storagePath: `images/${record.filename}`,
+        storageUri: record.mockUri,
+        metadata: {
+          title: record.title,
+          description: record.description,
+          width: record.width,
+          height: record.height,
+          takenAt: record.takenAt,
+          rating: record.rating,
+          favorite: record.favorite,
+          checksum: record.checksum,
+          driveFileId: record.driveFileId,
+          dryRun: true
+        }
+      }))
+    ).then(() => undefined);
+
+    await this.assetsReady;
+  }
 }
 
 export function mapGoogleDriveRecordToImageAsset(record: GoogleDriveImageRecord): ImageAsset {
-  return createImageAsset({
+  return {
     id: record.id,
     uri: record.mockUri,
     metadata: createImageMetadata({
@@ -86,7 +133,7 @@ export function mapGoogleDriveRecordToImageAsset(record: GoogleDriveImageRecord)
         }
       }
     })
-  });
+  };
 }
 
 function stableIndex(seed: string, length: number): number {
@@ -99,3 +146,16 @@ function stableIndex(seed: string, length: number): number {
   return hash % length;
 }
 
+function inferImageMimeType(filename: string): string {
+  const lower = filename.toLowerCase();
+
+  if (lower.endsWith('.png')) {
+    return 'image/png';
+  }
+
+  if (lower.endsWith('.webp')) {
+    return 'image/webp';
+  }
+
+  return 'image/jpeg';
+}
