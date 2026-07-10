@@ -8,7 +8,7 @@ import type { RetryResult } from '../../domain/retry/index.ts';
 import type { JobExecutionResult, ScheduleResult } from '../../domain/scheduler/index.ts';
 import type { EditorialReview, ReviewIssue, ReviewResult } from '../../domain/editorialReview/index.ts';
 import type { ImageAsset } from '../../domain/image/index.ts';
-import type { AffiliateLink, Recommendation } from '../../domain/monetization/index.ts';
+import type { AffiliateLink, MonetizationProviderDiagnostics, Recommendation } from '../../domain/monetization/index.ts';
 import type { RealGenerationReview } from '../realGenerationReview/index.ts';
 import type { WorkflowResult } from '../../workflows/index.ts';
 
@@ -38,6 +38,7 @@ export interface DryRunResult {
   imagePreview?: string;
   recommendedProducts?: DryRunRecommendedProduct[];
   affiliateLinks?: AffiliateLink[];
+  monetizationDiagnostics?: MonetizationProviderDiagnostics;
   monetizationPreview?: string;
   affiliateDisclosure?: string;
   publishingPackage?: PublishingPackage;

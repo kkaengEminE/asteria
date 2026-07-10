@@ -13,3 +13,7 @@ export interface CoupangProductRecord {
   coupangProductId: string;
   mockUri: string;
 }
+
+export interface CoupangProductSearchResponse {
+  products: CoupangProductRecord[];
+}

@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { AuditLog } from '../src/services/auditLog/index.ts';
 import { ProviderRegistry } from '../src/providers/index.ts';
 import {
   CoupangAffiliateProvider,
+  createCoupangAffiliateConfigFromEnv,
   coupangAffiliateProviderToken,
   mapCoupangRecordToProduct,
+  type CoupangAffiliateLinkTransportRequest,
+  type CoupangAffiliateTransport,
+  type CoupangAffiliateTransportRequest,
   type CoupangProductRecord
 } from '../src/providers/monetization/coupang/index.ts';
 
@@ -94,11 +99,129 @@ test('coupang affiliate provider makes no external api call', async () => {
   assert.ok(recommendations.every((recommendation) => recommendation.affiliateLink?.url.startsWith('mock://')));
 });
 
+test('coupang production provider is disabled by default', () => {
+  assert.throws(
+    () =>
+      new CoupangAffiliateProvider({
+        ...createCoupangAffiliateConfigFromEnv({}),
+        transport: new MockCoupangTransport(mockRecords)
+      }),
+    /COUPANG_ENABLED=true/
+  );
+});
+
+test('coupang production provider requires credentials', () => {
+  assert.throws(
+    () =>
+      new CoupangAffiliateProvider({
+        ...createCoupangAffiliateConfigFromEnv({
+          COUPANG_ENABLED: 'true'
+        }),
+        transport: new MockCoupangTransport(mockRecords)
+      }),
+    /COUPANG_ACCESS_KEY/
+  );
+});
+
+test('coupang production provider maps mocked transport response', async () => {
+  const transport = new MockCoupangTransport(mockRecords);
+  const provider = createProductionProvider(transport);
+  const recommendations = await provider.recommendProducts({
+    topic: 'cat enrichment',
+    tags: ['cat', 'enrichment'],
+    limit: 1
+  });
+
+  assert.equal(transport.searchCalls.length, 1);
+  assert.equal(transport.linkCalls.length, 1);
+  assert.equal(recommendations.length, 1);
+  assert.equal(recommendations[0].product.metadata?.dryRun, false);
+  assert.equal(recommendations[0].affiliateLink?.url, 'https://cou.pang/affiliate/cat-puzzle-feeder');
+  assert.equal(recommendations[0].affiliateLink?.metadata?.productionLink, true);
+  assert.equal(provider.getDiagnostics().requestCount, 2);
+  assert.equal(provider.getDiagnostics().returnedProductCount, 1);
+});
+
+test('coupang production provider retries transport failures', async () => {
+  const transport = new MockCoupangTransport(mockRecords, { failSearchAttempts: 1 });
+  const provider = createProductionProvider(transport);
+  const products = await provider.searchProducts({
+    tags: ['cat']
+  });
+
+  assert.ok(products.length > 0);
+  assert.equal(transport.searchCalls.length, 2);
+  assert.equal(provider.getDiagnostics().retryCount, 1);
+});
+
+test('coupang production provider records audit events', async () => {
+  const auditLog = new AuditLog();
+  const provider = createProductionProvider(new MockCoupangTransport(mockRecords), auditLog);
+
+  await provider.searchProducts({
+    tags: ['cat']
+  });
+
+  assert.equal(auditLog.filterByEventType('AFFILIATE_REQUEST_STARTED').length, 1);
+  assert.equal(auditLog.filterByEventType('AFFILIATE_REQUEST_SUCCEEDED').length, 1);
+});
+
 function createProvider(): CoupangAffiliateProvider {
   return new CoupangAffiliateProvider({
     dryRun: true,
     records: mockRecords
   });
+}
+
+function createProductionProvider(transport: CoupangAffiliateTransport, auditLog?: AuditLog): CoupangAffiliateProvider {
+  return new CoupangAffiliateProvider({
+    ...createCoupangAffiliateConfigFromEnv({
+      COUPANG_ENABLED: 'true',
+      COUPANG_ACCESS_KEY: 'test-access-key',
+      COUPANG_SECRET_KEY: 'test-secret-key',
+      COUPANG_PARTNER_ID: 'test-partner-id',
+      COUPANG_BASE_URL: 'https://coupang.test'
+    }),
+    transport,
+    auditLog
+  });
+}
+
+class MockCoupangTransport implements CoupangAffiliateTransport {
+  readonly searchCalls: CoupangAffiliateTransportRequest[] = [];
+  readonly linkCalls: CoupangAffiliateLinkTransportRequest[] = [];
+  private searchAttempts = 0;
+  private readonly records: CoupangProductRecord[];
+  private readonly options: { failSearchAttempts?: number };
+
+  constructor(records: CoupangProductRecord[], options: { failSearchAttempts?: number } = {}) {
+    this.records = records;
+    this.options = options;
+  }
+
+  async searchProducts(request: CoupangAffiliateTransportRequest) {
+    this.searchCalls.push(request);
+    this.searchAttempts += 1;
+
+    if (this.searchAttempts <= (this.options.failSearchAttempts ?? 0)) {
+      const error = new Error('Temporary Coupang search failure.');
+      (error as Error & { code: string; retryable: boolean }).code = 'temporary_coupang_failure';
+      (error as Error & { code: string; retryable: boolean }).retryable = true;
+      throw error;
+    }
+
+    return {
+      products: this.records
+    };
+  }
+
+  async generateAffiliateLink(request: CoupangAffiliateLinkTransportRequest) {
+    this.linkCalls.push(request);
+
+    return {
+      url: `https://cou.pang/affiliate/${request.productId}`
+    };
+  }
 }
 
 const mockRecords: CoupangProductRecord[] = [

@@ -4,7 +4,7 @@ Asteria is the foundation for an extensible AI Publishing OS: a reusable content
 
 ## Current Sprint
 
-Sprint 41 introduces Scheduled Job Execution Foundation. A provider-neutral executor can inspect due scheduled jobs, run a supplied dry-run operation with RetryService, record preview execution results, and emit execution audit events. It does not publish content or call publisher adapters.
+Sprint 42 introduces Real Coupang Integration behind the provider-neutral monetization boundary. Mock monetization remains the default, while explicit Coupang mode requires `COUPANG_ENABLED=true` and credentials before any transport call can occur. Publishing remains disabled.
 
 ## Commands
 
@@ -50,6 +50,12 @@ Run the dry run with Dog Magazine:
 npm run dry-run -- --magazine dog --language ko-KR "강아지가 산책 중 냄새를 오래 맡는 이유"
 ```
 
+Run the dry run with the production-capable Coupang adapter only when Coupang configuration is intentionally enabled:
+
+```bash
+npm run dry-run -- --affiliate coupang "indoor enrichment"
+```
+
 Magazine profiles may extend reusable templates. The current Cat and Dog profiles extend `magazines/templates/blog.example.json`, inheriting shared review, SEO, image, and affiliate defaults while overriding magazine-specific prompt profile, tone, persona, and categories. The CLI runs both through the shared magazine runtime.
 
 Run the Quality Lab batch evaluator with a newline-separated topic file:
@@ -78,11 +84,13 @@ Retry Foundation provides a reusable retry service for future AI providers, stor
 
 The CLI loads `.env` automatically for local development. Existing exported shell environment variables take precedence over `.env` values. OpenAI production mode requires `OPENAI_PRODUCTION_ENABLED=true` and `OPENAI_API_KEY`. Gemini production mode requires `GEMINI_PRODUCTION_ENABLED=true` and `GEMINI_API_KEY`. Without the matching flag and key, the dry run fails clearly before any external request is made and names the required variables.
 
+Coupang affiliate mode requires `COUPANG_ENABLED=true`, `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY`, and `COUPANG_PARTNER_ID`. Mock affiliate mode remains the default. Coupang request and response shapes stay inside the adapter, tests use mocked transport, and dry-run output reports provider name, request count, retry count, returned products, and failure reason.
+
 Gemini dry runs request strict JSON output and include a limited repair fallback for common malformed JSON in long generated article bodies. If parsing still fails, the CLI reports the provider, model, parse error, and a truncated response preview without exposing secrets.
 
 When a PublishingPackage exists, dry-run Article and SEO Preview sections use the PublishingPackage as the source of truth. Legacy article and SEO preview steps no longer override or conflict with the package output.
 
-The dry run prints the assembled PublishingPackage, prompt profile, prompt stack, prompt id, prompt version, rendered variables, composed prompt preview, retry count, validation result, validation report, quality score, quality report, review score, review result, review summary, review issues, threshold result, article title, article word and character count, SEO title and description, FAQ count, approval decision, approval reasons, blocking issues, recommendations, generation duration, queue result, queue item ID, queue status, queue destination, scheduler result, scheduled job ID, scheduled job status, execution preview status, due status, execution attempts, execution queue status, audit timeline, retry metadata, publishing preview status, recommended product names, recommendation reasons, mock affiliate links, disclosure text, selected image filename, tags, category, score, and mock preview URI.
+The dry run prints the assembled PublishingPackage, prompt profile, prompt stack, prompt id, prompt version, rendered variables, composed prompt preview, retry count, validation result, validation report, quality score, quality report, review score, review result, review summary, review issues, threshold result, article title, article word and character count, SEO title and description, FAQ count, approval decision, approval reasons, blocking issues, recommendations, generation duration, queue result, queue item ID, queue status, queue destination, scheduler result, scheduled job ID, scheduled job status, execution preview status, due status, execution attempts, execution queue status, audit timeline, retry metadata, publishing preview status, monetization provider diagnostics, recommended product names, recommendation reasons, affiliate links, disclosure text, selected image filename, tags, category, score, and mock preview URI.
 
 OpenAI and Gemini are not required for local dry runs or tests. MockAIProvider remains the default. Real publishing remains disabled unless a future composition explicitly sets `ASTERIA_PUBLISHING_ENABLED=true`; the current WordPress path is preview-only.
 

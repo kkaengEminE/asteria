@@ -62,7 +62,7 @@ Gemini publishing-package requests use strict JSON instructions and Gemini JSON 
 
 `src/providers/image/googleDrive` contains the Google Drive image library adapter draft. It uses local mock metadata only, maps Google Drive-shaped records into the storage-agnostic Image Asset Domain, and does not call Google APIs.
 
-`src/providers/monetization/coupang` contains the Coupang affiliate adapter draft. It uses local mock Coupang-style product records only, maps them into the provider-agnostic Monetization Domain, and generates mock affiliate links without calling Coupang APIs.
+`src/providers/monetization/coupang` contains the production-capable Coupang affiliate adapter. Mock records remain available and are the default dry-run path. Explicit Coupang mode requires `COUPANG_ENABLED=true` plus credentials, uses an injectable transport, maps Coupang-shaped records into the provider-agnostic Monetization Domain, integrates RetryService and AuditLog, and keeps Coupang request and response details inside the adapter.
 
 `src/providers/storage/local` contains the LocalStorageProvider. It implements the shared StorageProvider boundary for tests and local development-only file behavior. It supports upload, download, list, create folder, and metadata lookup against an explicit root directory while preventing paths from escaping that root. It is not a production storage adapter.
 
@@ -140,7 +140,7 @@ Future provider-backed features such as AI generation, research, WordPress publi
 
 `src/magazines/cat` and `src/magazines/dog` are thin magazine modules. Cat keeps backward-compatible `runCatMagazineDryRun` exports, while Dog exposes `runDogMagazineDryRun`; both delegate to `runMagazineDryRun`.
 
-The shared magazine dry run includes image selection and monetization preview with local mock fixtures only. It registers mock Google Drive and Coupang-style providers, resolves them through Provider Registry, and passes storage-agnostic image and monetization interfaces into workflow steps.
+The shared magazine dry run includes image selection and monetization preview. It registers mock Google Drive image providers by default and resolves monetization through Provider Registry. Mock affiliate mode remains the default, while explicit Coupang mode can resolve the production-capable adapter only after environment safeguards pass. Workflow steps receive provider-agnostic image and monetization interfaces.
 
 Cat Magazine and Dog Magazine are the first `MagazineProfile` examples under `magazines/cat/profile.example.json` and `magazines/dog/profile.example.json`. Both extend the shared `blog` template under `magazines/templates/blog.example.json`, and editorial prompt inputs come from the merged profile/template system.
 
@@ -309,9 +309,9 @@ Future asset-backed features should depend on Asset Library, not directly on Goo
 
 The Monetization Domain does not know about Coupang, Amazon, Temu, or any affiliate implementation. Affiliate providers must adapt their own product catalogs and link generation into the domain product, recommendation, affiliate link, and monetization result models.
 
-Monetization workflows should operate on provider-agnostic product metadata such as name, category, tags, brand, price, currency, rating, thumbnail, URL, and provider name. Provider-specific APIs, credentials, tracking parameters, and commission rules belong in future adapters.
+Monetization workflows should operate on provider-agnostic product metadata such as name, category, tags, brand, price, currency, rating, thumbnail, URL, and provider name. Provider-specific APIs, credentials, tracking parameters, transport behavior, and commission rules belong inside adapters.
 
-The current Coupang affiliate adapter is a mock-first draft. Coupang-shaped product IDs and records stay inside the adapter or product metadata. SDK usage, API credentials, real Coupang Partners links, network calls, and production monetized publishing are deferred.
+The current Coupang affiliate adapter is production-capable but disabled by default. It can use local mock records or an injected transport for real Coupang mode, guarded by `COUPANG_ENABLED=true` and required credentials. Coupang-shaped product IDs and records stay inside the adapter or product metadata. Production monetized publishing remains deferred because publishing is still disabled.
 
 ## Workflow Failure Boundary
 

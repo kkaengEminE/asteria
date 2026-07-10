@@ -254,6 +254,8 @@ Status: Implemented with execution domain models, ScheduledJobExecutor, in-memor
 
 Connect the Coupang affiliate adapter to real product and affiliate link workflows.
 
+Status: Implemented with production-capable Coupang monetization adapter, disabled-by-default environment safeguards, injectable transport, mocked test transport, RetryService integration, affiliate audit events, provider diagnostics, dry-run `--affiliate coupang` mode, and tests. MockCoupangProvider remains available. Publishing, WordPress execution, persistence, and external API calls during tests remain disabled.
+
 ### Sprint 43: Instagram Generation
 
 Generate Instagram-ready captions, hashtags, and image selection metadata from article content.

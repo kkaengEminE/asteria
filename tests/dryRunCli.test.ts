@@ -3,10 +3,21 @@ import { test } from 'node:test';
 import { formatDryRunReport, parseDryRunArgs } from '../scripts/dry-run.ts';
 
 test('dry-run parser supports ai mode and language option', () => {
-  const parsed = parseDryRunArgs(['--magazine', 'cat', '--ai', 'gemini', '--language', 'ko-KR', '고양이가 밤에 뛰어다니는 이유']);
+  const parsed = parseDryRunArgs([
+    '--magazine',
+    'cat',
+    '--ai',
+    'gemini',
+    '--affiliate',
+    'coupang',
+    '--language',
+    'ko-KR',
+    '고양이가 밤에 뛰어다니는 이유'
+  ]);
 
   assert.equal(parsed.magazine, 'cat');
   assert.equal(parsed.aiMode, 'gemini');
+  assert.equal(parsed.affiliateMode, 'coupang');
   assert.equal(parsed.language, 'ko-KR');
   assert.equal(parsed.topic, '고양이가 밤에 뛰어다니는 이유');
 });
@@ -134,6 +145,48 @@ test('dry-run report displays execution preview information when available', () 
   assert.match(report, /Scheduled Job ID: schedule-1/);
   assert.match(report, /Execution Status: SUCCEEDED/);
   assert.match(report, /Queue Status: PROCESSING/);
+});
+
+test('dry-run report displays monetization provider diagnostics', () => {
+  const report = formatDryRunReport(createDryRunResultFixture('mock-ai', {
+    recommendedProducts: [
+      {
+        id: 'cat-puzzle-feeder',
+        name: 'Cat Puzzle Feeder',
+        tags: ['cat'],
+        reason: 'Matched product.',
+        confidence: 1,
+        priority: 1,
+        score: 20
+      }
+    ],
+    affiliateLinks: [
+      {
+        productId: 'cat-puzzle-feeder',
+        provider: 'coupang',
+        url: 'https://cou.pang/affiliate/cat-puzzle-feeder',
+        label: 'Cat Puzzle Feeder',
+        disclosure: 'Disclosure',
+        metadata: {
+          dryRun: false
+        }
+      }
+    ],
+    monetizationDiagnostics: {
+      provider: 'cat-coupang-affiliate',
+      productionEnabled: true,
+      requestCount: 2,
+      retryCount: 1,
+      returnedProductCount: 1,
+      failureReason: undefined
+    }
+  }));
+
+  assert.match(report, /Provider: cat-coupang-affiliate/);
+  assert.match(report, /Request Count: 2/);
+  assert.match(report, /Retry Count: 1/);
+  assert.match(report, /Returned Products: 1/);
+  assert.match(report, /Affiliate Link: https:\/\/cou\.pang\/affiliate\/cat-puzzle-feeder/);
 });
 
 function createDryRunResultFixture(providerName: string, overrides: Record<string, unknown> = {}): any {

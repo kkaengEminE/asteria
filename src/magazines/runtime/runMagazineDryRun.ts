@@ -9,7 +9,12 @@ import {
   type OpenAITransport
 } from '../../providers/ai/index.ts';
 import { GoogleDriveImageLibrary } from '../../providers/image/googleDrive/index.ts';
-import { CoupangAffiliateProvider } from '../../providers/monetization/coupang/index.ts';
+import {
+  CoupangAffiliateProvider,
+  createCoupangAffiliateConfigFromEnv,
+  type CoupangAffiliateTransport,
+  type CoupangEnvironment
+} from '../../providers/monetization/coupang/index.ts';
 import { WordPressPublisher } from '../../providers/publisher/wordpress/index.ts';
 import { AuditLog } from '../../services/auditLog/index.ts';
 import { DryRunWorkflowFactory, type DryRunResult } from '../../services/dryRun/index.ts';
@@ -40,11 +45,15 @@ export interface MagazineDryRunOptions {
   openAITransport?: OpenAITransport;
   geminiEnv?: GeminiEnvironment;
   geminiTransport?: GeminiTransport;
+  affiliateMode?: MagazineDryRunAffiliateMode;
+  coupangEnv?: CoupangEnvironment;
+  coupangTransport?: CoupangAffiliateTransport;
   registry?: ProviderRegistry;
   registerMockProviders?: boolean;
 }
 
 export type MagazineDryRunAIMode = 'mock' | 'openai' | 'gemini';
+export type MagazineDryRunAffiliateMode = 'mock' | 'coupang';
 
 export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Promise<DryRunResult> {
   const topic = options.topic ?? 'indoor enrichment for cats';
@@ -57,7 +66,10 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       openAIEnv: options.openAIEnv,
       openAITransport: options.openAITransport,
       geminiEnv: options.geminiEnv,
-      geminiTransport: options.geminiTransport
+      geminiTransport: options.geminiTransport,
+      affiliateMode: options.affiliateMode,
+      coupangEnv: options.coupangEnv,
+      coupangTransport: options.coupangTransport
     });
   }
 
@@ -130,6 +142,9 @@ export interface RegisterMagazineDryRunMockProviderOptions {
   openAITransport?: OpenAITransport;
   geminiEnv?: GeminiEnvironment;
   geminiTransport?: GeminiTransport;
+  affiliateMode?: MagazineDryRunAffiliateMode;
+  coupangEnv?: CoupangEnvironment;
+  coupangTransport?: CoupangAffiliateTransport;
 }
 
 export function registerMagazineDryRunMockProviders(
@@ -194,6 +209,14 @@ export function registerMagazineDryRunMockProviders(
       mockMonetizationProviderToken,
       {
         create(context) {
+          if (options.affiliateMode === 'coupang') {
+            return new CoupangAffiliateProvider({
+              name: `${context.magazineSlug ?? 'cat'}-coupang-affiliate`,
+              ...createCoupangAffiliateConfigFromEnv(options.coupangEnv),
+              transport: options.coupangTransport
+            });
+          }
+
           return new CoupangAffiliateProvider({
             name: `${context.magazineSlug ?? 'cat'}-coupang-affiliate`,
             dryRun: true,

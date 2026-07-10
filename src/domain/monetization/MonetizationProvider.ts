@@ -16,6 +16,16 @@ export interface MonetizationProvider {
   recommendProducts(query: ProductSearchQuery): Promise<Recommendation[]>;
   generateAffiliateLink(product: Product): Promise<AffiliateLink>;
   previewRecommendation(topic: string, recommendations: Recommendation[]): Promise<MonetizationResult>;
+  getDiagnostics?(): MonetizationProviderDiagnostics;
+}
+
+export interface MonetizationProviderDiagnostics {
+  provider: string;
+  productionEnabled?: boolean;
+  requestCount: number;
+  retryCount: number;
+  returnedProductCount: number;
+  failureReason?: string;
 }
 
 export interface MockMonetizationProviderOptions {
@@ -26,6 +36,7 @@ export interface MockMonetizationProviderOptions {
 export class MockMonetizationProvider implements MonetizationProvider {
   readonly name: string;
   private readonly products: Product[];
+  private returnedProductCount = 0;
 
   constructor(options: MockMonetizationProviderOptions) {
     this.name = options.name ?? 'mock-monetization';
@@ -37,7 +48,11 @@ export class MockMonetizationProvider implements MonetizationProvider {
       .filter((product) => matchesProductSearchQuery(product, query))
       .sort((left, right) => scoreProductForQuery(right, query) - scoreProductForQuery(left, query));
 
-    return typeof query.limit === 'number' ? matches.slice(0, query.limit) : matches;
+    const products = typeof query.limit === 'number' ? matches.slice(0, query.limit) : matches;
+
+    this.returnedProductCount = products.length;
+
+    return products;
   }
 
   async recommendProducts(query: ProductSearchQuery): Promise<Recommendation[]> {
@@ -71,5 +86,14 @@ export class MockMonetizationProvider implements MonetizationProvider {
   async previewRecommendation(topic: string, recommendations: Recommendation[]): Promise<MonetizationResult> {
     return createMonetizationPreview(topic, recommendations);
   }
-}
 
+  getDiagnostics(): MonetizationProviderDiagnostics {
+    return {
+      provider: this.name,
+      productionEnabled: false,
+      requestCount: 0,
+      retryCount: 0,
+      returnedProductCount: this.returnedProductCount
+    };
+  }
+}

@@ -363,9 +363,10 @@ function createGenerateMonetizationPreviewStep(
       const affiliateLinks = recommendations
         .map((recommendation) => recommendation.affiliateLink)
         .filter((link): link is NonNullable<typeof link> => Boolean(link));
+      const monetizationDiagnostics = options.monetizationProvider.getDiagnostics?.();
 
       for (const link of affiliateLinks) {
-        if (!link.url.startsWith('mock://')) {
+        if (!link.url.startsWith('mock://') && monetizationDiagnostics?.productionEnabled !== true) {
           throw new Error(`${magazineProfile.name} dry run only allows mock affiliate links.`);
         }
       }
@@ -377,6 +378,7 @@ function createGenerateMonetizationPreviewStep(
           productSearchQuery: query,
           recommendations,
           affiliateLinks,
+          monetizationDiagnostics,
           monetizationPreview: monetizationResult.preview,
           affiliateDisclosure: createAffiliateDisclosure(affiliateLinks.length)
         }

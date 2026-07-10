@@ -250,14 +250,15 @@ Current image adapter draft:
 
 The Google Drive image library adapter implements the domain image library behavior with local mock records only. It maps Google Drive-shaped metadata into `ImageAsset` and supports search, find, random, score, and select without Google APIs.
 
-Current monetization adapter draft:
+Current monetization adapter:
 
 - `providers/monetization/coupang/CoupangAffiliateProvider`
 - `providers/monetization/coupang/CoupangAffiliateConfig`
 - `providers/monetization/coupang/CoupangProductRecord`
 - `providers/monetization/coupang/CoupangAffiliateLinkResult`
+- `providers/monetization/coupang/CoupangAffiliateTransport`
 
-The Coupang affiliate adapter implements `MonetizationProvider` with local mock records only. It maps Coupang-shaped product metadata into `Product`, supports product search, ranked recommendations, mock affiliate link generation, and preview creation without Coupang APIs.
+The Coupang affiliate adapter implements `MonetizationProvider` with both mock records and an explicit production-capable transport path. Mock mode remains the default. Production mode requires `COUPANG_ENABLED=true`, `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY`, and `COUPANG_PARTNER_ID`, then uses an injected transport and RetryService to search products and generate affiliate links. Adapter diagnostics expose provider name, request count, retry count, returned product count, and failure reason without leaking Coupang transport types into workflows.
 
 Current storage provider foundation:
 

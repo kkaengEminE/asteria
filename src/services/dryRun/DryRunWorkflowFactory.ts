@@ -6,7 +6,7 @@ import type { PublishingQueueResult } from '../../domain/publishingQueue/index.t
 import type { RetryResult } from '../../domain/retry/index.ts';
 import type { JobExecutionResult, ScheduleResult } from '../../domain/scheduler/index.ts';
 import type { ImageAsset } from '../../domain/image/index.ts';
-import type { AffiliateLink, Recommendation } from '../../domain/monetization/index.ts';
+import type { AffiliateLink, MonetizationProviderDiagnostics, Recommendation } from '../../domain/monetization/index.ts';
 import {
   SequentialWorkflowEngine,
   type WorkflowContext,
@@ -50,6 +50,7 @@ export interface CreateDryRunResultOptions {
   imageSelectionReasonKey?: string;
   recommendationsKey?: string;
   affiliateLinksKey?: string;
+  monetizationDiagnosticsKey?: string;
   monetizationPreviewKey?: string;
   affiliateDisclosureKey?: string;
   magazineConfigKey?: string;
@@ -113,6 +114,9 @@ export class DryRunWorkflowFactory {
       imagePreview: selectedImage?.uri,
       recommendedProducts: recommendations ? summarizeRecommendations(recommendations) : undefined,
       affiliateLinks: context.data[options.affiliateLinksKey ?? 'affiliateLinks'] as AffiliateLink[] | undefined,
+      monetizationDiagnostics: context.data[
+        options.monetizationDiagnosticsKey ?? 'monetizationDiagnostics'
+      ] as MonetizationProviderDiagnostics | undefined,
       monetizationPreview: context.data[options.monetizationPreviewKey ?? 'monetizationPreview'] as string | undefined,
       affiliateDisclosure: context.data[options.affiliateDisclosureKey ?? 'affiliateDisclosure'] as string | undefined,
       publishingPackage: context.data.publishingPackage as PublishingPackage | undefined,

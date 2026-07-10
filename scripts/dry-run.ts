@@ -14,6 +14,7 @@ export async function runDryRunCli(argv: string[]): Promise<void> {
     topic: args.topic,
     magazineSlug: args.magazine,
     aiMode: args.aiMode,
+    affiliateMode: args.affiliateMode,
     language: args.language
   });
 
@@ -80,12 +81,20 @@ export function formatDryRunReport(result: Awaited<ReturnType<typeof runMagazine
     'Monetization Preview:',
     result.recommendedProducts && result.recommendedProducts.length > 0
       ? [
+          [
+            `Provider: ${result.monetizationDiagnostics?.provider ?? 'Unavailable'}`,
+            `Production Enabled: ${result.monetizationDiagnostics?.productionEnabled ?? false}`,
+            `Request Count: ${result.monetizationDiagnostics?.requestCount ?? 0}`,
+            `Retry Count: ${result.monetizationDiagnostics?.retryCount ?? 0}`,
+            `Returned Products: ${result.monetizationDiagnostics?.returnedProductCount ?? result.recommendedProducts.length}`,
+            `Failure Reason: ${result.monetizationDiagnostics?.failureReason ?? 'None'}`
+          ].join('\n'),
           ...result.recommendedProducts.map((product, index) =>
             [
               `${index + 1}. ${product.name}`,
               `Reason: ${product.reason}`,
               `Score: ${product.score}`,
-              `Mock Link: ${result.affiliateLinks?.[index]?.url ?? 'Unavailable'}`
+              `${result.affiliateLinks?.[index]?.metadata?.dryRun === false ? 'Affiliate Link' : 'Mock Link'}: ${result.affiliateLinks?.[index]?.url ?? 'Unavailable'}`
             ].join('\n')
           ),
           `Disclosure: ${result.affiliateDisclosure ?? 'Unavailable'}`
@@ -208,11 +217,13 @@ export function parseDryRunArgs(args: string[]): {
   topic?: string;
   magazine: string;
   aiMode: 'mock' | 'openai' | 'gemini';
+  affiliateMode: 'mock' | 'coupang';
   language?: string;
 } {
   const topicParts: string[] = [];
   let magazine = process.env.ASTERIA_MAGAZINE || 'cat';
   let aiMode: 'mock' | 'openai' | 'gemini' = parseAIMode(process.env.ASTERIA_AI_MODE);
+  let affiliateMode: 'mock' | 'coupang' = parseAffiliateMode(process.env.ASTERIA_AFFILIATE_MODE);
   let language: string | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
@@ -232,6 +243,17 @@ export function parseDryRunArgs(args: string[]): {
     if (arg === '--magazine') {
       magazine = parseMagazine(args[index + 1]);
       index += 1;
+      continue;
+    }
+
+    if (arg === '--affiliate') {
+      affiliateMode = parseAffiliateMode(args[index + 1]);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--affiliate=')) {
+      affiliateMode = parseAffiliateMode(arg.slice('--affiliate='.length));
       continue;
     }
 
@@ -258,6 +280,7 @@ export function parseDryRunArgs(args: string[]): {
     topic: topicParts.join(' ') || undefined,
     magazine,
     aiMode,
+    affiliateMode,
     language
   };
 }
@@ -268,6 +291,10 @@ function parseMagazine(value: string | undefined): string {
 
 function parseAIMode(value: string | undefined): 'mock' | 'openai' | 'gemini' {
   return value === 'openai' || value === 'gemini' ? value : 'mock';
+}
+
+function parseAffiliateMode(value: string | undefined): 'mock' | 'coupang' {
+  return value === 'coupang' ? value : 'mock';
 }
 
 function isMainModule(): boolean {

@@ -13,6 +13,12 @@ import type {
   OpenAITransportRequest,
   OpenAITransportResponse
 } from '../src/providers/ai/index.ts';
+import type {
+  CoupangAffiliateLinkTransportRequest,
+  CoupangAffiliateTransport,
+  CoupangAffiliateTransportRequest,
+  CoupangProductRecord
+} from '../src/providers/monetization/coupang/index.ts';
 import { ProviderRegistry } from '../src/providers/index.ts';
 import {
   registerCatDryRunMockProviders,
@@ -285,6 +291,42 @@ test('cat magazine dry run monetization makes no external api call', async () =>
   assert.doesNotMatch(result.affiliateLinks?.[0].url ?? '', /^https?:\/\//);
 });
 
+test('cat magazine dry run production coupang mode is disabled by default', async () => {
+  const transport = new MockCoupangTransport();
+  const result = await runCatMagazineDryRun({
+    topic: 'indoor enrichment',
+    affiliateMode: 'coupang',
+    coupangEnv: {},
+    coupangTransport: transport
+  });
+
+  assert.equal(result.workflowStatus, 'failed');
+  assert.match(result.error ?? '', /Coupang production mode is disabled/);
+  assert.equal(transport.searchCalls.length, 0);
+});
+
+test('cat magazine dry run can use mocked production coupang provider', async () => {
+  const transport = new MockCoupangTransport();
+  const result = await runCatMagazineDryRun({
+    topic: 'indoor enrichment',
+    affiliateMode: 'coupang',
+    coupangEnv: {
+      COUPANG_ENABLED: 'true',
+      COUPANG_ACCESS_KEY: 'test-access-key',
+      COUPANG_SECRET_KEY: 'test-secret-key',
+      COUPANG_PARTNER_ID: 'test-partner-id',
+      COUPANG_BASE_URL: 'https://coupang.test'
+    },
+    coupangTransport: transport
+  });
+
+  assert.equal(result.workflowStatus, 'success');
+  assert.equal(result.monetizationDiagnostics?.productionEnabled, true);
+  assert.equal(result.monetizationDiagnostics?.requestCount, 4);
+  assert.ok((result.monetizationDiagnostics?.returnedProductCount ?? 0) > 0);
+  assert.ok(result.affiliateLinks?.every((link) => link.url.startsWith('https://cou.pang/affiliate/')));
+});
+
 function createFailingAIProvider(): AIProvider {
   return {
     name: 'failing-ai',
@@ -365,3 +407,66 @@ class MockOpenAITransport implements OpenAITransport {
     return this.response;
   }
 }
+
+class MockCoupangTransport implements CoupangAffiliateTransport {
+  readonly searchCalls: CoupangAffiliateTransportRequest[] = [];
+  readonly linkCalls: CoupangAffiliateLinkTransportRequest[] = [];
+
+  async searchProducts(request: CoupangAffiliateTransportRequest) {
+    this.searchCalls.push(request);
+
+    return {
+      products: mockCoupangRecords
+    };
+  }
+
+  async generateAffiliateLink(request: CoupangAffiliateLinkTransportRequest) {
+    this.linkCalls.push(request);
+
+    return {
+      url: `https://cou.pang/affiliate/${request.productId}`
+    };
+  }
+}
+
+const mockCoupangRecords: CoupangProductRecord[] = [
+  {
+    id: 'cat-enrichment-toy',
+    productName: 'Interactive Cat Enrichment Toy',
+    productDescription: 'Production-style Coupang product fixture for cat enrichment.',
+    categoryName: 'cat-care',
+    keywords: ['cat', 'enrichment', 'toy'],
+    priceAmount: 19900,
+    currency: 'KRW',
+    rating: 4.7,
+    productUrl: 'https://www.coupang.test/products/cat-enrichment-toy',
+    coupangProductId: 'prod-cat-enrichment-toy',
+    mockUri: 'mock://coupang/products/cat-enrichment-toy'
+  },
+  {
+    id: 'cat-window-perch',
+    productName: 'Cat Window Perch',
+    productDescription: 'Production-style Coupang product fixture for indoor enrichment.',
+    categoryName: 'cat-care',
+    keywords: ['cat', 'enrichment', 'window'],
+    priceAmount: 33900,
+    currency: 'KRW',
+    rating: 4.5,
+    productUrl: 'https://www.coupang.test/products/cat-window-perch',
+    coupangProductId: 'prod-cat-window-perch',
+    mockUri: 'mock://coupang/products/cat-window-perch'
+  },
+  {
+    id: 'cat-puzzle-feeder',
+    productName: 'Cat Puzzle Feeder',
+    productDescription: 'Production-style Coupang product fixture for food enrichment.',
+    categoryName: 'cat-care',
+    keywords: ['cat', 'enrichment', 'food'],
+    priceAmount: 28900,
+    currency: 'KRW',
+    rating: 4.8,
+    productUrl: 'https://www.coupang.test/products/cat-puzzle-feeder',
+    coupangProductId: 'prod-cat-puzzle-feeder',
+    mockUri: 'mock://coupang/products/cat-puzzle-feeder'
+  }
+];
