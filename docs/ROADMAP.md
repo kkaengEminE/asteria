@@ -333,3 +333,9 @@ Status: Implemented with in-memory adapters for PublishingQueueRepository, Sched
 Resolve Architecture Review 004 cleanup items before durable persistence.
 
 Status: Implemented with `PersistenceCompositionFactory`, explicit runtime ownership of in-memory repositories/stores/locks/idempotency/UnitOfWork, removal of internal default persistence adapter construction from operational services, ScheduledJobExecutor lock/idempotency cleanup on post-claim paths, Audit/Metrics future async direction documentation, and architecture boundary tests. No durable persistence, database, ORM, filesystem persistence, publishing, or external API calls were added.
+
+### Sprint 52: Durable Persistence Adapter Planning
+
+Select and design the first durable persistence adapter path before implementation.
+
+Status: Planned in documentation with SQLite recommended as the first local/dev durable adapter path and PostgreSQL recommended as the production adapter target. The first future implementation scope is Queue, Scheduler, Job Execution, Idempotency, and Locks, while Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred. Proposed schema boundaries, migration policy, transaction/concurrency strategy, optimistic revision behavior, idempotency policy, and retry-safe publisher dispatch constraints are documented in `docs/DURABLE_PERSISTENCE_PLAN.md`. No database, ORM, filesystem persistence, runtime behavior change, external API call, publishing, or product feature was added.

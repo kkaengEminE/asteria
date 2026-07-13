@@ -478,6 +478,8 @@ Sprint 51 adds in-memory adapters for Queue, Scheduler, Job Execution, Audit, Me
 
 Architecture Cleanup Patch 006 adds `PersistenceCompositionFactory`, which creates the runtime-owned persistence bundle for dry runs. Operational services receive repositories, stores, lock manager, idempotency store, and UnitOfWork through constructor injection instead of constructing default in-memory adapters internally. This prepares future durable adapters without changing service behavior.
 
+Sprint 52 adds durable adapter planning without implementation. The planned first durable local/dev adapter is SQLite, while PostgreSQL is the production target. The first future implementation should focus on `PublishingQueueRepository`, `SchedulerRepository`, `JobExecutionRepository`, `IdempotencyStore`, and `LockManager`; `AuditStore`, `MetricsStore`, `AssetCatalogRepository`, and `StorageMetadataRepository` remain deferred until the operational path is proven durable.
+
 ## `src/prompts`
 
 Contains prompt management logic:

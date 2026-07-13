@@ -301,7 +301,7 @@ Metrics must not contain secrets or provider SDK response objects. They are summ
 
 ## Persistence Boundary
 
-Persistence is implemented through provider-neutral ports plus in-memory adapters for current runtime services. Durable persistence is not implemented. The authoritative planning document is `docs/PERSISTENCE_ARCHITECTURE.md`.
+Persistence is implemented through provider-neutral ports plus in-memory adapters for current runtime services. Durable persistence is not implemented. The authoritative architecture document is `docs/PERSISTENCE_ARCHITECTURE.md`; the first durable adapter plan is `docs/DURABLE_PERSISTENCE_PLAN.md`.
 
 Persistence enters Asteria through repository ports and future adapters, not through domain models, provider SDK records, workflow internals, or direct database access from runtime steps.
 
@@ -324,9 +324,11 @@ Sprint 51 migrates PublishingQueue, SchedulerService, ScheduledJobExecutor recor
 
 Architecture Cleanup Patch 006 adds `PersistenceCompositionFactory` so runtime composition owns repositories, stores, idempotency, locking, and UnitOfWork selection. Operational service constructors no longer create default persistence adapters internally. Durable adapters remain deferred, but future runtime composition can swap the persistence bundle without changing queue, scheduler, executor, audit, metrics, or asset services.
 
+Sprint 52 selects SQLite as the first local/dev durable adapter path and PostgreSQL as the production adapter target, without implementing either backend. The first future durable scope should cover Queue, Scheduler, Job Execution, Idempotency, and Locks before Audit, Metrics, Asset Catalog, or Storage Metadata are migrated.
+
 Locking should combine optimistic concurrency for entity transitions with short-lived execution locks. Idempotency should be scoped by operation type and entity, especially for queue enqueue, schedule creation, job execution, publisher dispatch, asset registration, and audit append.
 
-Migration strategy is deferred to a later implementation sprint. Future migrations should be explicit, versioned, additive where possible, and owned by persistence adapters and release operations. No migration may enable publishing automatically.
+Migration implementation is deferred to a later sprint. Future migrations should be explicit, versioned, additive where possible, and owned by persistence adapters and release operations. No migration may enable publishing automatically.
 
 ## AI Provider Boundary
 

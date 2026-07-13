@@ -1,6 +1,6 @@
 # Persistence Architecture Planning
 
-Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrates existing in-memory operational services onto those ports. This document still does not select a database, add schema files, add filesystem storage, run migrations, change runtime behavior, or introduce external services.
+Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selects a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md` without implementing a database, adding schema files, adding filesystem storage, running migrations, changing runtime behavior, or introducing external services.
 
 ## Goals
 
@@ -9,11 +9,13 @@ Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 tur
 - Let Queue, Scheduler, Audit, Metrics, Asset Catalog, and Storage metadata become durable without leaking database details into domain models or workflows.
 - Define repository ports before choosing adapters.
 - Define transaction, locking, idempotency, and migration policies before production persistence work.
+- Keep durable adapter selection documented separately from implementation work.
 
 ## Non-Goals
 
 - No SQLite, PostgreSQL, Prisma, Drizzle, filesystem persistence, or database setup.
 - No durable persistence implementation.
+- No durable adapter package or schema file.
 - No runtime behavior changes.
 - No production publishing enablement.
 - No external API calls.
@@ -460,9 +462,17 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - Architecture boundary coverage prevents operational services from directly instantiating concrete in-memory persistence adapters.
 - Future async direction for Audit and Metrics is documented without changing public APIs.
 
+## Planned in Sprint 52
+
+- SQLite is recommended as the first local/dev durable adapter path.
+- PostgreSQL is recommended as the production adapter target.
+- The first future durable implementation scope should cover `PublishingQueueRepository`, `SchedulerRepository`, `JobExecutionRepository`, `IdempotencyStore`, and `LockManager`.
+- `AuditStore`, `MetricsStore`, `AssetCatalogRepository`, and `StorageMetadataRepository` remain deferred until operational persistence is proven.
+- Proposed schema boundaries, migration policy, transaction boundaries, optimistic revision behavior, idempotency policy, and locking strategy are documented in `docs/DURABLE_PERSISTENCE_PLAN.md`.
+
 ## Accepted Deferrals
 
-- No database adapter is selected.
+- No database adapter is implemented.
 - No schema or migration file is created.
 - No persistence configuration or environment variables are added.
 - No filesystem persistence is introduced.
@@ -472,8 +482,8 @@ Migration ownership belongs to persistence adapters and release operations, not 
 
 ## Future Sprint Candidates
 
-1. Durable Queue Adapter Sprint: add first durable queue adapter behind the repository port.
-2. AuditStore Sprint: add durable append-only audit storage behind AuditLog.
-3. Asset Catalog Persistence Sprint: add durable asset metadata catalog behind AssetLibrary.
-4. Scheduler Persistence Sprint: persist scheduled jobs and execution records.
-5. Migration Tooling Sprint: choose and introduce migration tooling after repository ports stabilize.
+1. SQLite Operational Persistence Adapter Sprint: add first durable local/dev adapter for queue, scheduler, execution, idempotency, and locks.
+2. Durable AuditStore Sprint: add durable append-only audit storage behind AuditLog after async write direction is confirmed.
+3. Durable MetricsStore Sprint: decide whether metrics are stored as durable events or exported asynchronously.
+4. Asset Catalog Persistence Sprint: add durable asset metadata catalog behind AssetLibrary.
+5. PostgreSQL Operational Persistence Adapter Sprint: implement the production-target adapter after SQLite validates schema and repository behavior.

@@ -4,7 +4,7 @@ Asteria is the foundation for an extensible AI Publishing OS: a reusable content
 
 ## Current Sprint
 
-Sprint 51 migrates existing in-memory operational services onto the provider-neutral persistence ports introduced in Sprint 50. Publishing Queue, SchedulerService, ScheduledJobExecutor records, AuditLog, MetricsService, AssetLibrary metadata, and storage metadata now compose through in-memory repository/store adapters. No database, filesystem persistence, runtime behavior change, external API call, or publishing enablement is introduced.
+Sprint 52 plans the first durable persistence adapter path without implementing persistence. The selected path is SQLite for local/dev adapter proof and PostgreSQL as the production target. The first future implementation scope is operational persistence for Queue, Scheduler, Job Execution, Idempotency, and Locks. No database, ORM, filesystem persistence, runtime behavior change, external API call, or publishing enablement is introduced.
 
 ## Commands
 
@@ -97,6 +97,8 @@ Audit Log records important workflow events through `AuditStore`; the current ru
 Persistence Architecture is documented under `docs/PERSISTENCE_ARCHITECTURE.md`. Persistence ports live under `src/services/persistence` and expose provider-neutral domain models only. Current runtime services use in-memory adapters behind those ports; durable database/filesystem adapters remain deferred.
 
 Runtime persistence composition is explicit. `PersistenceCompositionFactory` creates the dry-run in-memory repository/store/lock/idempotency/UnitOfWork bundle, and runtime code injects those ports into Queue, Scheduler, Executor, Audit, Metrics, and Asset services. Services no longer choose default persistence adapters internally.
+
+Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. The plan recommends SQLite as the first local/dev durable adapter and PostgreSQL as the production adapter target, with operational persistence migrating before Audit, Metrics, and Asset Catalog durability.
 
 Retry Foundation provides a reusable retry service for future AI providers, storage providers, publisher adapters, and scheduler work. It records retry attempts, retry count, final reason, and policy metadata without performing real waits in tests. ContentGenerationWorkflow now uses RetryService for recoverable structured output failures while preserving existing metadata. The current dry run also includes mock retry metadata for report visibility.
 
