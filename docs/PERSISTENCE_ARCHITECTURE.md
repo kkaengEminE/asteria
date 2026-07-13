@@ -490,6 +490,13 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - Runtime selection through `ASTERIA_PERSISTENCE_MODE=memory|sqlite` and `ASTERIA_SQLITE_DATABASE_PATH`.
 - Tests for isolated temporary databases, persistence across repository instances, revision conflicts, transaction rollback, idempotency records, locks, dry-run regression, Quality Lab regression, and architecture boundary compliance.
 
+## Validated in Sprint 54
+
+- SQLite operational flow across Queue, Scheduler, ScheduledJobExecutor, RetryService, IdempotencyStore, LockManager, and UnitOfWork.
+- Queue enqueue, status transitions, scheduling, rescheduling, execution, duplicate execution prevention, retry after recoverable failure, lock expiration, stale revision conflict, transaction rollback, repeated migration startup, and restart with an existing SQLite database.
+- ScheduledJobExecutor now avoids execution id collisions after process recreation by checking the execution repository before creating a new execution id.
+- SQLite Quality Lab mode remains compatible with local/dev persistence.
+
 ## Accepted Deferrals
 
 - No PostgreSQL adapter is implemented.

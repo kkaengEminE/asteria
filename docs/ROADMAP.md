@@ -345,3 +345,9 @@ Status: Planned in documentation with SQLite recommended as the first local/dev 
 Implement the first opt-in durable local/dev persistence adapter without making it the default.
 
 Status: Implemented with `src/providers/persistence/sqlite`, initial schema migration, repeatable migration startup checks, unsupported future schema version failure, SQLite adapters for Publishing Queue, Scheduler, Job Execution, Idempotency, and Locks, SQLite UnitOfWork transaction rollback coverage, runtime selection through `ASTERIA_PERSISTENCE_MODE=sqlite` plus `ASTERIA_SQLITE_DATABASE_PATH`, isolated temporary database tests, dry-run regression, Quality Lab regression, and architecture boundary coverage. In-memory remains default. Publishing, PostgreSQL, Prisma, Drizzle, filesystem persistence, Audit persistence, Metrics persistence, Asset Catalog persistence, Storage Metadata persistence, and external API calls remain disabled/deferred.
+
+### Sprint 54: SQLite Operational Validation
+
+Validate SQLite operational behavior under realistic runtime scenarios without adding new persistence features.
+
+Status: Implemented with operational SQLite integration coverage for Queue, Scheduler, ScheduledJobExecutor, RetryService, IdempotencyStore, LockManager, and UnitOfWork. Validation covers queue enqueue, queue status transitions, scheduling, rescheduling, execution, duplicate execution prevention, retry after recoverable failure, lock expiration, stale revision conflicts, transaction rollback, restart with an existing SQLite database, repeated startup migration, persistence across runtime recreation, SQLite dry-run mode, and SQLite Quality Lab mode. ScheduledJobExecutor was hardened to avoid execution id collisions after process recreation. Publishing, PostgreSQL, external APIs, and new persistence features remain disabled/deferred.

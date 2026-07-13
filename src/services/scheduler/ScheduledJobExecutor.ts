@@ -256,7 +256,7 @@ export class ScheduledJobExecutor {
       }
 
       const execution: ScheduledJobExecution = {
-        id: this.createId(),
+        id: await this.createId(),
         jobId: job.id,
         queueItemId: job.queueItemId,
         status: 'RUNNING',
@@ -460,7 +460,7 @@ export class ScheduledJobExecutor {
     metadata?: Record<string, unknown>;
   }): Promise<JobExecutionResult<T>> {
     const execution: ScheduledJobExecution = {
-      id: this.createId(),
+      id: await this.createId(),
       jobId: input.job?.id ?? 'unknown',
       queueItemId: input.job?.queueItemId,
       status: 'SKIPPED',
@@ -525,8 +525,15 @@ export class ScheduledJobExecutor {
     return finished;
   }
 
-  private createId(): string {
-    return `execution-${this.nextId++}`;
+  private async createId(): Promise<string> {
+    while (true) {
+      const id = `execution-${this.nextId++}`;
+      const existing = await this.repository.getById(id);
+
+      if (!existing) {
+        return id;
+      }
+    }
   }
 }
 
