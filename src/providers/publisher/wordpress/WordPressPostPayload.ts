@@ -1,4 +1,4 @@
-import type { PublishingPayload } from '../../../core/types.ts';
+import type { PublishingDestination } from '../../../domain/publishingQueue/index.ts';
 
 export interface WordPressPostPayload {
   title: string;
@@ -17,8 +17,25 @@ export class WordPressPostPayloadValidationError extends Error {
   }
 }
 
+export interface CreateWordPressPostPayloadInput {
+  draft: {
+    title: string;
+    body: string;
+    summary?: string;
+    slug?: string;
+    tags?: string[];
+    format?: string;
+    language?: string;
+    metadata?: Record<string, unknown>;
+  };
+  destination: PublishingDestination;
+  metadata?: Record<string, unknown>;
+  images?: unknown[];
+  affiliateLinks?: unknown[];
+}
+
 export function createWordPressPostPayload(
-  payload: PublishingPayload,
+  payload: CreateWordPressPostPayloadInput,
   defaultStatus: WordPressPostPayload['status'] = 'draft'
 ): WordPressPostPayload {
   const postPayload: WordPressPostPayload = {
@@ -50,4 +67,3 @@ export function validateWordPressPostPayload(payload: WordPressPostPayload): voi
     throw new WordPressPostPayloadValidationError('WordPress post payload requires content.');
   }
 }
-

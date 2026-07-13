@@ -1,15 +1,18 @@
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
-import type { PublishingResult, ResearchResult } from '../../core/types.ts';
+import type { ResearchResult } from '../../core/types.ts';
 import type { AuditEvent } from '../../domain/audit/index.ts';
 import type { ApprovalResult } from '../../domain/approval/index.ts';
 import type { PublishingPackage } from '../../domain/content/index.ts';
 import type { PublishingQueueResult } from '../../domain/publishingQueue/index.ts';
+import type { PublishResult } from '../../domain/publisher/index.ts';
+import type { MetricSnapshot } from '../../domain/metrics/index.ts';
 import type { RetryResult } from '../../domain/retry/index.ts';
 import type { JobExecutionResult, ScheduleResult } from '../../domain/scheduler/index.ts';
 import type { EditorialReview, ReviewIssue, ReviewResult } from '../../domain/editorialReview/index.ts';
 import type { ImageAsset } from '../../domain/image/index.ts';
 import type { AffiliateLink, MonetizationProviderDiagnostics, Recommendation } from '../../domain/monetization/index.ts';
 import type { RealGenerationReview } from '../realGenerationReview/index.ts';
+import type { DryRunPreviewReport } from './DryRunPreviewReport.ts';
 import type { WorkflowResult } from '../../workflows/index.ts';
 
 export interface DryRunMagazineSummary {
@@ -23,13 +26,16 @@ export interface DryRunResult {
   topic: string;
   workflowStatus: WorkflowResult['status'];
   executedSteps: string[];
+  previewReport: DryRunPreviewReport;
   renderedPromptPreview?: string;
   articlePreview?: string;
   seoPreview?: string;
-  publishPreview?: PublishingResult;
+  publishPreview?: PublishResult;
   queueResult?: PublishingQueueResult;
   schedulerResult?: ScheduleResult;
   executionResult?: JobExecutionResult;
+  publisherResult?: PublishResult;
+  metricsSnapshot?: MetricSnapshot;
   auditTimeline?: AuditEvent[];
   retryMetadata?: RetryResult;
   researchPreview?: ResearchResult[];

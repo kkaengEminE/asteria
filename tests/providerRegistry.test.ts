@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { AIProvider, AIProviderRequest, AIProviderResponse } from '../src/core/index.ts';
+import { createAIUsage, createMockPublishingPackage, type AIProvider, type AIRequest, type AIResponse } from '../src/providers/ai/index.ts';
 import {
   createProviderToken,
   DuplicateProviderRegistrationError,
@@ -38,10 +38,10 @@ test('provider registry resolves provider', async () => {
     dryRun: true
   });
 
-  const response = await provider.generate({ prompt: 'Hello' });
+  const response = await provider.generate({ userPrompt: 'Hello' });
 
   assert.equal(provider.name, 'cat');
-  assert.equal(response.text, 'mock response: Hello');
+  assert.equal(response.content, 'mock response: Hello');
 });
 
 test('provider registry rejects duplicate registration', () => {
@@ -96,11 +96,31 @@ test('provider registry removes provider', async () => {
 function createMockAiProvider(name: string): AIProvider {
   return {
     name,
-    async generate(request: AIProviderRequest): Promise<AIProviderResponse> {
+    async generate(request: AIRequest): Promise<AIResponse> {
       return {
-        text: `mock response: ${request.prompt}`
+        content: `mock response: ${request.userPrompt ?? request.systemPrompt ?? ''}`,
+        finishReason: 'stop',
+        usage: createAIUsage(0, 0),
+        model: 'mock-model',
+        provider: name
+      };
+    },
+    async generatePublishingPackage(request) {
+      return createMockPublishingPackage(request, name, 'mock-model');
+    },
+    async *stream(request: AIRequest): AsyncIterable<AIResponse> {
+      yield await this.generate(request);
+    },
+    async countTokens(request: AIRequest) {
+      const totalTokens = (request.userPrompt ?? request.systemPrompt ?? '').split(/\s+/u).filter(Boolean).length;
+
+      return createAIUsage(totalTokens, 0);
+    },
+    async healthCheck() {
+      return {
+        ok: true,
+        provider: name
       };
     }
   };
 }
-

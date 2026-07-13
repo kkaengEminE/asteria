@@ -4,7 +4,7 @@ Asteria is the foundation for an extensible AI Publishing OS: a reusable content
 
 ## Current Sprint
 
-Sprint 42 introduces Real Coupang Integration behind the provider-neutral monetization boundary. Mock monetization remains the default, while explicit Coupang mode requires `COUPANG_ENABLED=true` and credentials before any transport call can occur. Publishing remains disabled.
+Sprint 50 turns the approved persistence architecture into provider-neutral TypeScript ports only. Asteria now has repository/store contracts for Queue, Scheduler, Job Execution, Audit, Metrics, Asset Catalog, Storage Metadata, Idempotency, Locking, and UnitOfWork, plus tiny in-memory proof adapters for idempotency, locks, and UnitOfWork tests. No database, filesystem persistence, runtime behavior change, external API call, or publishing enablement is introduced.
 
 ## Commands
 
@@ -74,15 +74,33 @@ Asset Library sits above StorageProvider. It registers assets, stores or retriev
 
 Publishing Queue sits between editorial approval and future publisher execution. It stores provider-neutral queue items in memory for this foundation sprint, records approval decisions and destinations, rejects `NEEDS_REVIEW`, `REJECTED`, or missing approval packages, audits queue rejections, enforces explicit status transition rules, and does not invoke publisher adapters during dry-run queue preview.
 
-Scheduler Foundation sits after Publishing Queue. It can create, list, get, and cancel in-memory scheduled jobs for approved queue items, updates queue status to `SCHEDULED`, emits `JOB_SCHEDULED` and `JOB_CANCELLED` audit events, and displays scheduler preview metadata in dry-run output. It does not run jobs, call publisher adapters, or introduce persistence.
+Scheduler Operations sit after Publishing Queue. The in-memory SchedulerService can create, list, get, reschedule, retry scheduling, cancel, and mark jobs completed for operational preview. It prevents duplicate active jobs, rejects invalid schedules, keeps completed jobs immutable, emits scheduler audit events, records scheduler metrics, and displays operational state in dry-run output. It does not run cron, call external schedulers, publish content, or introduce persistence.
 
-Scheduled Job Executor sits after Scheduler. It checks due status, skips future/cancelled/invalid jobs, prevents duplicate execution, moves valid queue items to `PROCESSING`, runs only a supplied provider-neutral preview operation, and records success or failure without transitioning to `PUBLISHED`. It uses RetryService for recoverable simulated execution failures and does not call WordPress or any publisher adapter.
+Scheduled Job Executor sits after Scheduler. It checks due status, skips future/cancelled/invalid jobs, prevents duplicate execution, moves valid queue items to `PROCESSING`, and can execute scheduled publishing previews through PublisherService without transitioning to `PUBLISHED`. It uses RetryService for recoverable execution failures and does not call WordPress or any network publisher adapter.
+
+Publisher Foundation sits between scheduled execution and concrete publisher adapters. It defines provider-neutral publish request/result/failure/status models, validates requests, dispatches through PublisherService, audits publish started/succeeded/failed/skipped events, and supports DryRunPublisher preview mode while real publishing remains disabled.
+
+WordPress Publisher Adapter sits behind the Publisher boundary. It maps provider-neutral publish requests into WordPress post payloads, uses an injectable transport, retries recoverable transport failures, emits publish audit events, and requires `WORDPRESS_ENABLED=true`, `WORDPRESS_SITE_URL`, `WORDPRESS_USERNAME`, and `WORDPRESS_APPLICATION_PASSWORD` before adapter execution. Tests use mocked transport only.
+
+Legacy provider contracts are being retired gradually. Current AI providers live under `src/providers/ai`, publisher execution models live under `src/domain/publisher`, and provider adapters must not import obsolete `src/core` contracts. Remaining `src/core` contracts are kept only where they are still active or compatibility-safe.
+
+Legacy publishing contracts have been retired from active paths. PublishingWorkflow now creates provider-neutral `PublishRequest` values and returns `PublishResult` values through PublisherService. The dry-run CLI keeps the existing Publish Preview section while using the current publisher domain internally.
+
+Metrics Foundation records operational counters, durations, and failures in memory for dry-run observability. Metrics are provider-neutral and observational only; they do not change approval, queue, scheduler, executor, publisher, or provider decisions.
+
+Instagram Content Generation is dry-run only. It converts the provider-neutral PublishingPackage into social preview content using magazine profile values and SEO keywords. It does not post, call Instagram APIs, perform OAuth, or publish content.
+
+Podcast / TTS Foundation is dry-run only. It converts the provider-neutral PublishingPackage into an audio-ready preview package using magazine profile values and, when available, Instagram Preview hook and CTA text. It does not synthesize audio, call TTS APIs, publish podcasts, or upload media.
 
 Audit Log records important workflow events in memory for this foundation sprint. The dry run displays a timeline for content generation, quality evaluation, editorial review completion, approval decisions, queue events, scheduler events, and job execution events. Future persistence should sit behind an AuditStore-style port; external logging remains deferred.
+
+Persistence Architecture is documented under `docs/PERSISTENCE_ARCHITECTURE.md`. Persistence ports live under `src/services/persistence` and expose provider-neutral domain models only. Existing runtime services still use their current in-memory foundations; durable adapters remain deferred.
 
 Retry Foundation provides a reusable retry service for future AI providers, storage providers, publisher adapters, and scheduler work. It records retry attempts, retry count, final reason, and policy metadata without performing real waits in tests. ContentGenerationWorkflow now uses RetryService for recoverable structured output failures while preserving existing metadata. The current dry run also includes mock retry metadata for report visibility.
 
 The CLI loads `.env` automatically for local development. Existing exported shell environment variables take precedence over `.env` values. OpenAI production mode requires `OPENAI_PRODUCTION_ENABLED=true` and `OPENAI_API_KEY`. Gemini production mode requires `GEMINI_PRODUCTION_ENABLED=true` and `GEMINI_API_KEY`. Without the matching flag and key, the dry run fails clearly before any external request is made and names the required variables.
+
+WordPress adapter execution requires `WORDPRESS_ENABLED=true`, `WORDPRESS_SITE_URL`, `WORDPRESS_USERNAME`, and `WORDPRESS_APPLICATION_PASSWORD`. The default dry run does not use the WordPress adapter for scheduled execution; it uses DryRunPublisher. Real WordPress publishing remains disabled.
 
 Coupang affiliate mode requires `COUPANG_ENABLED=true`, `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY`, and `COUPANG_PARTNER_ID`. Mock affiliate mode remains the default. Coupang request and response shapes stay inside the adapter, tests use mocked transport, and dry-run output reports provider name, request count, retry count, returned products, and failure reason.
 
@@ -90,7 +108,7 @@ Gemini dry runs request strict JSON output and include a limited repair fallback
 
 When a PublishingPackage exists, dry-run Article and SEO Preview sections use the PublishingPackage as the source of truth. Legacy article and SEO preview steps no longer override or conflict with the package output.
 
-The dry run prints the assembled PublishingPackage, prompt profile, prompt stack, prompt id, prompt version, rendered variables, composed prompt preview, retry count, validation result, validation report, quality score, quality report, review score, review result, review summary, review issues, threshold result, article title, article word and character count, SEO title and description, FAQ count, approval decision, approval reasons, blocking issues, recommendations, generation duration, queue result, queue item ID, queue status, queue destination, scheduler result, scheduled job ID, scheduled job status, execution preview status, due status, execution attempts, execution queue status, audit timeline, retry metadata, publishing preview status, monetization provider diagnostics, recommended product names, recommendation reasons, affiliate links, disclosure text, selected image filename, tags, category, score, and mock preview URI.
+The dry run prints the assembled PublishingPackage, prompt profile, prompt stack, prompt id, prompt version, rendered variables, composed prompt preview, retry count, validation result, validation report, quality score, quality report, review score, review result, review summary, review issues, threshold result, article title, article word and character count, SEO title and description, FAQ count, approval decision, approval reasons, blocking issues, recommendations, generation duration, queue result, queue item ID, queue status, queue destination, scheduler result, scheduled job ID, scheduled job status, scheduler job counts, duplicate and lookup state, schedule retry attempts, execution preview status, due status, execution attempts, execution queue status, publisher adapter, publisher mode, preview URL, target site, publishing enabled flag, publish result, publish ID, metrics summary, Instagram preview, Podcast preview, audit timeline, retry metadata, publishing preview status, monetization provider diagnostics, recommended product names, recommendation reasons, affiliate links, disclosure text, selected image filename, tags, category, score, and mock preview URI.
 
 OpenAI and Gemini are not required for local dry runs or tests. MockAIProvider remains the default. Real publishing remains disabled unless a future composition explicitly sets `ASTERIA_PUBLISHING_ENABLED=true`; the current WordPress path is preview-only.
 

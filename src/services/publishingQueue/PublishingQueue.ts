@@ -9,6 +9,7 @@ import type {
   PublishingQueueStatus
 } from '../../domain/publishingQueue/index.ts';
 import type { AuditLog } from '../auditLog/index.ts';
+import type { MetricsService } from '../metrics/index.ts';
 
 export interface PublishingQueueEnqueueInput {
   publishingPackage: PublishingPackage;
@@ -27,6 +28,7 @@ export interface PublishingQueueStorage {
 export interface PublishingQueueOptions {
   storage?: PublishingQueueStorage;
   auditLog?: AuditLog;
+  metricsService?: MetricsService;
 }
 
 export interface PublishingQueueTransitionOptions {
@@ -52,6 +54,7 @@ export class InMemoryPublishingQueueStorage implements PublishingQueueStorage {
 export class PublishingQueue {
   private readonly storage: PublishingQueueStorage;
   private readonly auditLog?: AuditLog;
+  private readonly metricsService?: MetricsService;
   private nextId = 1;
 
   constructor(storageOrOptions: PublishingQueueStorage | PublishingQueueOptions = {}) {
@@ -63,12 +66,21 @@ export class PublishingQueue {
 
     this.storage = storageOrOptions.storage ?? new InMemoryPublishingQueueStorage();
     this.auditLog = storageOrOptions.auditLog;
+    this.metricsService = storageOrOptions.metricsService;
   }
 
   async enqueue(input: PublishingQueueEnqueueInput): Promise<PublishingQueueResult> {
     const approvalDecision = input.approvalResult?.decision ?? 'UNKNOWN';
 
     if (approvalDecision !== 'APPROVED') {
+      this.metricsService?.incrementCounter('publishing_queue.rejected', 1, {
+        tags: {
+          approvalDecision
+        },
+        metadata: {
+          destinationName: input.destination.name
+        }
+      });
       this.auditLog?.append({
         type: 'QUEUE_REJECTED',
         actor: {
@@ -108,6 +120,15 @@ export class PublishingQueue {
     };
 
     await this.storage.save(item);
+    this.metricsService?.incrementCounter('publishing_queue.enqueued', 1, {
+      tags: {
+        destinationType: item.destination.type
+      },
+      metadata: {
+        queueItemId: item.id,
+        destinationName: item.destination.name
+      }
+    });
     this.auditLog?.append({
       type: 'QUEUE_CREATED',
       actor: {
@@ -155,6 +176,12 @@ export class PublishingQueue {
     }
 
     if (!canTransition(item.status, status, options)) {
+      this.metricsService?.recordFailure('publishing_queue.invalid_transition', `${item.status} -> ${status}`, {
+        tags: {
+          from: item.status,
+          to: status
+        }
+      });
       return {
         status: 'invalid_transition',
         item,
@@ -170,6 +197,14 @@ export class PublishingQueue {
     };
 
     await this.storage.save(updated);
+    this.metricsService?.incrementCounter('publishing_queue.status_updated', 1, {
+      tags: {
+        status
+      },
+      metadata: {
+        queueItemId: updated.id
+      }
+    });
 
     return {
       status: 'updated',
@@ -206,6 +241,12 @@ export class PublishingQueue {
     };
 
     await this.storage.save(updated);
+    this.metricsService?.incrementCounter('publishing_queue.cancelled', 1, {
+      metadata: {
+        queueItemId: updated.id,
+        reason
+      }
+    });
     this.auditLog?.append({
       type: 'QUEUE_CANCELLED',
       actor: {
@@ -262,6 +303,14 @@ export class PublishingQueue {
     };
 
     await this.storage.save(updated);
+    this.metricsService?.recordFailure('publishing_queue.failed', queueFailure.reason, {
+      tags: {
+        code: queueFailure.code ?? 'unknown'
+      },
+      metadata: {
+        queueItemId: updated.id
+      }
+    });
     this.auditLog?.append({
       type: 'QUEUE_FAILED',
       actor: {

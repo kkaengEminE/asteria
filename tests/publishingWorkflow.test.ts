@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Publisher } from '../src/core/index.ts';
-import type { PublishingPayload, PublishingResult } from '../src/core/types.ts';
 import type { ApprovalResult } from '../src/domain/approval/index.ts';
 import { createPublishingPackage, createTag, type PublishingPackage } from '../src/domain/content/index.ts';
-import { WordPressPublisher } from '../src/providers/publisher/wordpress/index.ts';
+import type { PublishRequest, PublishResult, Publisher } from '../src/domain/publisher/index.ts';
 import { PublishingWorkflow } from '../src/services/publishing/index.ts';
 
 test('publishing workflow blocks real publishing when disabled', async () => {
@@ -24,8 +22,8 @@ test('publishing workflow blocks real publishing when disabled', async () => {
     destination: createDestination()
   });
 
-  assert.equal(result.status, 'skipped');
-  assert.match(result.message ?? '', /Publishing is disabled/);
+  assert.equal(result.status, 'SKIPPED');
+  assert.match(result.message, /Publishing is disabled/);
   assert.equal(publisher.calls.length, 0);
 });
 
@@ -46,13 +44,13 @@ test('publishing workflow requires approved publishing package', async () => {
     destination: createDestination()
   });
 
-  assert.equal(result.status, 'skipped');
-  assert.match(result.message ?? '', /requires APPROVED content/);
+  assert.equal(result.status, 'SKIPPED');
+  assert.match(result.message, /requires APPROVED content/);
   assert.equal(result.metadata?.approvalDecision, 'NEEDS_REVIEW');
   assert.equal(publisher.calls.length, 0);
 });
 
-test('publishing workflow maps approved package into publisher payload', async () => {
+test('publishing workflow maps approved package into publish request', async () => {
   const publisher = new CountingPublisher();
   const workflow = new PublishingWorkflow({
     publisher,
@@ -69,19 +67,21 @@ test('publishing workflow maps approved package into publisher payload', async (
     destination: createDestination()
   });
 
-  assert.equal(result.status, 'draft');
+  assert.equal(result.status, 'PREVIEW');
   assert.equal(publisher.calls.length, 1);
-  assert.equal(publisher.calls[0].draft.title, 'Approved Cat Article');
-  assert.equal(publisher.calls[0].draft.slug, 'approved-cat-article');
-  assert.deepEqual(publisher.calls[0].draft.tags, ['approved', 'cat']);
+  assert.equal(publisher.calls[0].publishingPackage.article.title, 'Approved Cat Article');
+  assert.equal(publisher.calls[0].publishingPackage.article.slug, 'approved-cat-article');
+  assert.deepEqual(
+    publisher.calls[0].publishingPackage.article.metadata.tags.map((tag) => tag.name),
+    ['approved', 'cat']
+  );
+  assert.equal(publisher.calls[0].mode, 'preview');
 });
 
-test('wordpress dry-run publishing preview makes no external api call', async () => {
+test('publishing workflow dry-run preview makes no external api call', async () => {
+  const publisher = new CountingPublisher();
   const workflow = new PublishingWorkflow({
-    publisher: new WordPressPublisher({
-      siteUrl: 'https://example.test',
-      dryRun: true
-    }),
+    publisher,
     config: {
       dryRun: true,
       publishingEnabled: false,
@@ -95,26 +95,31 @@ test('wordpress dry-run publishing preview makes no external api call', async ()
     destination: createDestination()
   });
 
-  assert.equal(result.status, 'draft');
-  assert.equal(result.url, undefined);
+  assert.equal(result.status, 'PREVIEW');
+  assert.equal(publisher.calls.length, 1);
   assert.equal(result.metadata?.dryRun, true);
-  assert.match(result.externalId ?? '', /^wordpress-preview-/);
+  assert.equal(result.metadata?.title, 'Approved Cat Article');
 });
 
 class CountingPublisher implements Publisher {
   readonly name = 'counting-publisher';
-  readonly calls: PublishingPayload[] = [];
+  readonly mode = 'dry-run' as const;
+  readonly calls: PublishRequest[] = [];
 
-  async publish(payload: PublishingPayload): Promise<PublishingResult> {
-    this.calls.push(payload);
+  async publish(request: PublishRequest): Promise<PublishResult> {
+    this.calls.push(request);
 
     return {
-      status: 'draft',
-      destination: payload.destination,
+      status: 'PREVIEW',
+      publisher: this.name,
+      mode: request.mode ?? 'preview',
+      destination: request.destination,
+      publishId: 'preview-approved-cat-article',
+      previewUrl: 'https://preview.asteria.local/wordpress/preview-approved-cat-article',
       message: 'Dry-run publisher called.',
       metadata: {
         dryRun: true,
-        title: payload.draft.title
+        title: request.publishingPackage.article.title
       }
     };
   }

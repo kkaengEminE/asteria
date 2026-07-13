@@ -1,1 +1,1 @@
-export type ScheduleStatus = 'SCHEDULED' | 'CANCELLED';
+export type ScheduleStatus = 'SCHEDULED' | 'CANCELLED' | 'COMPLETED';

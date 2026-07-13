@@ -5,7 +5,14 @@ import { test } from 'node:test';
 
 const srcRoot = join(process.cwd(), 'src');
 const domainRoot = join(srcRoot, 'domain');
+const previewRoot = join(domainRoot, 'preview');
 const providerRoot = join(srcRoot, 'providers');
+const persistenceRoot = join(srcRoot, 'services', 'persistence');
+const publishingServiceRoots = [
+  join(srcRoot, 'services', 'publishing'),
+  join(srcRoot, 'services', 'publisher'),
+  join(srcRoot, 'services', 'scheduler')
+];
 const workflowRoot = join(process.cwd(), 'src', 'workflows');
 const concreteProviderImportPatterns = [
   /from\s+['"][^'"]*providers\/ai\/(?:openai|gemini)[^'"]*['"]/,
@@ -55,6 +62,30 @@ test('domain does not import services workflows runtime or providers', async () 
   assert.deepEqual(violations, []);
 });
 
+test('preview domain does not import runtime workflows providers or CLI scripts', async () => {
+  const files = await listTypeScriptFiles(previewRoot);
+  const violations: string[] = [];
+  const forbiddenPatterns = [
+    /from\s+['"][^'"]*magazines\//,
+    /from\s+['"][^'"]*workflows\//,
+    /from\s+['"][^'"]*providers\//,
+    /from\s+['"][^'"]*scripts\//
+  ];
+
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+
+    for (const pattern of forbiddenPatterns) {
+      if (pattern.test(source)) {
+        violations.push(file.replace(`${process.cwd()}/`, ''));
+      }
+    }
+  }
+
+  assert.deepEqual(violations, []);
+});
+
+
 test('provider adapters do not import workflows', async () => {
   const files = await listTypeScriptFiles(providerRoot);
   const violations: string[] = [];
@@ -64,6 +95,67 @@ test('provider adapters do not import workflows', async () => {
 
     if (/from\s+['"][^'"]*workflows\//.test(source)) {
       violations.push(file.replace(`${process.cwd()}/`, ''));
+    }
+  }
+
+  assert.deepEqual(violations, []);
+});
+
+test('provider adapters do not import legacy core contracts', async () => {
+  const files = await listTypeScriptFiles(providerRoot);
+  const violations: string[] = [];
+
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+
+    if (/from\s+['"][^'"]*core\//.test(source)) {
+      violations.push(file.replace(`${process.cwd()}/`, ''));
+    }
+  }
+
+  assert.deepEqual(violations, []);
+});
+
+test('publishing and scheduler services use provider-neutral publisher contracts', async () => {
+  const files = (await Promise.all(publishingServiceRoots.map((root) => listTypeScriptFiles(root)))).flat();
+  const violations: string[] = [];
+  const forbiddenPatterns = [
+    /from\s+['"][^'"]*core\/Publisher/,
+    /\bPublishingPayload\b/,
+    /\bPublishingResult\b/,
+    /\bcreatePublishingPayload\b/
+  ];
+
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+
+    for (const pattern of forbiddenPatterns) {
+      if (pattern.test(source)) {
+        violations.push(file.replace(`${process.cwd()}/`, ''));
+        break;
+      }
+    }
+  }
+
+  assert.deepEqual(violations, []);
+});
+
+test('persistence ports do not import database or orm packages', async () => {
+  const files = await listTypeScriptFiles(persistenceRoot);
+  const violations: string[] = [];
+  const forbiddenPatterns = [
+    /from\s+['"][^'"]*(?:sqlite|postgres|prisma|drizzle|typeorm|sequelize|knex)[^'"]*['"]/i,
+    /(?:sqlite|postgres|prisma|drizzle|typeorm|sequelize|knex)/i
+  ];
+
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+
+    for (const pattern of forbiddenPatterns) {
+      if (pattern.test(source)) {
+        violations.push(file.replace(`${process.cwd()}/`, ''));
+        break;
+      }
     }
   }
 

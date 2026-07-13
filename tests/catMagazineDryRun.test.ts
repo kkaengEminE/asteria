@@ -41,6 +41,8 @@ test('cat magazine dry run succeeds', async () => {
     'Research',
     'Generate Publishing Package',
     'Select Image',
+    'Generate Instagram Preview',
+    'Generate Podcast Preview',
     'Generate Article',
     'Generate SEO',
     'Generate Monetization Preview',
@@ -51,10 +53,23 @@ test('cat magazine dry run succeeds', async () => {
   assert.match(result.renderedPromptPreview ?? '', /indoor enrichment/);
   assert.match(result.articlePreview ?? '', /Mock Cat Care Article/);
   assert.match(result.seoPreview ?? '', /Title Tag/);
-  assert.equal(result.publishPreview?.status, 'skipped');
+  assert.equal(result.publishPreview?.status, 'SKIPPED');
   assert.match(result.publishPreview?.message ?? '', /requires APPROVED content/);
+  assert.equal(result.schedulerResult?.operationState?.scheduledJobCount, 0);
+  assert.equal(result.schedulerResult?.operationState?.activeJobCount, 0);
+  assert.equal(result.schedulerResult?.operationState?.lookupSucceeded, false);
   assert.equal(result.selectedImage?.filename, 'cat-window-enrichment.jpg');
   assert.match(result.imagePreview ?? '', /^mock:\/\//);
+  const instagramPreview = result.previewReport.channels.find((preview) => preview.channel === 'instagram');
+  const podcastPreview = result.previewReport.channels.find((preview) => preview.channel === 'podcast');
+
+  assert.equal(instagramPreview?.payload.magazineId, 'cat');
+  assert.match(instagramPreview?.payload.post.caption.short ?? '', /Mock Article: indoor enrichment/);
+  assert.equal(instagramPreview?.payload.post.hashtags.primary.includes('#catcare'), true);
+  assert.match(instagramPreview?.payload.post.imageSelectionReference ?? '', /cat-window-enrichment\.jpg/);
+  assert.match(podcastPreview?.payload.episode.title ?? '', /Mock Article: indoor enrichment/);
+  assert.equal(podcastPreview?.payload.ttsRequest.segments[0].role, 'intro');
+  assert.equal((podcastPreview?.payload.episode.script.chapters.length ?? 0) > 0, true);
   assert.match(result.monetizationPreview ?? '', /Interactive Cat Enrichment Toy/);
 });
 

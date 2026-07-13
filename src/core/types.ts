@@ -49,23 +49,6 @@ export interface PublishingDestination {
   metadata?: Record<string, unknown>;
 }
 
-export interface PublishingPayload {
-  draft: ContentDraft;
-  destination: PublishingDestination;
-  images?: ImageAsset[];
-  affiliateLinks?: AffiliateLink[];
-  metadata?: Record<string, unknown>;
-}
-
-export interface PublishingResult {
-  status: 'draft' | 'published' | 'scheduled' | 'skipped' | 'failed';
-  destination: PublishingDestination;
-  url?: string;
-  externalId?: string;
-  message?: string;
-  metadata?: Record<string, unknown>;
-}
-
 export interface AffiliateLink {
   provider: string;
   label: string;
@@ -95,4 +78,3 @@ export interface AnalyticsSnapshot {
   metrics: Record<string, number>;
   metadata?: Record<string, unknown>;
 }
-

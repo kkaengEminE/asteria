@@ -15,9 +15,10 @@ import {
   type CoupangAffiliateTransport,
   type CoupangEnvironment
 } from '../../providers/monetization/coupang/index.ts';
-import { WordPressPublisher } from '../../providers/publisher/wordpress/index.ts';
 import { AuditLog } from '../../services/auditLog/index.ts';
 import { DryRunWorkflowFactory, type DryRunResult } from '../../services/dryRun/index.ts';
+import { MetricsService } from '../../services/metrics/index.ts';
+import { DryRunPublisher } from '../../services/publisher/index.ts';
 import { createMagazineDryRunSteps } from './dryRunSteps.ts';
 import {
   createMockResearchProvider,
@@ -95,6 +96,7 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       dryRun: true
     });
     const auditLog = new AuditLog();
+    const metricsService = new MetricsService();
 
     const steps = createMagazineDryRunSteps({
       topic,
@@ -107,7 +109,8 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       publisher,
       imageLibrary,
       monetizationProvider,
-      auditLog
+      auditLog,
+      metricsService
     });
     const workflowFactory = new DryRunWorkflowFactory();
 
@@ -118,7 +121,8 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       topic,
       steps,
       initialData: {
-        auditLog
+        auditLog,
+        metricsService
       }
     });
 
@@ -131,6 +135,14 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       topic,
       workflowStatus: 'failed',
       executedSteps: [],
+      previewReport: {
+        content: {},
+        media: {},
+        monetization: {},
+        channels: [],
+        publishing: {},
+        observability: {}
+      },
       error: describeError(error)
     };
   }
@@ -182,10 +194,9 @@ export function registerMagazineDryRunMockProviders(
     registry.register(
       mockPublisherToken,
       () =>
-        new WordPressPublisher({
-          siteUrl: 'https://example.test',
-          dryRun: true
-        })
+        new DryRunPublisher({
+          name: 'mock-publisher'
+      })
     );
   }
 

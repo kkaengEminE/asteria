@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Publisher } from '../src/core/index.ts';
-import type { PublishingPayload, PublishingResult } from '../src/core/types.ts';
 import type { ApprovalResult } from '../src/domain/approval/index.ts';
 import { createPublishingPackage, createTag, type PublishingPackage } from '../src/domain/content/index.ts';
+import type { PublishRequest, PublishResult, Publisher } from '../src/domain/publisher/index.ts';
 import { AuditLog } from '../src/services/auditLog/index.ts';
 import { PublishingQueue } from '../src/services/publishingQueue/index.ts';
 import { PublishingWorkflow } from '../src/services/publishing/index.ts';
@@ -253,9 +252,9 @@ test('publishing workflow creates queue item without invoking publisher', async 
     destination: createDestination()
   });
 
-  assert.equal(result.status, 'draft');
+  assert.equal(result.status, 'PREVIEW');
   assert.equal(result.metadata?.queued, true);
-  assert.match(result.externalId ?? '', /^queue-/);
+  assert.match(result.publishId ?? '', /^queue-/);
   assert.equal(publisher.calls.length, 0);
 });
 
@@ -275,14 +274,17 @@ test('cat dry-run includes queue rejection preview for non-approved package', as
 
 class CountingPublisher implements Publisher {
   readonly name = 'counting-publisher';
-  readonly calls: PublishingPayload[] = [];
+  readonly mode = 'dry-run' as const;
+  readonly calls: PublishRequest[] = [];
 
-  async publish(payload: PublishingPayload): Promise<PublishingResult> {
-    this.calls.push(payload);
+  async publish(request: PublishRequest): Promise<PublishResult> {
+    this.calls.push(request);
 
     return {
-      status: 'draft',
-      destination: payload.destination,
+      status: 'PREVIEW',
+      publisher: this.name,
+      mode: request.mode ?? 'preview',
+      destination: request.destination,
       message: 'Publisher should not be called in queue mode.'
     };
   }

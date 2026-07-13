@@ -19,6 +19,8 @@ import type { GoogleDriveImageRecord } from './GoogleDriveImageRecord.ts';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
+let defaultStorageInstanceId = 1;
+
 export const googleDriveImageLibraryToken = createProviderToken<ImageDomainLibrary>(
   'Image',
   'google-drive',
@@ -37,7 +39,7 @@ export class GoogleDriveImageLibrary implements ImageDomainLibrary {
     this.records = config.records;
     this.assetLibrary = config.assetLibrary ?? new AssetLibrary({
       storageProvider: config.storageProvider ?? new LocalStorageProvider({
-        rootDir: join(tmpdir(), 'asteria-google-drive-image-assets')
+        rootDir: join(tmpdir(), `asteria-google-drive-image-assets-${process.pid}-${defaultStorageInstanceId++}`)
       })
     });
   }

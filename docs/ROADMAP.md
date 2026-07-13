@@ -256,14 +256,68 @@ Connect the Coupang affiliate adapter to real product and affiliate link workflo
 
 Status: Implemented with production-capable Coupang monetization adapter, disabled-by-default environment safeguards, injectable transport, mocked test transport, RetryService integration, affiliate audit events, provider diagnostics, dry-run `--affiliate coupang` mode, and tests. MockCoupangProvider remains available. Publishing, WordPress execution, persistence, and external API calls during tests remain disabled.
 
-### Sprint 43: Instagram Generation
+### Sprint 43: Publisher Foundation
+
+Complete the provider-neutral Publisher layer between ScheduledJobExecutor and concrete publisher adapters.
+
+Status: Implemented with provider-neutral publisher domain models, PublisherService validation/dispatch/result normalization, DryRunPublisher deterministic preview IDs and URLs, ScheduledJobExecutor publish request integration, publish audit events, RetryService integration, dry-run publisher output, and tests. Real WordPress publishing, network calls, persistence, and production publishing remain disabled.
+
+### Sprint 44: WordPress Publisher Adapter
+
+Implement the provider-specific WordPress Publisher adapter behind the provider-neutral Publisher interface.
+
+Status: Implemented with WordPressPublisher, WordPressTransport, WordPressMapper, guarded WordPress environment config, mocked transport tests, retry integration, audit integration, provider-neutral publish result mapping, legacy dry-run preview compatibility, and documentation. DryRunPublisher remains default. Production publishing, network calls, persistence, and WordPress execution remain disabled.
+
+### Sprint 45: Metrics Foundation
+
+Introduce provider-neutral pipeline observability before adding more production-facing integrations.
+
+Status: Implemented with Metrics Domain models, in-memory MetricsService, counters, duration recording, failure recording, snapshots, ContentGenerationWorkflow integration, PublishingQueue integration, SchedulerService integration, ScheduledJobExecutor integration, PublisherService integration, dry-run Metrics Summary output, and tests. Persistence, external analytics, Instagram, and real publishing remain deferred.
+
+### Sprint 46: Instagram Generation
 
 Generate Instagram-ready captions, hashtags, and image selection metadata from article content.
 
-### Sprint 44: Podcast / TTS
+Status: Implemented with provider-neutral Instagram domain models, InstagramContentService, PublishingPackage-to-social preview generation, MagazineProfile propagation, SEO keyword hashtag reuse, selected image reference metadata, dry-run Instagram Preview output, and tests. Instagram posting, Instagram API calls, OAuth, publishing, and persistence remain deferred.
+
+### Sprint 47: Podcast / TTS
 
 Add text-to-speech generation and podcast publishing workflows behind replaceable interfaces.
 
-### Sprint 45: Scheduler Operations
+Status: Foundation implemented with provider-neutral Podcast / TTS domain models, PodcastContentService, PublishingPackage-to-audio preview generation, optional Instagram Preview hook/CTA reuse, chapter generation, duration estimation, TTS segment generation, dry-run Podcast Preview output, and tests. Real TTS APIs, audio synthesis, podcast publishing, media upload, external network calls, and persistence remain deferred.
 
-Enable real scheduler execution, such as GitHub Actions or a future scheduler backend, only after publishing integrations have production safeguards.
+### Architecture Cleanup Patch 003
+
+Reduce DryRunResult growth and split dry-run runtime composition before adding more preview channels.
+
+Status: Implemented with Architecture Review 003 documentation, provider-neutral preview aggregation primitives, `DryRunPreviewReport`, typed channel previews, section-specific dry-run CLI formatters, concern-based magazine runtime step grouping, architecture boundary guard coverage for preview domain, and regression tests. No new product features, channels, persistence, publishing, or external API calls were added.
+
+### Sprint 48: Scheduler Operations
+
+Strengthen provider-neutral scheduler operations without persistence, cron, external schedulers, or publishing.
+
+Status: Implemented with reschedule, retry scheduling, invalid schedule rejection, duplicate active job detection, immutable completed scheduler jobs, scheduler operation state in dry-run output, audit events, metrics, RetryService integration, and tests. Persistence, external schedulers, cron integration, and publishing remain deferred.
+
+### Architecture Cleanup Patch 004
+
+Retire safe legacy contracts before persistence work.
+
+Status: Implemented with removal of the obsolete `src/core/AIProvider` contract, provider registry test migration to the current `src/providers/ai` contract, WordPress adapter cleanup away from legacy publishing preview payload/result helpers, a provider adapter boundary guard against legacy core imports, and documentation refresh. Public CLI behavior remains unchanged. The older publishing workflow payload was deferred to Architecture Cleanup Patch 005 and has since been retired.
+
+### Architecture Cleanup Patch 005
+
+Retire the remaining active legacy publishing workflow contracts before persistence work.
+
+Status: Implemented with PublishingWorkflow migration to `PublishRequest` / `PublishResult`, execution through PublisherService, DryRunPublisher-backed magazine runtime composition, removal of obsolete core Publisher and publishing payload/result contracts, dry-run publish preview compatibility, expanded architecture boundary guard coverage for publishing and scheduler services, and regression tests. Publishing remains disabled, no persistence was added, and no external API calls were introduced.
+
+### Sprint 49: Persistence Architecture Planning
+
+Design provider-neutral persistence architecture before adding durable storage.
+
+Status: Planned in documentation with repository boundaries, persistence ownership, transaction policy, locking strategy, idempotency policy, migration strategy, and lifecycle design for Queue, Scheduler, Audit, Metrics, Assets, and Storage metadata. No database, SQLite, PostgreSQL, ORM, filesystem persistence, runtime behavior change, external API call, or product feature was added.
+
+### Sprint 50: Persistence Ports Foundation
+
+Turn the approved persistence architecture into provider-neutral TypeScript ports only.
+
+Status: Implemented with `src/services/persistence` repository/store ports for Publishing Queue, Scheduler, Job Execution, Audit, Metrics, Asset Catalog, Storage Metadata, Idempotency, Locking, and UnitOfWork. Added shared revision, pagination, transaction, lock token, and idempotency record types plus small in-memory proof adapters for IdempotencyStore, LockManager, and UnitOfWork tests. Existing runtime services were not migrated. No database, ORM, filesystem persistence, runtime behavior change, external API call, publishing, or product feature was added.

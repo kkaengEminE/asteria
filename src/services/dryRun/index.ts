@@ -6,6 +6,14 @@ export type {
   DryRunSelectedImage
 } from './DryRunResult.ts';
 export { summarizeImage, summarizeMagazine, summarizeRecommendations } from './DryRunResult.ts';
+export type {
+  DryRunContentPreview,
+  DryRunMediaPreview,
+  DryRunMonetizationPreview,
+  DryRunObservabilityPreview,
+  DryRunPreviewReport,
+  DryRunPublishingPreview
+} from './DryRunPreviewReport.ts';
 export { DryRunStepFactory, createDryRunStepResult, requireWorkflowData } from './DryRunStepFactory.ts';
 export type { DryRunStepDefinition } from './DryRunStepFactory.ts';
 export { DryRunWorkflowFactory } from './DryRunWorkflowFactory.ts';

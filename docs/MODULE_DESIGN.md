@@ -4,14 +4,12 @@ This document defines the intended module responsibilities for the AI Publishing
 
 ## `src/core`
 
-Contains system contracts:
+Contains remaining early-stage contracts and compatibility-safe exports:
 
-- `AIProvider`
 - `ResearchProvider`
 - `ContentGenerator`
 - `ImageLibrary`
 - `ImageSelector`
-- `Publisher`
 - `AffiliateProvider`
 - `TTSProvider`
 - `PodcastPublisher`
@@ -20,7 +18,7 @@ Contains system contracts:
 - `WorkflowEngine`
 - `MagazineConfig`
 
-These files should remain implementation-free.
+These files should remain implementation-free. New provider foundations should use their current provider or domain locations. The legacy core AI provider and publisher contracts have been retired; current AI contracts live in `providers/ai`, and current publishing contracts live in `domain/publisher`.
 
 ## `src/domain`
 
@@ -172,6 +170,42 @@ Current retry domain foundation:
 
 The retry domain defines provider-neutral retry policy, attempt history, results, and reasons. It does not know about AI providers, storage providers, publisher adapters, schedulers, network clients, or real waiting.
 
+Current metrics domain foundation:
+
+- `domain/metrics/MetricEvent`
+- `domain/metrics/MetricType`
+- `domain/metrics/MetricSnapshot`
+- `domain/metrics/MetricCounter`
+
+The metrics domain defines provider-neutral observability models for counters, durations, failures, and snapshots. It does not know about persistence, external analytics vendors, workflows, providers, publisher adapters, or network execution.
+
+Current Instagram content domain foundation:
+
+- `domain/instagram/InstagramPost`
+- `domain/instagram/InstagramCaption`
+- `domain/instagram/InstagramHashtagSet`
+- `domain/instagram/InstagramContentPackage`
+
+The Instagram content domain defines provider-neutral social preview models. It does not know about Instagram APIs, OAuth, posting, publishing, provider SDKs, network clients, or persistence.
+
+Current podcast / TTS domain foundation:
+
+- `domain/podcast/PodcastEpisode`
+- `domain/podcast/PodcastScript`
+- `domain/podcast/TTSRequest`
+- `domain/podcast/TTSSegment`
+- `domain/podcast/PodcastContentPackage`
+
+The podcast / TTS domain defines provider-neutral audio preview models. It does not know about TTS APIs, podcast hosting platforms, RSS feeds, media storage, publishing adapters, network clients, or persistence.
+
+Current preview aggregation foundation:
+
+- `domain/preview/PreviewSection`
+- `domain/preview/PreviewSectionType`
+- `domain/preview/ChannelPreview`
+
+The preview domain defines provider-neutral report section primitives and typed channel preview entries. It does not know about runtime composition, workflow execution, concrete providers, or CLI scripts.
+
 ## `src/providers`
 
 Contains adapters for external systems. Future providers should be added behind interfaces, for example:
@@ -233,14 +267,17 @@ For publishing package generation, GeminiProvider consumes rendered prompt asset
 
 GeminiMapper strengthens publishing-package requests with strict JSON-only instructions, requests JSON MIME output when possible, extracts JSON from fenced or surrounded text, and applies limited repair for raw newlines, unescaped quotes, and unterminated trailing strings. If parsing still fails, GeminiProvider returns a clear provider/model/parse-error message with a truncated raw response preview.
 
-Current publisher adapter draft:
+Current WordPress publisher adapter:
 
 - `providers/publisher/wordpress/WordPressPublisher`
 - `providers/publisher/wordpress/WordPressPublisherConfig`
+- `providers/publisher/wordpress/WordPressTransport`
+- `providers/publisher/wordpress/WordPressMapper`
 - `providers/publisher/wordpress/WordPressPostPayload`
-- `providers/publisher/wordpress/WordPressPublishResult`
 
-The WordPress adapter implements `Publisher` and returns dry-run preview results only. It performs local validation and does not call WordPress APIs.
+The WordPress adapter implements the provider-neutral `Publisher` interface. It maps `PublishRequest` values into WordPress post payloads, validates title and content, requires `WORDPRESS_ENABLED=true` and credentials for adapter execution, uses injectable transport, retries recoverable transport failures, records publish audit events, and returns preview results while real publishing remains disabled. Tests use mocked transport only.
+
+The older WordPress legacy preview payload/result helper has been removed from the adapter. Runtime dry-run compatibility uses a simple mock publisher where the older publishing workflow still needs a preview-only publisher shape.
 
 Current image adapter draft:
 
@@ -291,10 +328,11 @@ Future services:
 Current dry-run service foundation:
 
 - `DryRunResult`
+- `DryRunPreviewReport`
 - `DryRunStepFactory`
 - `DryRunWorkflowFactory`
 
-The dry-run services provide shared workflow construction, workflow execution, step helper utilities, and dry-run result shaping. They include generic image and monetization preview fields, but do not know about Cat Magazine prompts or provider implementations.
+The dry-run services provide shared workflow construction, workflow execution, step helper utilities, preview aggregation, and dry-run result shaping. `DryRunPreviewReport` groups content, media, monetization, channel, publishing, and observability outputs so future preview channels do not require a new top-level `DryRunResult` field. These services do not know about Cat Magazine prompts or provider implementations.
 
 Dry-run CLI rendering prefers `PublishingPackage` article and SEO data over legacy article/SEO preview fields. This keeps real provider output, summaries, FAQ, SEO metadata, and package metadata aligned in one visible report.
 
@@ -337,7 +375,21 @@ Current publishing workflow foundation:
 - `PublishingWorkflow`
 - `PublishingWorkflowConfig`
 
-The publishing workflow is provider-neutral. It requires `APPROVED` approval metadata before invoking a `Publisher`, maps `PublishingPackage` values into `PublishingPayload`, returns skipped results when publishing is disabled or approval is missing, and keeps dry-run preview behavior separate from real publishing enablement. When a Publishing Queue is injected, it creates a queue result instead of invoking a publisher adapter.
+The publishing workflow is provider-neutral. It requires `APPROVED` approval metadata before publisher execution, maps `PublishingPackage` values into `PublishRequest`, returns `PublishResult` values, and delegates active publisher execution to `PublisherService`. When a Publishing Queue is injected, it creates a queue result instead of invoking a publisher adapter.
+
+The previous `PublishingPayload` / `PublishingResult` workflow contract has been removed from active code. The dry-run result still exposes a `publishPreview` field name for CLI compatibility, but the value is now the current `PublishResult` domain model.
+
+Current publisher execution foundation:
+
+- `domain/publisher/PublishRequest`
+- `domain/publisher/PublishResult`
+- `domain/publisher/PublishStatus`
+- `domain/publisher/PublishFailure`
+- `domain/publisher/Publisher`
+- `services/publisher/PublisherService`
+- `services/publisher/DryRunPublisher`
+
+The publisher execution layer is provider-neutral. `PublisherService` validates `PublishRequest` values, dispatches to a configured publisher, normalizes `PublishResult`, records publish audit events, and uses RetryService for retryable publisher failures. `DryRunPublisher` generates deterministic preview IDs and preview URLs without network calls. Real publishing remains disabled.
 
 Current publishing queue foundation:
 
@@ -353,9 +405,9 @@ Current scheduler service foundation:
 - `ScheduledJobExecutor`
 - `InMemoryScheduledJobExecutionStorage`
 
-The Scheduler service supports scheduling approved queue items, preventing duplicate active schedules, retrieving jobs, listing jobs, and cancelling jobs. It updates the Publishing Queue to `SCHEDULED`, records scheduler audit events, uses in-memory storage, and does not execute publishing.
+The Scheduler service supports scheduling approved queue items, preventing duplicate active schedules, retrieving jobs, listing jobs, rescheduling, retry scheduling through RetryService, cancelling jobs, rejecting invalid policies, and marking jobs completed for operational preview. Completed jobs are immutable. It updates the Publishing Queue to `SCHEDULED`, records scheduler audit events, records scheduler metrics, uses in-memory storage, and does not execute publishing or external scheduler platforms.
 
-The Scheduled Job Executor supports due checks, execution preview, success recording, failure recording, duplicate execution prevention, skipped invalid jobs, RetryService integration, audit events, and queue transition to `PROCESSING`. It receives a provider-neutral operation from composition and does not import or invoke publisher adapters.
+The Scheduled Job Executor supports due checks, execution preview, success recording, failure recording, duplicate execution prevention, skipped invalid jobs, RetryService integration, audit events, and queue transition to `PROCESSING`. It can execute provider-neutral publish requests through PublisherService and does not import concrete publisher adapters.
 
 Current audit log foundation:
 
@@ -370,6 +422,24 @@ Current retry service foundation:
 
 The Retry Service executes a generic operation with configurable max attempts, fixed delay metadata, retryable/non-retryable error classification, and retry history. It simulates delay without sleeping in tests. Future AI, storage, publisher, and scheduler integrations may opt into this service through composition.
 
+Current metrics service foundation:
+
+- `MetricsService`
+
+The Metrics Service records counters, durations, and failures in memory and produces snapshots for dry-run reporting. ContentGenerationWorkflow, PublishingQueue, SchedulerService, ScheduledJobExecutor, and PublisherService receive it through composition. Metrics are observational only and do not change approval decisions, queue transitions, scheduler decisions, publisher dispatch, retry behavior, or provider calls.
+
+Current Instagram content service foundation:
+
+- `InstagramContentService`
+
+The Instagram Content Service generates dry-run social preview content from a `PublishingPackage`, `MagazineProfile`, SEO keywords, and selected image metadata. It outputs short caption, long caption, CTA, hashtag groups, alt text, image selection reference, and source metadata. It does not post to Instagram or call external APIs.
+
+Current podcast content service foundation:
+
+- `PodcastContentService`
+
+The Podcast Content Service generates dry-run audio preview content from a `PublishingPackage`, `MagazineProfile`, and optional `InstagramContentPackage`. It outputs spoken intro, spoken outro, narration script, chapter list, estimated duration, and TTS text segments. It does not synthesize audio, call TTS APIs, publish podcasts, upload media, or call external APIs.
+
 Current asset library foundation:
 
 - `AssetLibrary`
@@ -378,6 +448,23 @@ Current asset library foundation:
 The Asset Library service uses a `StorageProvider` internally to upload, download, and look up file metadata. Callers register assets and retrieve asset metadata or image-domain projections without receiving the storage provider itself.
 
 The Google Drive image library adapter now registers mock image records through Asset Library and then exposes image-domain `ImageAsset` values for dry-run selection. This keeps Google Drive as a storage/provider detail rather than the asset model.
+
+Current persistence ports foundation:
+
+- `PublishingQueueRepository`
+- `SchedulerRepository`
+- `JobExecutionRepository`
+- `AuditStore`
+- `MetricsStore`
+- `AssetCatalogRepository`
+- `StorageMetadataRepository`
+- `IdempotencyStore`
+- `LockManager`
+- `UnitOfWork`
+
+These provider-neutral TypeScript ports live under `src/services/persistence`. They expose domain models and provider-neutral query objects only. Services should own transaction boundaries, while adapters should own database or storage-specific details.
+
+Sprint 50 also adds small in-memory proof adapters for `IdempotencyStore`, `LockManager`, and `UnitOfWork` so tests can exercise idempotency, lock acquire/release, and transaction commit/rollback semantics. Queue, Scheduler, Audit, Metrics, Assets, and Storage metadata services are not migrated yet and remain on their existing in-memory foundations until a future implementation sprint.
 
 ## `src/prompts`
 
@@ -436,7 +523,7 @@ Current workflow core:
 
 `SequentialWorkflowEngine` is intentionally minimal. It registers steps, executes them in order, supports cancellation between steps, stops on failure, and returns structured results.
 
-`ContentGenerationWorkflow` is an application workflow for building a validated publishing package from one topic through an `AIProvider`. It is intentionally separate from publishing workflows and does not know about WordPress. It uses the Prompt Asset System for profile-based composed prompt input, the structured output layer for validation and normalization, the content quality service for structural quality metadata, the editorial review service for publication-readiness metadata, the real generation review service for review-only threshold calibration, and the editorial approval service for readiness decision metadata.
+`ContentGenerationWorkflow` is an application workflow for building a validated publishing package from one topic through an `AIProvider`. It is intentionally separate from publishing workflows and does not know about WordPress. It uses the Prompt Asset System for profile-based composed prompt input, the structured output layer for validation and normalization, the content quality service for structural quality metadata, the editorial review service for publication-readiness metadata, the real generation review service for review-only threshold calibration, the editorial approval service for readiness decision metadata, and optional MetricsService instrumentation for provider-neutral counters and duration snapshots.
 
 ContentGenerationWorkflow uses the shared `RetryService` for recoverable structured output failures. It preserves the existing `maxRetries` option, retry count metadata, and structured output recovery behavior while avoiding local retry-loop duplication.
 
@@ -465,9 +552,16 @@ Current shared magazine dry-run runtime:
 - `runtime/providerTokens`
 - `runtime/mockProviders`
 - `runtime/dryRunSteps`
+- `runtime/steps/contentSteps`
+- `runtime/steps/mediaSteps`
+- `runtime/steps/channelPreviewSteps`
+- `runtime/steps/monetizationSteps`
+- `runtime/steps/publishingSteps`
 - `runtime/runMagazineDryRun`
 
-The runtime module is the shared composition root for magazine dry runs. It uses mock research, resolves the provider-agnostic Mock AI provider, resolves the WordPress publisher adapter in dry-run mode, resolves mock image libraries for image selection, resolves mock affiliate adapters for monetization preview, creates a dry-run Publishing Queue, creates a dry-run Scheduler preview, and creates a dry-run execution preview. It does not publish files, access real image storage, generate production affiliate links, execute real scheduled jobs, or call external APIs. Generic dry-run workflow execution and result shaping are delegated to `src/services/dryRun`.
+The runtime module is the shared composition root for magazine dry runs. It uses mock research, resolves the provider-agnostic Mock AI provider, resolves DryRunPublisher through the provider registry for preview-only publishing, resolves mock image libraries for image selection, resolves mock affiliate adapters for monetization preview, generates an Instagram Preview from the PublishingPackage and selected image, generates a Podcast Preview from the PublishingPackage and Instagram Preview, creates a dry-run Publishing Queue, creates a dry-run Scheduler preview, creates a dry-run PublisherService execution preview with DryRunPublisher, and injects MetricsService across the pipeline for a final dry-run Metrics Summary. It does not publish files, access real image storage, generate production affiliate links, post to Instagram, synthesize audio, publish podcasts, execute real scheduled jobs, or call external APIs. Generic dry-run workflow execution and result shaping are delegated to `src/services/dryRun`.
+
+Dry-run step composition is split by concern under `runtime/steps`. The public `runtime/dryRunSteps` entry point remains stable for callers, while the internal grouping keeps content, media, channel previews, monetization, and publishing orchestration easier to review.
 
 Magazine dry-run supports explicit AI mode selection. Mock mode remains the default. OpenAI or Gemini mode can be selected for production AI generation only when environment safeguards are satisfied; publishing still remains disabled.
 

@@ -21,6 +21,7 @@ import { EditorialApprovalService } from '../../services/editorialApproval/index
 import { EditorialReviewService } from '../../services/editorialReview/index.ts';
 import { RealGenerationReviewService, type RealGenerationReview } from '../../services/realGenerationReview/index.ts';
 import type { AuditLog } from '../../services/auditLog/index.ts';
+import type { MetricsService } from '../../services/metrics/index.ts';
 import { RetryService, type RetryServiceExecuteOptions } from '../../services/retry/index.ts';
 import {
   StructuredOutputError,
@@ -41,6 +42,7 @@ export interface ContentGenerationWorkflowOptions {
   editorialApprovalService?: EditorialApprovalService;
   parser?: StructuredOutputParser;
   auditLog?: AuditLog;
+  metricsService?: MetricsService;
   retryService?: RetryService;
 }
 
@@ -86,6 +88,7 @@ export class ContentGenerationWorkflow {
   private readonly editorialApprovalService: EditorialApprovalService;
   private readonly parser: StructuredOutputParser;
   private readonly auditLog?: AuditLog;
+  private readonly metricsService?: MetricsService;
   private readonly retryService: RetryService;
 
   constructor(options: ContentGenerationWorkflowOptions) {
@@ -99,6 +102,7 @@ export class ContentGenerationWorkflow {
     this.editorialReviewService = options.editorialReviewService ?? new EditorialReviewService();
     this.realGenerationReviewService = options.realGenerationReviewService ?? new RealGenerationReviewService();
     this.auditLog = options.auditLog;
+    this.metricsService = options.metricsService;
     this.editorialApprovalService = options.editorialApprovalService ?? new EditorialApprovalService({
       auditLog: options.auditLog
     });
@@ -108,6 +112,14 @@ export class ContentGenerationWorkflow {
 
   async execute(request: ContentRequest): Promise<PublishingPackage> {
     const startedAt = Date.now();
+    this.metricsService?.incrementCounter('content_generation.started', 1, {
+      tags: {
+        workflow: 'content-generation'
+      },
+      metadata: {
+        topic: request.topic
+      }
+    });
     const promptRegistry = this.promptRegistry ?? (await createDefaultPromptAssetRegistry());
     const composedPrompt = composePrompt({
       registry: promptRegistry,
@@ -196,6 +208,18 @@ export class ContentGenerationWorkflow {
           realGenerationReview,
           auditContext
         });
+        this.metricsService?.incrementCounter('content_generation.succeeded', 1, {
+          tags: {
+            provider: parsed.publishingPackage.metadata?.provider
+              ? String(parsed.publishingPackage.metadata.provider)
+              : this.aiProvider.name
+          }
+        });
+        this.metricsService?.recordDuration('content_generation.duration_ms', Date.now() - startedAt, {
+          tags: {
+            workflow: 'content-generation'
+          }
+        });
 
         return attachGenerationMetadata(parsed.publishingPackage, {
           providerName: stringMetadata(parsed.publishingPackage.metadata?.provider) ?? this.aiProvider.name,
@@ -232,6 +256,19 @@ export class ContentGenerationWorkflow {
     if (retryResult.status === 'success' && retryResult.value) {
       return retryResult.value;
     }
+
+    this.metricsService?.recordFailure(
+      'content_generation.failed',
+      retryResult.finalReason?.message ?? 'Content generation failed.',
+      {
+        tags: {
+          workflow: 'content-generation'
+        },
+        metadata: {
+          retryCount: retryResult.retryCount
+        }
+      }
+    );
 
     throw retryResult.error instanceof Error ? retryResult.error : new Error(String(retryResult.error));
   }

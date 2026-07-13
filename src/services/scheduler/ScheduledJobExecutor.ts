@@ -1,6 +1,9 @@
 import type { AuditLog } from '../auditLog/index.ts';
 import type { PublishingQueue } from '../publishingQueue/index.ts';
 import { RetryService } from '../retry/index.ts';
+import type { PublisherService } from '../publisher/index.ts';
+import type { MetricsService } from '../metrics/index.ts';
+import type { PublishRequest, PublishResult } from '../../domain/publisher/index.ts';
 import type { RetryPolicy } from '../../domain/retry/index.ts';
 import type {
   JobExecutionFailure,
@@ -24,11 +27,14 @@ export interface ScheduledJobExecutorOptions {
   storage?: ScheduledJobExecutionStorage;
   auditLog?: AuditLog;
   retryService?: RetryService;
+  publisherService?: PublisherService;
+  metricsService?: MetricsService;
 }
 
 export interface ExecuteScheduledJobInput<T> {
   jobId: string;
-  operation: (attemptNumber: number) => Promise<T> | T;
+  operation?: (attemptNumber: number) => Promise<T> | T;
+  publishRequest?: PublishRequest;
   retryPolicy?: Partial<RetryPolicy>;
   now?: string;
   metadata?: Record<string, unknown>;
@@ -61,6 +67,8 @@ export class ScheduledJobExecutor {
   private readonly storage: ScheduledJobExecutionStorage;
   private readonly auditLog?: AuditLog;
   private readonly retryService: RetryService;
+  private readonly publisherService?: PublisherService;
+  private readonly metricsService?: MetricsService;
   private nextId = 1;
 
   constructor(options: ScheduledJobExecutorOptions) {
@@ -69,6 +77,8 @@ export class ScheduledJobExecutor {
     this.storage = options.storage ?? new InMemoryScheduledJobExecutionStorage();
     this.auditLog = options.auditLog;
     this.retryService = options.retryService ?? new RetryService();
+    this.publisherService = options.publisherService;
+    this.metricsService = options.metricsService;
   }
 
   isDue(job: ScheduledJob, now = new Date().toISOString()): boolean {
@@ -77,6 +87,7 @@ export class ScheduledJobExecutor {
 
   async execute<T>(input: ExecuteScheduledJobInput<T>): Promise<JobExecutionResult<T>> {
     const now = input.now ?? new Date().toISOString();
+    const startedAt = Date.now();
     const job = await this.scheduler.get(input.jobId);
 
     if (!job) {
@@ -173,6 +184,12 @@ export class ScheduledJobExecutor {
     };
 
     await this.storage.save(execution);
+    this.metricsService?.incrementCounter('scheduled_job_execution.started', 1, {
+      metadata: {
+        jobId: job.id,
+        queueItemId: job.queueItemId
+      }
+    });
     this.auditLog?.append({
       type: 'JOB_EXECUTION_STARTED',
       actor: createExecutorActor(),
@@ -207,7 +224,7 @@ export class ScheduledJobExecutor {
       };
     }
 
-    const retryResult = await this.retryService.execute(input.operation, {
+    const retryResult = await this.retryService.execute(this.createExecutionOperation(input), {
       policy: input.retryPolicy,
       now: () => now
     });
@@ -229,6 +246,17 @@ export class ScheduledJobExecutor {
           retryCount: retryResult.retryCount
         }
       });
+      this.metricsService?.incrementCounter('scheduled_job_execution.succeeded', 1, {
+        metadata: {
+          jobId: job.id,
+          queueItemId: job.queueItemId
+        }
+      });
+      this.metricsService?.recordDuration('scheduled_job_execution.duration_ms', Date.now() - startedAt, {
+        metadata: {
+          jobId: job.id
+        }
+      });
 
       return {
         status: 'SUCCEEDED',
@@ -245,6 +273,15 @@ export class ScheduledJobExecutor {
     }
 
     const failure = createFailureFromRetryResult(retryResult.finalReason);
+    this.metricsService?.recordFailure('scheduled_job_execution.failed', failure.reason, {
+      tags: {
+        code: failure.code ?? 'unknown'
+      },
+      metadata: {
+        jobId: job.id,
+        queueItemId: job.queueItemId
+      }
+    });
     const failed = await this.finishExecution(execution, 'FAILED', failure, now, {
       attemptCount: retryResult.attemptCount,
       retryCount: retryResult.retryCount
@@ -287,6 +324,32 @@ export class ScheduledJobExecutor {
     );
   }
 
+  private createExecutionOperation<T>(input: ExecuteScheduledJobInput<T>): (attemptNumber: number) => Promise<T> | T {
+    if (input.publishRequest) {
+      if (!this.publisherService) {
+        return () => {
+          const error = new Error('Scheduled publishing execution requires PublisherService.');
+          (error as Error & { code: string; retryable: boolean }).code = 'publisher_service_missing';
+          (error as Error & { code: string; retryable: boolean }).retryable = false;
+          throw error;
+        };
+      }
+
+      return async () => this.publisherService!.publish(input.publishRequest!) as Promise<T & PublishResult>;
+    }
+
+    if (input.operation) {
+      return input.operation;
+    }
+
+    return () => {
+      const error = new Error('Scheduled job execution requires an operation or publish request.');
+      (error as Error & { code: string; retryable: boolean }).code = 'execution_operation_missing';
+      (error as Error & { code: string; retryable: boolean }).retryable = false;
+      throw error;
+    };
+  }
+
   private async skip<T>(input: {
     job?: ScheduledJob | null;
     due: boolean;
@@ -309,6 +372,14 @@ export class ScheduledJobExecutor {
     };
 
     await this.storage.save(execution);
+    this.metricsService?.incrementCounter('scheduled_job_execution.skipped', 1, {
+      tags: {
+        reason: input.failure.code ?? 'unknown'
+      },
+      metadata: {
+        jobId: execution.jobId
+      }
+    });
     this.auditLog?.append({
       type: 'JOB_EXECUTION_SKIPPED',
       actor: createExecutorActor(),

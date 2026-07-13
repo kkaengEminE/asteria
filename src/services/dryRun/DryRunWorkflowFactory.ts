@@ -1,8 +1,13 @@
 import type { MagazineConfig } from '../../core/MagazineConfig.ts';
-import type { PublishingResult, ResearchResult } from '../../core/types.ts';
+import type { ResearchResult } from '../../core/types.ts';
 import type { AuditEvent } from '../../domain/audit/index.ts';
 import type { PublishingPackage } from '../../domain/content/index.ts';
+import type { InstagramContentPackage } from '../../domain/instagram/index.ts';
+import type { MetricSnapshot } from '../../domain/metrics/index.ts';
+import type { PodcastContentPackage } from '../../domain/podcast/index.ts';
+import type { ChannelPreview } from '../../domain/preview/index.ts';
 import type { PublishingQueueResult } from '../../domain/publishingQueue/index.ts';
+import type { PublishResult } from '../../domain/publisher/index.ts';
 import type { RetryResult } from '../../domain/retry/index.ts';
 import type { JobExecutionResult, ScheduleResult } from '../../domain/scheduler/index.ts';
 import type { ImageAsset } from '../../domain/image/index.ts';
@@ -43,6 +48,8 @@ export interface CreateDryRunResultOptions {
   queueResultKey?: string;
   schedulerResultKey?: string;
   executionResultKey?: string;
+  publisherResultKey?: string;
+  metricsSnapshotKey?: string;
   auditTimelineKey?: string;
   retryMetadataKey?: string;
   researchKey?: string;
@@ -53,6 +60,8 @@ export interface CreateDryRunResultOptions {
   monetizationDiagnosticsKey?: string;
   monetizationPreviewKey?: string;
   affiliateDisclosureKey?: string;
+  instagramPreviewKey?: string;
+  podcastPreviewKey?: string;
   magazineConfigKey?: string;
   previewLength?: number;
 }
@@ -91,42 +100,138 @@ export class DryRunWorkflowFactory {
     const magazineConfig = context.data[options.magazineConfigKey ?? 'magazineConfig'] as MagazineConfig | undefined;
     const selectedImage = context.data[options.selectedImageKey ?? 'selectedImage'] as ImageAsset | undefined;
     const recommendations = context.data[options.recommendationsKey ?? 'recommendations'] as Recommendation[] | undefined;
+    const renderedPromptPreview = preview(context.data[options.promptKey ?? 'articlePrompt'], options.previewLength);
+    const articlePreview = context.data[options.articleKey ?? 'articlePreview'] as string | undefined;
+    const seoPreview = context.data[options.seoKey ?? 'seoPreview'] as string | undefined;
+    const publishPreview = context.data[options.publishKey ?? 'publishPreview'] as PublishResult | undefined;
+    const queueResult = context.data[options.queueResultKey ?? 'queueResult'] as PublishingQueueResult | undefined;
+    const schedulerResult = context.data[options.schedulerResultKey ?? 'schedulerResult'] as ScheduleResult | undefined;
+    const executionResult = context.data[options.executionResultKey ?? 'executionResult'] as JobExecutionResult | undefined;
+    const publisherResult = context.data[options.publisherResultKey ?? 'publisherResult'] as PublishResult | undefined;
+    const metricsSnapshot = context.data[options.metricsSnapshotKey ?? 'metricsSnapshot'] as MetricSnapshot | undefined;
+    const auditTimeline = context.data[options.auditTimelineKey ?? 'auditTimeline'] as AuditEvent[] | undefined;
+    const retryMetadata = context.data[options.retryMetadataKey ?? 'retryMetadata'] as RetryResult | undefined;
+    const researchPreview = context.data[options.researchKey ?? 'researchResults'] as ResearchResult[] | undefined;
+    const imageSelectionReason = context.data[options.imageSelectionReasonKey ?? 'imageSelectionReason'] as
+      | DryRunImageSelectionReason
+      | undefined;
+    const selectedImageSummary = selectedImage ? summarizeImage(selectedImage) : undefined;
+    const recommendedProducts = recommendations ? summarizeRecommendations(recommendations) : undefined;
+    const affiliateLinks = context.data[options.affiliateLinksKey ?? 'affiliateLinks'] as AffiliateLink[] | undefined;
+    const monetizationDiagnostics = context.data[
+      options.monetizationDiagnosticsKey ?? 'monetizationDiagnostics'
+    ] as MonetizationProviderDiagnostics | undefined;
+    const monetizationPreview = context.data[options.monetizationPreviewKey ?? 'monetizationPreview'] as string | undefined;
+    const affiliateDisclosure = context.data[options.affiliateDisclosureKey ?? 'affiliateDisclosure'] as string | undefined;
+    const publishingPackage = context.data.publishingPackage as PublishingPackage | undefined;
+    const contentGenerationMetadata = context.data.contentGenerationMetadata as DryRunResult['contentGenerationMetadata'];
+    const channelPreviews = createChannelPreviews({
+      instagramPreview: context.data[options.instagramPreviewKey ?? 'instagramPreview'] as
+        | InstagramContentPackage
+        | undefined,
+      podcastPreview: context.data[options.podcastPreviewKey ?? 'podcastPreview'] as
+        | PodcastContentPackage
+        | undefined
+    });
+    const previewReport = {
+      content: {
+        renderedPromptPreview,
+        articlePreview,
+        seoPreview,
+        publishingPackage,
+        researchPreview,
+        metadata: contentGenerationMetadata
+      },
+      media: {
+        selectedImage: selectedImageSummary,
+        imageSelectionReason,
+        imagePreview: selectedImage?.uri
+      },
+      monetization: {
+        recommendedProducts,
+        affiliateLinks,
+        diagnostics: monetizationDiagnostics,
+        preview: monetizationPreview,
+        disclosure: affiliateDisclosure
+      },
+      channels: channelPreviews,
+      publishing: {
+        publishPreview,
+        queueResult,
+        schedulerResult,
+        executionResult,
+        publisherResult
+      },
+      observability: {
+        metricsSnapshot,
+        auditTimeline,
+        retryMetadata
+      }
+    };
 
     return {
       magazine: magazineConfig ? summarizeMagazine(magazineConfig) : undefined,
       topic: options.topic,
       workflowStatus: options.workflowResult.status,
       executedSteps: options.workflowResult.steps.map((step) => step.stepName),
-      renderedPromptPreview: preview(context.data[options.promptKey ?? 'articlePrompt'], options.previewLength),
-      articlePreview: context.data[options.articleKey ?? 'articlePreview'] as string | undefined,
-      seoPreview: context.data[options.seoKey ?? 'seoPreview'] as string | undefined,
-      publishPreview: context.data[options.publishKey ?? 'publishPreview'] as PublishingResult | undefined,
-      queueResult: context.data[options.queueResultKey ?? 'queueResult'] as PublishingQueueResult | undefined,
-      schedulerResult: context.data[options.schedulerResultKey ?? 'schedulerResult'] as ScheduleResult | undefined,
-      executionResult: context.data[options.executionResultKey ?? 'executionResult'] as JobExecutionResult | undefined,
-      auditTimeline: context.data[options.auditTimelineKey ?? 'auditTimeline'] as AuditEvent[] | undefined,
-      retryMetadata: context.data[options.retryMetadataKey ?? 'retryMetadata'] as RetryResult | undefined,
-      researchPreview: context.data[options.researchKey ?? 'researchResults'] as ResearchResult[] | undefined,
-      selectedImage: selectedImage ? summarizeImage(selectedImage) : undefined,
-      imageSelectionReason: context.data[options.imageSelectionReasonKey ?? 'imageSelectionReason'] as
-        | DryRunImageSelectionReason
-        | undefined,
+      previewReport,
+      renderedPromptPreview,
+      articlePreview,
+      seoPreview,
+      publishPreview,
+      queueResult,
+      schedulerResult,
+      executionResult,
+      publisherResult,
+      metricsSnapshot,
+      auditTimeline,
+      retryMetadata,
+      researchPreview,
+      selectedImage: selectedImageSummary,
+      imageSelectionReason,
       imagePreview: selectedImage?.uri,
-      recommendedProducts: recommendations ? summarizeRecommendations(recommendations) : undefined,
-      affiliateLinks: context.data[options.affiliateLinksKey ?? 'affiliateLinks'] as AffiliateLink[] | undefined,
-      monetizationDiagnostics: context.data[
-        options.monetizationDiagnosticsKey ?? 'monetizationDiagnostics'
-      ] as MonetizationProviderDiagnostics | undefined,
-      monetizationPreview: context.data[options.monetizationPreviewKey ?? 'monetizationPreview'] as string | undefined,
-      affiliateDisclosure: context.data[options.affiliateDisclosureKey ?? 'affiliateDisclosure'] as string | undefined,
-      publishingPackage: context.data.publishingPackage as PublishingPackage | undefined,
-      contentGenerationMetadata: context.data.contentGenerationMetadata as DryRunResult['contentGenerationMetadata'],
+      recommendedProducts,
+      affiliateLinks,
+      monetizationDiagnostics,
+      monetizationPreview,
+      affiliateDisclosure,
+      publishingPackage,
+      contentGenerationMetadata,
       error:
         options.workflowResult.status === 'failed'
           ? describeWorkflowError(options.workflowResult)
           : undefined
     };
   }
+}
+
+function createChannelPreviews(input: {
+  instagramPreview?: InstagramContentPackage;
+  podcastPreview?: PodcastContentPackage;
+}): ChannelPreview[] {
+  const previews: ChannelPreview[] = [];
+
+  if (input.instagramPreview) {
+    previews.push({
+      id: 'instagram',
+      title: 'Instagram Preview',
+      type: 'channel',
+      channel: 'instagram',
+      payload: input.instagramPreview
+    });
+  }
+
+  if (input.podcastPreview) {
+    previews.push({
+      id: 'podcast',
+      title: 'Podcast Preview',
+      type: 'channel',
+      channel: 'podcast',
+      payload: input.podcastPreview
+    });
+  }
+
+  return previews;
 }
 
 function preview(value: unknown, maxLength = 500): string | undefined {

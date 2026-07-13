@@ -1,4 +1,4 @@
-import type { AudioAsset, PublishingResult } from './types';
+import type { AudioAsset } from './types';
 import type { MagazineConfig } from './MagazineConfig';
 
 export interface PodcastEpisodePayload {
@@ -11,6 +11,14 @@ export interface PodcastEpisodePayload {
 
 export interface PodcastPublisher {
   readonly name: string;
-  publishEpisode(payload: PodcastEpisodePayload): Promise<PublishingResult>;
+  publishEpisode(payload: PodcastEpisodePayload): Promise<PodcastPublishResult>;
 }
 
+export interface PodcastPublishResult {
+  status: 'draft' | 'published' | 'scheduled' | 'skipped' | 'failed';
+  destination?: string;
+  url?: string;
+  externalId?: string;
+  message?: string;
+  metadata?: Record<string, unknown>;
+}

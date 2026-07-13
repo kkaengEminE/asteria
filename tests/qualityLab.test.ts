@@ -130,6 +130,14 @@ function createTopicResult(
       workflowStatus,
       executedSteps: [],
       error: workflowStatus === 'failed' ? 'Failed topic' : undefined,
+      previewReport: {
+        content: {},
+        media: {},
+        monetization: {},
+        channels: [],
+        publishing: {},
+        observability: {}
+      },
       publishingPackage: workflowStatus === 'success'
         ? {
             article: {

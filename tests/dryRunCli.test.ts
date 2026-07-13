@@ -113,6 +113,13 @@ test('dry-run report displays scheduler information when available', () => {
         createdAt: '2026-07-10T00:00:00.000Z',
         updatedAt: '2026-07-10T00:00:00.000Z'
       },
+      operationState: {
+        scheduledJobCount: 1,
+        activeJobCount: 1,
+        duplicateDetected: false,
+        lookupSucceeded: true,
+        retryAttemptCount: 0
+      },
       message: 'Queue item queue-1 scheduled for 2026-07-10T09:00:00.000Z.'
     }
   }));
@@ -120,6 +127,9 @@ test('dry-run report displays scheduler information when available', () => {
   assert.match(report, /Scheduler:/);
   assert.match(report, /Result: scheduled/);
   assert.match(report, /Job ID: schedule-1/);
+  assert.match(report, /Scheduled Job Count: 1/);
+  assert.match(report, /Active Job Count: 1/);
+  assert.match(report, /Lookup Succeeded: true/);
 });
 
 test('dry-run report displays execution preview information when available', () => {
@@ -145,6 +155,38 @@ test('dry-run report displays execution preview information when available', () 
   assert.match(report, /Scheduled Job ID: schedule-1/);
   assert.match(report, /Execution Status: SUCCEEDED/);
   assert.match(report, /Queue Status: PROCESSING/);
+});
+
+test('dry-run report displays publisher preview information when available', () => {
+  const report = formatDryRunReport(createDryRunResultFixture('mock-ai', {
+    publisherResult: {
+      status: 'PREVIEW',
+      publisher: 'dry-run-publisher',
+      mode: 'preview',
+      destination: {
+        type: 'wordpress',
+        name: 'Cat Magazine WordPress',
+        enabled: true
+      },
+      publishId: 'preview-cat-magazine-wordpress-topic',
+      previewUrl: 'https://preview.asteria.local/wordpress/preview-cat-magazine-wordpress-topic',
+      message: 'Dry-run publish preview generated.',
+      metadata: {
+        adapter: 'dry-run',
+        targetSite: 'preview.asteria.local',
+        publishingEnabled: false
+      }
+    }
+  }));
+
+  assert.match(report, /Publisher:/);
+  assert.match(report, /Publisher Adapter: dry-run/);
+  assert.match(report, /Publisher Mode: preview/);
+  assert.match(report, /Preview URL: https:\/\/preview\.asteria\.local\/wordpress\/preview-cat-magazine-wordpress-topic/);
+  assert.match(report, /Target Site: preview\.asteria\.local/);
+  assert.match(report, /Publishing Enabled: false/);
+  assert.match(report, /Publish Result: PREVIEW/);
+  assert.match(report, /Publish ID: preview-cat-magazine-wordpress-topic/);
 });
 
 test('dry-run report displays monetization provider diagnostics', () => {
@@ -189,8 +231,172 @@ test('dry-run report displays monetization provider diagnostics', () => {
   assert.match(report, /Affiliate Link: https:\/\/cou\.pang\/affiliate\/cat-puzzle-feeder/);
 });
 
+test('dry-run report displays metrics summary', () => {
+  const report = formatDryRunReport(createDryRunResultFixture('mock-ai', {
+    metricsSnapshot: {
+      generatedAt: '2026-07-10T10:00:00.000Z',
+      counters: [
+        {
+          name: 'content_generation.started',
+          value: 1
+        }
+      ],
+      durations: [
+        {
+          name: 'content_generation.duration_ms',
+          count: 1,
+          totalMs: 42,
+          averageMs: 42,
+          minMs: 42,
+          maxMs: 42
+        }
+      ],
+      failures: [
+        {
+          name: 'publishing_queue.rejected',
+          count: 1,
+          lastFailureReason: 'Approval decision was NEEDS_REVIEW.'
+        }
+      ],
+      events: []
+    }
+  }));
+
+  assert.match(report, /Metrics Summary:/);
+  assert.match(report, /Generated At: 2026-07-10T10:00:00.000Z/);
+  assert.match(report, /Counters: content_generation\.started=1/);
+  assert.match(report, /content_generation\.duration_ms: count=1, avg=42ms, total=42ms/);
+  assert.match(report, /publishing_queue\.rejected: count=1, last=Approval decision was NEEDS_REVIEW\./);
+});
+
+test('dry-run report displays instagram preview output', () => {
+  const report = formatDryRunReport(createDryRunResultFixture('mock-ai', {
+    instagramPreview: {
+      magazineId: 'cat',
+      magazineName: 'Cat Magazine',
+      topic: 'indoor enrichment',
+      language: 'en-US',
+      post: {
+        caption: {
+          short: 'Indoor Cat Enrichment Guide - Warm and practical',
+          long: 'Indoor Cat Enrichment Guide\n\nA practical summary.\n\nSave this guide.',
+          cta: 'Save this cat guide.'
+        },
+        hashtags: {
+          primary: ['#catcare', '#enrichment'],
+          secondary: ['#cat', '#indoorcats'],
+          branded: ['#CatMagazine', '#asteria']
+        },
+        altText: 'Cat Magazine editorial image for Indoor Cat Enrichment Guide.',
+        imageSelectionReference: 'cat-image-1:cat-window.jpg'
+      },
+      source: {
+        articleTitle: 'Indoor Cat Enrichment Guide',
+        seoKeywords: ['cat care', 'enrichment']
+      }
+    }
+  }));
+
+  assert.match(report, /Instagram Preview:/);
+  assert.match(report, /Short Caption: Indoor Cat Enrichment Guide - Warm and practical/);
+  assert.match(report, /Primary Hashtags: #catcare #enrichment/);
+  assert.match(report, /Alt Text: Cat Magazine editorial image/);
+  assert.match(report, /Image Reference: cat-image-1:cat-window\.jpg/);
+});
+
+test('dry-run report displays podcast preview output', () => {
+  const report = formatDryRunReport(createDryRunResultFixture('mock-ai', {
+    podcastPreview: {
+      episode: {
+        title: 'Indoor Cat Enrichment Guide - audio brief',
+        language: 'en-US',
+        script: {
+          spokenIntro: 'Welcome to Cat Magazine.',
+          spokenOutro: 'Save this cat guide.',
+          estimatedDurationSeconds: 42,
+          chapters: [
+            {
+              order: 1,
+              title: 'Overview',
+              summary: 'A practical summary.'
+            }
+          ]
+        }
+      },
+      ttsRequest: {
+        voice: 'warm-editorial-neutral',
+        segments: [
+          {
+            id: 'intro',
+            role: 'intro',
+            estimatedDurationSeconds: 8
+          }
+        ]
+      },
+      source: {
+        instagramShortCaption: 'Indoor Cat Enrichment Guide - Warm and practical'
+      }
+    }
+  }));
+
+  assert.match(report, /Podcast Preview:/);
+  assert.match(report, /Episode Title: Indoor Cat Enrichment Guide - audio brief/);
+  assert.match(report, /Voice: warm-editorial-neutral/);
+  assert.match(report, /Estimated Duration: 42s/);
+  assert.match(report, /1\. Overview: A practical summary\./);
+  assert.match(report, /intro \[intro\] 8s/);
+  assert.match(report, /Instagram Hook Used: Indoor Cat Enrichment Guide - Warm and practical/);
+});
+
+test('dry-run result exposes channel previews through preview aggregation', () => {
+  const result = createDryRunResultFixture('mock-ai', {
+    instagramPreview: {
+      magazineId: 'cat',
+      magazineName: 'Cat Magazine',
+      topic: 'indoor enrichment',
+      language: 'en-US',
+      post: {
+        caption: {
+          short: 'Instagram preview',
+          long: 'Instagram preview long',
+          cta: 'Save this guide.'
+        },
+        hashtags: {
+          primary: ['#catcare'],
+          secondary: [],
+          branded: []
+        },
+        altText: 'Alt text'
+      },
+      source: {
+        articleTitle: 'Article',
+        seoKeywords: []
+      }
+    },
+    podcastPreview: {
+      episode: {
+        title: 'Podcast preview',
+        language: 'en-US',
+        script: {
+          spokenIntro: 'Intro',
+          spokenOutro: 'Outro',
+          estimatedDurationSeconds: 12,
+          chapters: []
+        }
+      },
+      ttsRequest: {
+        voice: 'warm-editorial-neutral',
+        segments: []
+      },
+      source: {}
+    }
+  });
+
+  assert.deepEqual(result.previewReport.channels.map((preview: any) => preview.channel), ['instagram', 'podcast']);
+});
+
 function createDryRunResultFixture(providerName: string, overrides: Record<string, unknown> = {}): any {
-  return {
+  const result: any = {
     magazine: {
       name: 'Cat Magazine'
     },
@@ -204,6 +410,63 @@ function createDryRunResultFixture(providerName: string, overrides: Record<strin
       providerName
     },
     ...overrides
+  };
+
+  return {
+    ...result,
+    previewReport: overrides.previewReport ?? {
+      content: {
+        renderedPromptPreview: result.renderedPromptPreview,
+        articlePreview: result.articlePreview,
+        seoPreview: result.seoPreview,
+        publishingPackage: result.publishingPackage,
+        metadata: result.contentGenerationMetadata
+      },
+      media: {
+        selectedImage: result.selectedImage,
+        imageSelectionReason: result.imageSelectionReason,
+        imagePreview: result.imagePreview
+      },
+      monetization: {
+        recommendedProducts: result.recommendedProducts,
+        affiliateLinks: result.affiliateLinks,
+        diagnostics: result.monetizationDiagnostics,
+        preview: result.monetizationPreview,
+        disclosure: result.affiliateDisclosure
+      },
+      channels: [
+        result.instagramPreview
+          ? {
+              id: 'instagram',
+              title: 'Instagram Preview',
+              type: 'channel',
+              channel: 'instagram',
+              payload: result.instagramPreview
+            }
+          : undefined,
+        result.podcastPreview
+          ? {
+              id: 'podcast',
+              title: 'Podcast Preview',
+              type: 'channel',
+              channel: 'podcast',
+              payload: result.podcastPreview
+            }
+          : undefined
+      ].filter(Boolean),
+      publishing: {
+        publishPreview: result.publishPreview,
+        queueResult: result.queueResult,
+        schedulerResult: result.schedulerResult,
+        executionResult: result.executionResult,
+        publisherResult: result.publisherResult
+      },
+      observability: {
+        metricsSnapshot: result.metricsSnapshot,
+        auditTimeline: result.auditTimeline,
+        retryMetadata: result.retryMetadata
+      }
+    }
   };
 }
 

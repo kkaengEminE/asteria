@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Publisher } from '../src/core/index.ts';
-import type { PublishingPayload, PublishingResult } from '../src/core/types.ts';
 import type { ApprovalResult } from '../src/domain/approval/index.ts';
 import { createPublishingPackage, createTag, type PublishingPackage } from '../src/domain/content/index.ts';
+import type { PublishRequest, PublishResult, Publisher } from '../src/domain/publisher/index.ts';
 import { AuditLog } from '../src/services/auditLog/index.ts';
+import { DryRunPublisher, PublisherService } from '../src/services/publisher/index.ts';
 import { PublishingQueue } from '../src/services/publishingQueue/index.ts';
 import { ScheduledJobExecutor, SchedulerService } from '../src/services/scheduler/index.ts';
 
@@ -155,6 +155,51 @@ test('scheduled job executor records audit events', async () => {
   assert.equal(auditLog.filterByEventType('JOB_EXECUTION_SUCCEEDED').length, 1);
 });
 
+test('scheduled job executor executes through publisher service', async () => {
+  const auditLog = new AuditLog();
+  const queue = new PublishingQueue({ auditLog });
+  const scheduler = new SchedulerService({ auditLog, queue });
+  const executor = new ScheduledJobExecutor({
+    auditLog,
+    queue,
+    scheduler,
+    publisherService: new PublisherService({
+      auditLog,
+      publisher: new DryRunPublisher(),
+      publishingEnabled: false
+    })
+  });
+  const queueResult = await queue.enqueue({
+    publishingPackage: createPackageFixture(),
+    approvalResult: createApprovalFixture('APPROVED'),
+    destination: createDestination(),
+    now: '2026-07-10T00:00:00.000Z'
+  });
+  const scheduleResult = await scheduler.schedule({
+    queueItem: queueResult.item!,
+    policy: {
+      scheduledFor: '2026-07-10T09:00:00.000Z',
+      timezone: 'UTC'
+    },
+    now: '2026-07-10T00:00:00.000Z'
+  });
+  const result = await executor.execute<PublishResult>({
+    jobId: scheduleResult.job!.id,
+    now: '2026-07-10T10:00:00.000Z',
+    publishRequest: {
+      publishingPackage: queueResult.item!.publishingPackage,
+      destination: queueResult.item!.destination,
+      mode: 'preview'
+    }
+  });
+
+  assert.equal(result.status, 'SUCCEEDED');
+  assert.equal(result.value?.status, 'PREVIEW');
+  assert.equal(result.value?.publisher, 'dry-run-publisher');
+  assert.equal(auditLog.filterByEventType('PUBLISH_STARTED').length, 1);
+  assert.equal(auditLog.filterByEventType('PUBLISH_SUCCEEDED').length, 1);
+});
+
 test('scheduled job executor does not invoke publisher adapters', async () => {
   const setup = await createScheduledSetup();
   const publisher = new CountingPublisher();
@@ -198,14 +243,17 @@ async function createScheduledSetup(auditLog?: AuditLog) {
 
 class CountingPublisher implements Publisher {
   readonly name = 'counting-publisher';
-  readonly calls: PublishingPayload[] = [];
+  readonly mode = 'dry-run' as const;
+  readonly calls: PublishRequest[] = [];
 
-  async publish(payload: PublishingPayload): Promise<PublishingResult> {
-    this.calls.push(payload);
+  async publish(request: PublishRequest): Promise<PublishResult> {
+    this.calls.push(request);
 
     return {
-      status: 'draft',
-      destination: payload.destination,
+      status: 'PREVIEW',
+      publisher: this.name,
+      mode: request.mode ?? 'preview',
+      destination: request.destination,
       message: 'Publisher should not be called by ScheduledJobExecutor.'
     };
   }
