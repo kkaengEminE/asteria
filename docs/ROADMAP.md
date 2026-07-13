@@ -327,3 +327,9 @@ Status: Implemented with `src/services/persistence` repository/store ports for P
 Migrate existing in-memory operational services onto the persistence ports without adding durable storage.
 
 Status: Implemented with in-memory adapters for PublishingQueueRepository, SchedulerRepository, JobExecutionRepository, AuditStore, MetricsStore, AssetCatalogRepository, and StorageMetadataRepository. PublishingQueue, SchedulerService, ScheduledJobExecutor execution records, AuditLog, MetricsService, AssetLibrary metadata, and storage metadata now compose through ports. ScheduledJobExecutor uses IdempotencyStore and LockManager for duplicate execution prevention. Existing public APIs and dry-run behavior remain compatible through in-memory composition and compatibility wrappers. No database, ORM, filesystem persistence, runtime behavior change, external API call, publishing, or product feature was added.
+
+### Architecture Cleanup Patch 006: Persistence Runtime Composition and Execution Cleanup
+
+Resolve Architecture Review 004 cleanup items before durable persistence.
+
+Status: Implemented with `PersistenceCompositionFactory`, explicit runtime ownership of in-memory repositories/stores/locks/idempotency/UnitOfWork, removal of internal default persistence adapter construction from operational services, ScheduledJobExecutor lock/idempotency cleanup on post-claim paths, Audit/Metrics future async direction documentation, and architecture boundary tests. No durable persistence, database, ORM, filesystem persistence, publishing, or external API calls were added.

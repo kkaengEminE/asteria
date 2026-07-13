@@ -1,6 +1,5 @@
 import type { AuditActor, AuditContext, AuditEvent, AuditEventType } from '../../domain/audit/index.ts';
 import type { AuditStore } from '../persistence/index.ts';
-import { InMemoryAuditStore } from '../persistence/index.ts';
 
 export interface AppendAuditEventInput {
   type: AuditEventType;
@@ -40,7 +39,7 @@ export class AuditLog {
   private readonly events: AuditEvent[] = [];
   private nextId = 1;
 
-  constructor(storageOrStore: AuditLogStorage | AuditStore = new InMemoryAuditStore()) {
+  constructor(storageOrStore: AuditLogStorage | AuditStore) {
     if (isAuditLogStorage(storageOrStore)) {
       this.storage = storageOrStore;
       return;

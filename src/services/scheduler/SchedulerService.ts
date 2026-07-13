@@ -10,7 +10,6 @@ import type { PublishingQueue } from '../publishingQueue/index.ts';
 import type { MetricsService } from '../metrics/index.ts';
 import { RetryService } from '../retry/index.ts';
 import type { SchedulerRepository } from '../persistence/index.ts';
-import { InMemorySchedulerRepository } from '../persistence/index.ts';
 
 export interface ScheduleJobInput {
   queueItem: PublishingQueueItem;
@@ -74,7 +73,7 @@ export class SchedulerService {
 
   constructor(options: SchedulerServiceOptions = {}) {
     this.repository = options.repository
-      ?? (options.storage ? new SchedulerStorageRepositoryAdapter(options.storage) : new InMemorySchedulerRepository());
+      ?? (options.storage ? new SchedulerStorageRepositoryAdapter(options.storage) : requireSchedulerRepository());
     this.auditLog = options.auditLog;
     this.queue = options.queue;
     this.metricsService = options.metricsService;
@@ -640,4 +639,8 @@ class SchedulerStorageRepositoryAdapter implements SchedulerRepository {
 
 function isTerminal(job: ScheduledJob): boolean {
   return job.status === 'CANCELLED' || job.status === 'COMPLETED';
+}
+
+function requireSchedulerRepository(): never {
+  throw new Error('SchedulerService requires a SchedulerRepository. Use PersistenceCompositionFactory in runtime composition.');
 }

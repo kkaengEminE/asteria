@@ -6,7 +6,6 @@ import type {
   MetricSnapshot
 } from '../../domain/metrics/index.ts';
 import type { MetricsStore } from '../persistence/index.ts';
-import { InMemoryMetricsStore } from '../persistence/index.ts';
 
 export interface MetricRecordOptions {
   tags?: Record<string, string>;
@@ -16,7 +15,7 @@ export interface MetricRecordOptions {
 
 export interface MetricsServiceOptions {
   now?: () => string;
-  store?: MetricsStore;
+  store: MetricsStore;
 }
 
 export class MetricsService {
@@ -24,9 +23,9 @@ export class MetricsService {
   private readonly now: () => string;
   private readonly store: MetricsStore;
 
-  constructor(options: MetricsServiceOptions = {}) {
+  constructor(options: MetricsServiceOptions) {
     this.now = options.now ?? (() => new Date().toISOString());
-    this.store = options.store ?? new InMemoryMetricsStore();
+    this.store = options.store;
   }
 
   incrementCounter(name: string, amount = 1, options: MetricRecordOptions = {}): MetricEvent {

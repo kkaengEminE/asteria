@@ -15,10 +15,12 @@ export type { MagazineDryRunStepOptions } from './steps/stepDefinitions.ts';
 export function createMagazineDryRunSteps(options: MagazineDryRunStepOptions): WorkflowStep[] {
   const stepFactory = new DryRunStepFactory();
   const publishingQueue = new PublishingQueue({
+    repository: options.persistence.publishingQueueRepository,
     auditLog: options.auditLog,
     metricsService: options.metricsService
   });
   const schedulerService = new SchedulerService({
+    repository: options.persistence.schedulerRepository,
     auditLog: options.auditLog,
     queue: publishingQueue,
     metricsService: options.metricsService
@@ -32,6 +34,9 @@ export function createMagazineDryRunSteps(options: MagazineDryRunStepOptions): W
     publishingEnabled: false
   });
   const scheduledJobExecutor = new ScheduledJobExecutor({
+    repository: options.persistence.jobExecutionRepository,
+    idempotencyStore: options.persistence.idempotencyStore,
+    lockManager: options.persistence.lockManager,
     auditLog: options.auditLog,
     metricsService: options.metricsService,
     queue: publishingQueue,

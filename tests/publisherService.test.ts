@@ -7,6 +7,7 @@ import type {
   Publisher
 } from '../src/domain/publisher/index.ts';
 import { AuditLog } from '../src/services/auditLog/index.ts';
+import { createInMemoryPersistenceComposition } from '../src/services/persistence/index.ts';
 import { DryRunPublisher, PublisherService } from '../src/services/publisher/index.ts';
 
 test('dry run publisher generates deterministic preview result', async () => {
@@ -68,7 +69,7 @@ test('publisher service retries retryable publisher failures', async () => {
 });
 
 test('publisher service records audit events', async () => {
-  const auditLog = new AuditLog();
+  const auditLog = createAuditLog();
   const service = new PublisherService({
     auditLog,
     publisher: new DryRunPublisher(),
@@ -82,7 +83,7 @@ test('publisher service records audit events', async () => {
 });
 
 test('publisher service records skipped audit event', async () => {
-  const auditLog = new AuditLog();
+  const auditLog = createAuditLog();
   const service = new PublisherService({
     auditLog,
     publisher: new CountingPublisher(),
@@ -109,6 +110,10 @@ function createPublishRequest(overrides: Partial<PublishRequest> = {}): PublishR
     },
     ...overrides
   };
+}
+
+function createAuditLog(): AuditLog {
+  return new AuditLog(createInMemoryPersistenceComposition().auditStore);
 }
 
 class CountingPublisher implements Publisher {

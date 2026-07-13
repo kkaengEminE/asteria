@@ -4,6 +4,10 @@ export type { IdempotencyStore } from './IdempotencyStore.ts';
 export type { JobExecutionQuery, JobExecutionRepository } from './JobExecutionRepository.ts';
 export type { LockManager } from './LockManager.ts';
 export type { MetricsSnapshotQuery, MetricsStore } from './MetricsStore.ts';
+export {
+  createInMemoryPersistenceComposition,
+  type PersistenceComposition
+} from './PersistenceCompositionFactory.ts';
 export type {
   IdempotencyRecord,
   IdempotencyStatus,

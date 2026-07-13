@@ -18,6 +18,10 @@ import {
 import { AuditLog } from '../../services/auditLog/index.ts';
 import { DryRunWorkflowFactory, type DryRunResult } from '../../services/dryRun/index.ts';
 import { MetricsService } from '../../services/metrics/index.ts';
+import {
+  createInMemoryPersistenceComposition,
+  type PersistenceComposition
+} from '../../services/persistence/index.ts';
 import { DryRunPublisher } from '../../services/publisher/index.ts';
 import { createMagazineDryRunSteps } from './dryRunSteps.ts';
 import {
@@ -49,6 +53,7 @@ export interface MagazineDryRunOptions {
   affiliateMode?: MagazineDryRunAffiliateMode;
   coupangEnv?: CoupangEnvironment;
   coupangTransport?: CoupangAffiliateTransport;
+  persistence?: PersistenceComposition;
   registry?: ProviderRegistry;
   registerMockProviders?: boolean;
 }
@@ -95,8 +100,11 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       magazineSlug,
       dryRun: true
     });
-    const auditLog = new AuditLog();
-    const metricsService = new MetricsService();
+    const persistence = options.persistence ?? createInMemoryPersistenceComposition();
+    const auditLog = new AuditLog(persistence.auditStore);
+    const metricsService = new MetricsService({
+      store: persistence.metricsStore
+    });
 
     const steps = createMagazineDryRunSteps({
       topic,
@@ -109,6 +117,7 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       publisher,
       imageLibrary,
       monetizationProvider,
+      persistence,
       auditLog,
       metricsService
     });

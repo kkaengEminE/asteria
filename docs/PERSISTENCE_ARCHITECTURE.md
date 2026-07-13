@@ -257,6 +257,13 @@ Sprint 51 status:
 - Current runtime uses `InMemoryAuditStore`.
 - AuditLog preserves its existing synchronous public API through an in-memory compatibility cache while durable async store design remains deferred.
 
+Future async direction:
+
+- Keep current synchronous AuditLog API until durable storage is introduced.
+- Before durable AuditStore adoption, split write behavior behind an async `AuditRecorder` or make append/query APIs explicitly async.
+- Durable audit failures must be visible to callers in operations where audit trail completeness is required.
+- Audit events remain append-only; corrections must be additional events.
+
 ### Metrics
 
 MetricsService owns observational counters, durations, failures, and snapshots.
@@ -272,6 +279,13 @@ Sprint 51 status:
 - MetricsService composes with `MetricsStore`.
 - Current runtime uses `InMemoryMetricsStore`.
 - MetricsService preserves its existing synchronous public API while recording through the store boundary.
+
+Future async direction:
+
+- Treat metrics as observational and eventually consistent unless a future sprint explicitly requires durable metric guarantees.
+- Before durable MetricsStore adoption, decide whether MetricsService becomes async or whether durable metrics are exported by a separate async recorder.
+- Metrics write failures must not change queue, scheduler, executor, publisher, or approval decisions.
+- Snapshots may remain in-memory for dry-run reporting while durable metrics are exported separately.
 
 ### Assets
 
@@ -436,6 +450,15 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - Optional StorageMetadataRepository recording for asset-backed storage metadata.
 - Architecture boundary coverage preventing workflows from importing concrete persistence adapters.
 - Regression coverage for dry-run and Quality Lab compatibility.
+
+## Implemented in Architecture Cleanup Patch 006
+
+- PersistenceCompositionFactory for explicit runtime ownership of repositories, stores, lock manager, idempotency store, and UnitOfWork.
+- Operational service constructors no longer instantiate default persistence adapters internally.
+- Magazine dry-run runtime composes queue, scheduler, executor, audit, and metrics through a shared persistence composition.
+- ScheduledJobExecutor finalizes idempotency and releases locks on post-claim skip, failure, and unexpected-error paths.
+- Architecture boundary coverage prevents operational services from directly instantiating concrete in-memory persistence adapters.
+- Future async direction for Audit and Metrics is documented without changing public APIs.
 
 ## Accepted Deferrals
 

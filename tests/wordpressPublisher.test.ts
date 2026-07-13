@@ -14,6 +14,7 @@ import {
   type WordPressTransportPostResponse
 } from '../src/providers/publisher/wordpress/index.ts';
 import { AuditLog } from '../src/services/auditLog/index.ts';
+import { createInMemoryPersistenceComposition } from '../src/services/persistence/index.ts';
 
 test('valid post payload returns preview publish result', async () => {
   const publisher = createEnabledPublisher({ transport: new MockWordPressTransport() });
@@ -139,7 +140,7 @@ test('wordpress publisher retries mocked transport failures', async () => {
 });
 
 test('wordpress publisher records audit events', async () => {
-  const auditLog = new AuditLog();
+  const auditLog = new AuditLog(createInMemoryPersistenceComposition().auditStore);
   const publisher = createEnabledPublisher({
     auditLog,
     transport: new MockWordPressTransport()

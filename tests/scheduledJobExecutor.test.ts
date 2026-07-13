@@ -4,6 +4,7 @@ import type { ApprovalResult } from '../src/domain/approval/index.ts';
 import { createPublishingPackage, createTag, type PublishingPackage } from '../src/domain/content/index.ts';
 import type { PublishRequest, PublishResult, Publisher } from '../src/domain/publisher/index.ts';
 import { AuditLog } from '../src/services/auditLog/index.ts';
+import { createInMemoryPersistenceComposition, type PersistenceComposition } from '../src/services/persistence/index.ts';
 import { DryRunPublisher, PublisherService } from '../src/services/publisher/index.ts';
 import { PublishingQueue } from '../src/services/publishingQueue/index.ts';
 import { ScheduledJobExecutor, SchedulerService } from '../src/services/scheduler/index.ts';
@@ -64,6 +65,25 @@ test('scheduled job executor skips invalid queue status', async () => {
 
   assert.equal(result.status, 'SKIPPED');
   assert.equal(result.failure?.code, 'invalid_queue_status');
+});
+
+test('scheduled job executor releases lock and finalizes idempotency after invalid queue status', async () => {
+  const setup = await createScheduledSetup();
+
+  await setup.queue.updateStatus(setup.queueItemId, 'PROCESSING');
+
+  const result = await setup.executor.execute({
+    jobId: setup.jobId,
+    now: '2026-07-10T10:00:00.000Z',
+    operation: () => ({ preview: true })
+  });
+  const idempotency = await setup.persistence.idempotencyStore.get(`scheduled-job:${setup.jobId}`, 'scheduled-job-execution');
+  const lock = await setup.persistence.lockManager.get(`scheduled-job:${setup.jobId}`);
+
+  assert.equal(result.status, 'SKIPPED');
+  assert.equal(idempotency?.status, 'FAILED');
+  assert.equal(idempotency?.failure?.code, 'invalid_queue_status');
+  assert.equal(lock, undefined);
 });
 
 test('scheduled job executor prevents duplicate execution', async () => {
@@ -142,8 +162,9 @@ test('scheduled job executor records retry exhaustion failure', async () => {
 });
 
 test('scheduled job executor records audit events', async () => {
-  const auditLog = new AuditLog();
-  const setup = await createScheduledSetup(auditLog);
+  const persistence = createInMemoryPersistenceComposition();
+  const auditLog = new AuditLog(persistence.auditStore);
+  const setup = await createScheduledSetup({ auditLog, persistence });
 
   await setup.executor.execute({
     jobId: setup.jobId,
@@ -156,10 +177,14 @@ test('scheduled job executor records audit events', async () => {
 });
 
 test('scheduled job executor executes through publisher service', async () => {
-  const auditLog = new AuditLog();
-  const queue = new PublishingQueue({ auditLog });
-  const scheduler = new SchedulerService({ auditLog, queue });
+  const persistence = createInMemoryPersistenceComposition();
+  const auditLog = new AuditLog(persistence.auditStore);
+  const queue = createQueue(persistence, auditLog);
+  const scheduler = createScheduler(persistence, queue, auditLog);
   const executor = new ScheduledJobExecutor({
+    repository: persistence.jobExecutionRepository,
+    idempotencyStore: persistence.idempotencyStore,
+    lockManager: persistence.lockManager,
     auditLog,
     queue,
     scheduler,
@@ -213,10 +238,18 @@ test('scheduled job executor does not invoke publisher adapters', async () => {
   assert.equal(publisher.calls.length, 0);
 });
 
-async function createScheduledSetup(auditLog?: AuditLog) {
-  const queue = new PublishingQueue({ auditLog });
-  const scheduler = new SchedulerService({ auditLog, queue });
-  const executor = new ScheduledJobExecutor({ auditLog, queue, scheduler });
+async function createScheduledSetup(options: { auditLog?: AuditLog; persistence?: PersistenceComposition } = {}) {
+  const persistence = options.persistence ?? createInMemoryPersistenceComposition();
+  const queue = createQueue(persistence, options.auditLog);
+  const scheduler = createScheduler(persistence, queue, options.auditLog);
+  const executor = new ScheduledJobExecutor({
+    repository: persistence.jobExecutionRepository,
+    idempotencyStore: persistence.idempotencyStore,
+    lockManager: persistence.lockManager,
+    auditLog: options.auditLog,
+    queue,
+    scheduler
+  });
   const queueResult = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -236,9 +269,25 @@ async function createScheduledSetup(auditLog?: AuditLog) {
     queue,
     scheduler,
     executor,
+    persistence,
     queueItemId: queueResult.item!.id,
     jobId: scheduleResult.job!.id
   };
+}
+
+function createQueue(persistence: PersistenceComposition, auditLog?: AuditLog): PublishingQueue {
+  return new PublishingQueue({
+    repository: persistence.publishingQueueRepository,
+    auditLog
+  });
+}
+
+function createScheduler(persistence: PersistenceComposition, queue: PublishingQueue, auditLog?: AuditLog): SchedulerService {
+  return new SchedulerService({
+    repository: persistence.schedulerRepository,
+    auditLog,
+    queue
+  });
 }
 
 class CountingPublisher implements Publisher {

@@ -320,7 +320,9 @@ Implemented port boundaries include:
 
 These ports live under `src/services/persistence`. Application services own transaction boundaries. Durable adapters should implement repository ports. Current runtime composition chooses in-memory adapters for dry runs and future durable adapters remain deferred.
 
-Sprint 51 migrates PublishingQueue, SchedulerService, ScheduledJobExecutor records, AuditLog, MetricsService, AssetLibrary metadata, and storage metadata onto these ports. Some no-argument constructors and legacy storage options remain as compatibility wrappers around in-memory ports so existing callers and CLI behavior stay unchanged.
+Sprint 51 migrates PublishingQueue, SchedulerService, ScheduledJobExecutor records, AuditLog, MetricsService, AssetLibrary metadata, and storage metadata onto these ports. Legacy storage options remain as compatibility wrappers where safe, but runtime code should pass repository/store ports explicitly.
+
+Architecture Cleanup Patch 006 adds `PersistenceCompositionFactory` so runtime composition owns repositories, stores, idempotency, locking, and UnitOfWork selection. Operational service constructors no longer create default persistence adapters internally. Durable adapters remain deferred, but future runtime composition can swap the persistence bundle without changing queue, scheduler, executor, audit, metrics, or asset services.
 
 Locking should combine optimistic concurrency for entity transitions with short-lived execution locks. Idempotency should be scoped by operation type and entity, especially for queue enqueue, schedule creation, job execution, publisher dispatch, asset registration, and audit append.
 

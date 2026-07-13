@@ -7,11 +7,10 @@ import {
 } from '../../domain/image/index.ts';
 import type { StorageProvider } from '../../domain/storage/index.ts';
 import type { AssetCatalogRepository, StorageMetadataRepository } from '../persistence/index.ts';
-import { InMemoryAssetCatalogRepository } from '../persistence/index.ts';
 
 export interface AssetLibraryOptions {
   storageProvider: StorageProvider;
-  catalogRepository?: AssetCatalogRepository;
+  catalogRepository: AssetCatalogRepository;
   storageMetadataRepository?: StorageMetadataRepository;
 }
 
@@ -22,7 +21,7 @@ export class AssetLibrary {
 
   constructor(options: AssetLibraryOptions) {
     this.storageProvider = options.storageProvider;
-    this.catalogRepository = options.catalogRepository ?? new InMemoryAssetCatalogRepository();
+    this.catalogRepository = options.catalogRepository;
     this.storageMetadataRepository = options.storageMetadataRepository;
   }
 

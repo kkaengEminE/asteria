@@ -11,7 +11,6 @@ import type {
 import type { AuditLog } from '../auditLog/index.ts';
 import type { MetricsService } from '../metrics/index.ts';
 import type { PublishingQueueRepository } from '../persistence/index.ts';
-import { InMemoryPublishingQueueRepository } from '../persistence/index.ts';
 
 export interface PublishingQueueEnqueueInput {
   publishingPackage: PublishingPackage;
@@ -60,7 +59,7 @@ export class PublishingQueue {
   private readonly metricsService?: MetricsService;
   private nextId = 1;
 
-  constructor(storageOrOptions: PublishingQueueStorage | PublishingQueueOptions = {}) {
+  constructor(storageOrOptions: PublishingQueueStorage | PublishingQueueOptions) {
     if (isPublishingQueueStorage(storageOrOptions)) {
       this.repository = new PublishingQueueStorageRepositoryAdapter(storageOrOptions);
       this.auditLog = undefined;
@@ -68,7 +67,7 @@ export class PublishingQueue {
     }
 
     this.repository = storageOrOptions.repository
-      ?? (storageOrOptions.storage ? new PublishingQueueStorageRepositoryAdapter(storageOrOptions.storage) : new InMemoryPublishingQueueRepository());
+      ?? (storageOrOptions.storage ? new PublishingQueueStorageRepositoryAdapter(storageOrOptions.storage) : requirePublishingQueueRepository());
     this.auditLog = storageOrOptions.auditLog;
     this.metricsService = storageOrOptions.metricsService;
   }
@@ -465,6 +464,10 @@ export function canTransition(
 
 function isPublishingQueueStorage(value: PublishingQueueStorage | PublishingQueueOptions): value is PublishingQueueStorage {
   return typeof (value as PublishingQueueStorage).save === 'function';
+}
+
+function requirePublishingQueueRepository(): never {
+  throw new Error('PublishingQueue requires a PublishingQueueRepository. Use PersistenceCompositionFactory in runtime composition.');
 }
 
 function createQueueAuditContext(item: PublishingQueueItem): AuditContext {

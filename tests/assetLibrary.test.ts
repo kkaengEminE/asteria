@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { AssetValidationError } from '../src/domain/asset/index.ts';
 import { LocalStorageProvider } from '../src/providers/storage/index.ts';
 import { AssetLibrary } from '../src/services/assetLibrary/index.ts';
+import { createInMemoryPersistenceComposition } from '../src/services/persistence/index.ts';
 
 test('asset library registers an asset through storage provider', async () => {
   const library = await createAssetLibrary();
@@ -121,7 +122,11 @@ test('asset validation rejects incomplete registration', async () => {
 
 async function createAssetLibrary(): Promise<AssetLibrary> {
   const rootDir = await mkdtemp(join(tmpdir(), 'asteria-assets-'));
+  const persistence = createInMemoryPersistenceComposition();
+
   return new AssetLibrary({
-    storageProvider: new LocalStorageProvider({ rootDir })
+    storageProvider: new LocalStorageProvider({ rootDir }),
+    catalogRepository: persistence.assetCatalogRepository,
+    storageMetadataRepository: persistence.storageMetadataRepository
   });
 }

@@ -15,6 +15,7 @@ import type { AuditLog } from '../../../services/auditLog/index.ts';
 import { DryRunStepFactory, requireWorkflowData } from '../../../services/dryRun/index.ts';
 import { InstagramContentService } from '../../../services/instagram/index.ts';
 import type { MetricsService } from '../../../services/metrics/index.ts';
+import type { PersistenceComposition } from '../../../services/persistence/index.ts';
 import { PodcastContentService } from '../../../services/podcast/index.ts';
 import { PublishingWorkflow } from '../../../services/publishing/index.ts';
 import { PublishingQueue } from '../../../services/publishingQueue/index.ts';
@@ -34,6 +35,7 @@ export interface MagazineDryRunStepOptions {
   publisher: Publisher;
   imageLibrary: ImageDomainLibrary;
   monetizationProvider: MonetizationProvider;
+  persistence: PersistenceComposition;
   auditLog?: AuditLog;
   metricsService?: MetricsService;
 }

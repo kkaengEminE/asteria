@@ -9,6 +9,7 @@ import {
   type ImageSelectionCriteria
 } from '../../../domain/image/index.ts';
 import { AssetLibrary, mapAssetToImageAsset } from '../../../services/assetLibrary/index.ts';
+import { InMemoryAssetCatalogRepository } from '../../../services/persistence/index.ts';
 import { LocalStorageProvider } from '../../storage/index.ts';
 import { createProviderToken } from '../../ProviderToken.ts';
 import {
@@ -40,7 +41,8 @@ export class GoogleDriveImageLibrary implements ImageDomainLibrary {
     this.assetLibrary = config.assetLibrary ?? new AssetLibrary({
       storageProvider: config.storageProvider ?? new LocalStorageProvider({
         rootDir: join(tmpdir(), `asteria-google-drive-image-assets-${process.pid}-${defaultStorageInstanceId++}`)
-      })
+      }),
+      catalogRepository: new InMemoryAssetCatalogRepository()
     });
   }
 

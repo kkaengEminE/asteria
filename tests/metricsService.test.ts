@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createCategory, createPublishingPackage, createTag } from '../src/domain/content/index.ts';
 import { MetricsService } from '../src/services/metrics/index.ts';
+import { createInMemoryPersistenceComposition } from '../src/services/persistence/index.ts';
 import { DryRunPublisher, PublisherService } from '../src/services/publisher/index.ts';
 import { MockAIProvider } from '../src/providers/ai/index.ts';
 import { ContentGenerationWorkflow } from '../src/workflows/index.ts';
 
 test('metrics service increments counters', () => {
   const metrics = new MetricsService({
+    store: createInMemoryPersistenceComposition().metricsStore,
     now: () => '2026-07-10T00:00:00.000Z'
   });
 
@@ -21,7 +23,7 @@ test('metrics service increments counters', () => {
 });
 
 test('metrics service records durations', () => {
-  const metrics = new MetricsService();
+  const metrics = createMetricsService();
 
   metrics.recordDuration('content_generation.duration_ms', 100);
   metrics.recordDuration('content_generation.duration_ms', 300);
@@ -36,7 +38,7 @@ test('metrics service records durations', () => {
 });
 
 test('metrics service snapshot includes failure summaries', () => {
-  const metrics = new MetricsService();
+  const metrics = createMetricsService();
 
   metrics.recordFailure('publisher.failed', 'Temporary publisher failure.');
   metrics.recordFailure('publisher.failed', 'Second publisher failure.');
@@ -48,7 +50,7 @@ test('metrics service snapshot includes failure summaries', () => {
 });
 
 test('content generation workflow records metrics', async () => {
-  const metrics = new MetricsService();
+  const metrics = createMetricsService();
   const workflow = new ContentGenerationWorkflow({
     aiProvider: new MockAIProvider(),
     metricsService: metrics
@@ -70,7 +72,7 @@ test('content generation workflow records metrics', async () => {
 });
 
 test('publisher service records metrics', async () => {
-  const metrics = new MetricsService();
+  const metrics = createMetricsService();
   const service = new PublisherService({
     metricsService: metrics,
     publisher: new DryRunPublisher(),
@@ -139,5 +141,11 @@ function createPackageFixture() {
     metadata: {
       dryRun: true
     }
+  });
+}
+
+function createMetricsService(): MetricsService {
+  return new MetricsService({
+    store: createInMemoryPersistenceComposition().metricsStore
   });
 }

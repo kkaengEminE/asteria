@@ -4,13 +4,15 @@ import type { ApprovalResult } from '../src/domain/approval/index.ts';
 import { createPublishingPackage, createTag, type PublishingPackage } from '../src/domain/content/index.ts';
 import { AuditLog } from '../src/services/auditLog/index.ts';
 import { MetricsService } from '../src/services/metrics/index.ts';
+import { createInMemoryPersistenceComposition, type PersistenceComposition } from '../src/services/persistence/index.ts';
 import { PublishingQueue } from '../src/services/publishingQueue/index.ts';
 import { SchedulerService } from '../src/services/scheduler/index.ts';
 
 test('scheduler creates a scheduled job for approved queue item', async () => {
-  const queue = new PublishingQueue();
+  const persistence = createInMemoryPersistenceComposition();
+  const queue = createQueue(persistence);
   const queueResult = await enqueueApproved(queue);
-  const scheduler = new SchedulerService({ queue });
+  const scheduler = createScheduler(persistence, queue);
 
   const result = await scheduler.schedule({
     queueItem: queueResult.item!,
@@ -26,9 +28,10 @@ test('scheduler creates a scheduled job for approved queue item', async () => {
 });
 
 test('scheduler cancels scheduled job and queue item', async () => {
-  const queue = new PublishingQueue();
+  const persistence = createInMemoryPersistenceComposition();
+  const queue = createQueue(persistence);
   const queueResult = await enqueueApproved(queue);
-  const scheduler = new SchedulerService({ queue });
+  const scheduler = createScheduler(persistence, queue);
   const scheduled = await scheduler.schedule({
     queueItem: queueResult.item!,
     policy: createSchedulePolicy()
@@ -44,11 +47,12 @@ test('scheduler cancels scheduled job and queue item', async () => {
 });
 
 test('scheduler reschedules an active scheduled job', async () => {
-  const auditLog = new AuditLog();
-  const metricsService = new MetricsService();
-  const queue = new PublishingQueue({ auditLog, metricsService });
+  const persistence = createInMemoryPersistenceComposition();
+  const auditLog = new AuditLog(persistence.auditStore);
+  const metricsService = new MetricsService({ store: persistence.metricsStore });
+  const queue = createQueue(persistence, auditLog, metricsService);
   const queueResult = await enqueueApproved(queue);
-  const scheduler = new SchedulerService({ auditLog, queue, metricsService });
+  const scheduler = createScheduler(persistence, queue, auditLog, metricsService);
   const scheduled = await scheduler.schedule({
     queueItem: queueResult.item!,
     policy: createSchedulePolicy()
@@ -72,9 +76,10 @@ test('scheduler reschedules an active scheduled job', async () => {
 });
 
 test('scheduler prevents duplicate scheduling for same queue item', async () => {
-  const queue = new PublishingQueue();
+  const persistence = createInMemoryPersistenceComposition();
+  const queue = createQueue(persistence);
   const queueResult = await enqueueApproved(queue);
-  const scheduler = new SchedulerService({ queue });
+  const scheduler = createScheduler(persistence, queue);
 
   const first = await scheduler.schedule({
     queueItem: queueResult.item!,
@@ -91,9 +96,10 @@ test('scheduler prevents duplicate scheduling for same queue item', async () => 
 });
 
 test('scheduler rejects invalid schedule policy without throwing', async () => {
-  const queue = new PublishingQueue();
+  const persistence = createInMemoryPersistenceComposition();
+  const queue = createQueue(persistence);
   const queueResult = await enqueueApproved(queue);
-  const scheduler = new SchedulerService({ queue });
+  const scheduler = createScheduler(persistence, queue);
 
   const result = await scheduler.schedule({
     queueItem: queueResult.item!,
@@ -107,11 +113,12 @@ test('scheduler rejects invalid schedule policy without throwing', async () => {
 });
 
 test('scheduler retry scheduling succeeds after retryable failure', async () => {
-  const auditLog = new AuditLog();
-  const metricsService = new MetricsService();
-  const queue = new PublishingQueue({ auditLog, metricsService });
+  const persistence = createInMemoryPersistenceComposition();
+  const auditLog = new AuditLog(persistence.auditStore);
+  const metricsService = new MetricsService({ store: persistence.metricsStore });
+  const queue = createQueue(persistence, auditLog, metricsService);
   const queueResult = await enqueueApproved(queue);
-  const scheduler = new SchedulerService({ auditLog, queue, metricsService });
+  const scheduler = createScheduler(persistence, queue, auditLog, metricsService);
 
   const result = await scheduler.retrySchedule({
     queueItem: queueResult.item!,
@@ -131,9 +138,10 @@ test('scheduler retry scheduling succeeds after retryable failure', async () => 
 });
 
 test('scheduler completed jobs are immutable', async () => {
-  const queue = new PublishingQueue();
+  const persistence = createInMemoryPersistenceComposition();
+  const queue = createQueue(persistence);
   const queueResult = await enqueueApproved(queue);
-  const scheduler = new SchedulerService({ queue });
+  const scheduler = createScheduler(persistence, queue);
   const scheduled = await scheduler.schedule({
     queueItem: queueResult.item!,
     policy: createSchedulePolicy()
@@ -157,10 +165,11 @@ test('scheduler completed jobs are immutable', async () => {
 });
 
 test('scheduler records audit events for schedule and cancellation', async () => {
-  const auditLog = new AuditLog();
-  const queue = new PublishingQueue({ auditLog });
+  const persistence = createInMemoryPersistenceComposition();
+  const auditLog = new AuditLog(persistence.auditStore);
+  const queue = createQueue(persistence, auditLog);
   const queueResult = await enqueueApproved(queue);
-  const scheduler = new SchedulerService({ auditLog, queue });
+  const scheduler = createScheduler(persistence, queue, auditLog);
 
   const scheduled = await scheduler.schedule({
     queueItem: queueResult.item!,
@@ -173,10 +182,11 @@ test('scheduler records audit events for schedule and cancellation', async () =>
 });
 
 test('scheduler rejects queue items that are no longer approved', async () => {
-  const queue = new PublishingQueue();
+  const persistence = createInMemoryPersistenceComposition();
+  const queue = createQueue(persistence);
   const queueResult = await enqueueApproved(queue);
   const processing = await queue.updateStatus(queueResult.item!.id, 'PROCESSING');
-  const scheduler = new SchedulerService({ queue });
+  const scheduler = createScheduler(persistence, queue);
 
   const result = await scheduler.schedule({
     queueItem: processing.item!,
@@ -192,6 +202,32 @@ function createSchedulePolicy() {
     scheduledFor: '2026-07-10T09:00:00.000Z',
     timezone: 'UTC'
   };
+}
+
+function createQueue(
+  persistence: PersistenceComposition,
+  auditLog?: AuditLog,
+  metricsService?: MetricsService
+): PublishingQueue {
+  return new PublishingQueue({
+    repository: persistence.publishingQueueRepository,
+    auditLog,
+    metricsService
+  });
+}
+
+function createScheduler(
+  persistence: PersistenceComposition,
+  queue: PublishingQueue,
+  auditLog?: AuditLog,
+  metricsService?: MetricsService
+): SchedulerService {
+  return new SchedulerService({
+    repository: persistence.schedulerRepository,
+    auditLog,
+    queue,
+    metricsService
+  });
 }
 
 async function enqueueApproved(queue: PublishingQueue) {

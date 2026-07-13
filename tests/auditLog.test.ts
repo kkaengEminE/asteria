@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import type { ApprovalResult } from '../src/domain/approval/index.ts';
 import { createPublishingPackage, createTag, type PublishingPackage } from '../src/domain/content/index.ts';
 import { AuditLog } from '../src/services/auditLog/index.ts';
+import { createInMemoryPersistenceComposition } from '../src/services/persistence/index.ts';
 import { PublishingQueue } from '../src/services/publishingQueue/index.ts';
 import { ContentGenerationWorkflow } from '../src/workflows/index.ts';
 import { MockAIProvider } from '../src/providers/ai/index.ts';
@@ -10,7 +11,7 @@ import { runMagazineDryRun } from '../src/magazines/runtime/index.ts';
 import { formatDryRunReport } from '../scripts/dry-run.ts';
 
 test('audit log records events', () => {
-  const auditLog = new AuditLog();
+  const auditLog = createAuditLog();
   const event = auditLog.append({
     type: 'CONTENT_GENERATED',
     message: 'Content generated.',
@@ -27,7 +28,7 @@ test('audit log records events', () => {
 });
 
 test('audit log filters by entity and event type', () => {
-  const auditLog = new AuditLog();
+  const auditLog = createAuditLog();
 
   auditLog.append({
     type: 'CONTENT_GENERATED',
@@ -51,7 +52,7 @@ test('audit log filters by entity and event type', () => {
 });
 
 test('audit log preserves timeline ordering', () => {
-  const auditLog = new AuditLog();
+  const auditLog = createAuditLog();
 
   auditLog.append({
     type: 'QUEUE_FAILED',
@@ -71,7 +72,7 @@ test('audit log preserves timeline ordering', () => {
 });
 
 test('content generation workflow records audit events', async () => {
-  const auditLog = new AuditLog();
+  const auditLog = createAuditLog();
   const workflow = new ContentGenerationWorkflow({
     aiProvider: new MockAIProvider(),
     auditLog
@@ -95,8 +96,12 @@ test('content generation workflow records audit events', async () => {
 });
 
 test('publishing queue records queue audit events', async () => {
-  const auditLog = new AuditLog();
-  const queue = new PublishingQueue({ auditLog });
+  const persistence = createInMemoryPersistenceComposition();
+  const auditLog = new AuditLog(persistence.auditStore);
+  const queue = new PublishingQueue({
+    repository: persistence.publishingQueueRepository,
+    auditLog
+  });
   const queued = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -167,6 +172,10 @@ function createPackageFixture(): PublishingPackage {
       prompt: 'Cat enrichment product suggestions.'
     }
   });
+}
+
+function createAuditLog(): AuditLog {
+  return new AuditLog(createInMemoryPersistenceComposition().auditStore);
 }
 
 function createApprovalFixture(decision: ApprovalResult['decision']): ApprovalResult {

@@ -476,6 +476,8 @@ These provider-neutral TypeScript ports live under `src/services/persistence`. T
 
 Sprint 51 adds in-memory adapters for Queue, Scheduler, Job Execution, Audit, Metrics, Asset Catalog, and Storage Metadata and migrates the active in-memory services onto those ports. `IdempotencyStore` and `LockManager` are integrated into ScheduledJobExecutor duplicate execution prevention. `UnitOfWork` remains available for future operations that materially span multiple persistence ports. Durable database, ORM, and filesystem adapters remain deferred.
 
+Architecture Cleanup Patch 006 adds `PersistenceCompositionFactory`, which creates the runtime-owned persistence bundle for dry runs. Operational services receive repositories, stores, lock manager, idempotency store, and UnitOfWork through constructor injection instead of constructing default in-memory adapters internally. This prepares future durable adapters without changing service behavior.
+
 ## `src/prompts`
 
 Contains prompt management logic:

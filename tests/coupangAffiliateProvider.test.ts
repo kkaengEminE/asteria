@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { AuditLog } from '../src/services/auditLog/index.ts';
+import { createInMemoryPersistenceComposition } from '../src/services/persistence/index.ts';
 import { ProviderRegistry } from '../src/providers/index.ts';
 import {
   CoupangAffiliateProvider,
@@ -155,7 +156,7 @@ test('coupang production provider retries transport failures', async () => {
 });
 
 test('coupang production provider records audit events', async () => {
-  const auditLog = new AuditLog();
+  const auditLog = new AuditLog(createInMemoryPersistenceComposition().auditStore);
   const provider = createProductionProvider(new MockCoupangTransport(mockRecords), auditLog);
 
   await provider.searchProducts({

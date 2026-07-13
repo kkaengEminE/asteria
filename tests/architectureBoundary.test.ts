@@ -8,6 +8,7 @@ const domainRoot = join(srcRoot, 'domain');
 const previewRoot = join(domainRoot, 'preview');
 const providerRoot = join(srcRoot, 'providers');
 const persistenceRoot = join(srcRoot, 'services', 'persistence');
+const serviceRoot = join(srcRoot, 'services');
 const publishingServiceRoots = [
   join(srcRoot, 'services', 'publishing'),
   join(srcRoot, 'services', 'publisher'),
@@ -171,6 +172,21 @@ test('persistence ports do not import database or orm packages', async () => {
         violations.push(file.replace(`${process.cwd()}/`, ''));
         break;
       }
+    }
+  }
+
+  assert.deepEqual(violations, []);
+});
+
+test('operational services do not instantiate concrete persistence adapters directly', async () => {
+  const files = (await listTypeScriptFiles(serviceRoot)).filter((file) => !normalize(file).startsWith(normalize(persistenceRoot)));
+  const violations: string[] = [];
+
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+
+    if (/from\s+['"][^'"]*services\/persistence\/inMemory[^'"]*['"]/.test(source) || /\bnew\s+InMemory[A-Za-z]*(?:Repository|Store|LockManager|UnitOfWork)\b/.test(source)) {
+      violations.push(file.replace(`${process.cwd()}/`, ''));
     }
   }
 

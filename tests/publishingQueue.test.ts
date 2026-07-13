@@ -4,13 +4,14 @@ import type { ApprovalResult } from '../src/domain/approval/index.ts';
 import { createPublishingPackage, createTag, type PublishingPackage } from '../src/domain/content/index.ts';
 import type { PublishRequest, PublishResult, Publisher } from '../src/domain/publisher/index.ts';
 import { AuditLog } from '../src/services/auditLog/index.ts';
+import { createInMemoryPersistenceComposition } from '../src/services/persistence/index.ts';
 import { PublishingQueue } from '../src/services/publishingQueue/index.ts';
 import { PublishingWorkflow } from '../src/services/publishing/index.ts';
 import { runMagazineDryRun } from '../src/magazines/runtime/index.ts';
 import { formatDryRunReport } from '../scripts/dry-run.ts';
 
 test('publishing queue enqueues approved package', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -25,7 +26,7 @@ test('publishing queue enqueues approved package', async () => {
 });
 
 test('publishing queue rejects needs review package', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('NEEDS_REVIEW'),
@@ -39,7 +40,7 @@ test('publishing queue rejects needs review package', async () => {
 });
 
 test('publishing queue rejects rejected package', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('REJECTED'),
@@ -51,7 +52,7 @@ test('publishing queue rejects rejected package', async () => {
 });
 
 test('publishing queue supports lookup and listing', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -66,7 +67,7 @@ test('publishing queue supports lookup and listing', async () => {
 });
 
 test('publishing queue updates status', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -81,7 +82,7 @@ test('publishing queue updates status', async () => {
 });
 
 test('publishing queue allows valid transitions', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -99,7 +100,7 @@ test('publishing queue allows valid transitions', async () => {
 });
 
 test('publishing queue rejects invalid transitions', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -113,7 +114,7 @@ test('publishing queue rejects invalid transitions', async () => {
 });
 
 test('publishing queue terminal statuses cannot transition', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -133,7 +134,7 @@ test('publishing queue terminal statuses cannot transition', async () => {
 });
 
 test('publishing queue failed item requires explicit retry transition to pending', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -154,7 +155,7 @@ test('publishing queue failed item requires explicit retry transition to pending
 });
 
 test('publishing queue cancels item', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -169,7 +170,7 @@ test('publishing queue cancels item', async () => {
 });
 
 test('publishing queue records failure', async () => {
-  const queue = new PublishingQueue();
+  const queue = createQueue();
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
     approvalResult: createApprovalFixture('APPROVED'),
@@ -188,8 +189,7 @@ test('publishing queue records failure', async () => {
 });
 
 test('publishing queue records audit event on needs review rejection', async () => {
-  const auditLog = new AuditLog();
-  const queue = new PublishingQueue({ auditLog });
+  const { auditLog, queue } = createAuditedQueue();
 
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
@@ -204,8 +204,7 @@ test('publishing queue records audit event on needs review rejection', async () 
 });
 
 test('publishing queue records audit event on rejected approval rejection', async () => {
-  const auditLog = new AuditLog();
-  const queue = new PublishingQueue({ auditLog });
+  const { auditLog, queue } = createAuditedQueue();
 
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
@@ -220,8 +219,7 @@ test('publishing queue records audit event on rejected approval rejection', asyn
 });
 
 test('publishing queue records audit event on missing approval rejection', async () => {
-  const auditLog = new AuditLog();
-  const queue = new PublishingQueue({ auditLog });
+  const { auditLog, queue } = createAuditedQueue();
 
   const result = await queue.enqueue({
     publishingPackage: createPackageFixture(),
@@ -236,9 +234,10 @@ test('publishing queue records audit event on missing approval rejection', async
 
 test('publishing workflow creates queue item without invoking publisher', async () => {
   const publisher = new CountingPublisher();
+  const queue = createQueue();
   const workflow = new PublishingWorkflow({
     publisher,
-    queue: new PublishingQueue(),
+    queue,
     config: {
       dryRun: true,
       publishingEnabled: false,
@@ -288,6 +287,28 @@ class CountingPublisher implements Publisher {
       message: 'Publisher should not be called in queue mode.'
     };
   }
+}
+
+function createQueue(): PublishingQueue {
+  const persistence = createInMemoryPersistenceComposition();
+
+  return new PublishingQueue({
+    repository: persistence.publishingQueueRepository
+  });
+}
+
+function createAuditedQueue(): { auditLog: AuditLog; queue: PublishingQueue } {
+  const persistence = createInMemoryPersistenceComposition();
+  const auditLog = new AuditLog(persistence.auditStore);
+  const queue = new PublishingQueue({
+    repository: persistence.publishingQueueRepository,
+    auditLog
+  });
+
+  return {
+    auditLog,
+    queue
+  };
 }
 
 function createPackageFixture(): PublishingPackage {
