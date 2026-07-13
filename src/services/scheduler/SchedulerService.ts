@@ -9,6 +9,8 @@ import type { PublishingQueueItem } from '../../domain/publishingQueue/index.ts'
 import type { PublishingQueue } from '../publishingQueue/index.ts';
 import type { MetricsService } from '../metrics/index.ts';
 import { RetryService } from '../retry/index.ts';
+import type { SchedulerRepository } from '../persistence/index.ts';
+import { InMemorySchedulerRepository } from '../persistence/index.ts';
 
 export interface ScheduleJobInput {
   queueItem: PublishingQueueItem;
@@ -39,6 +41,7 @@ export interface SchedulerStorage {
 }
 
 export interface SchedulerServiceOptions {
+  repository?: SchedulerRepository;
   storage?: SchedulerStorage;
   auditLog?: AuditLog;
   queue?: PublishingQueue;
@@ -62,7 +65,7 @@ export class InMemorySchedulerStorage implements SchedulerStorage {
 }
 
 export class SchedulerService {
-  private readonly storage: SchedulerStorage;
+  private readonly repository: SchedulerRepository;
   private readonly auditLog?: AuditLog;
   private readonly queue?: PublishingQueue;
   private readonly metricsService?: MetricsService;
@@ -70,7 +73,8 @@ export class SchedulerService {
   private nextId = 1;
 
   constructor(options: SchedulerServiceOptions = {}) {
-    this.storage = options.storage ?? new InMemorySchedulerStorage();
+    this.repository = options.repository
+      ?? (options.storage ? new SchedulerStorageRepositoryAdapter(options.storage) : new InMemorySchedulerRepository());
     this.auditLog = options.auditLog;
     this.queue = options.queue;
     this.metricsService = options.metricsService;
@@ -102,7 +106,7 @@ export class SchedulerService {
       this.metricsService?.incrementCounter('scheduler.duplicate', 1, {
         metadata: {
           queueItemId: input.queueItem.id,
-          jobId: existing.id
+        jobId: existing.id
         }
       });
       return {
@@ -159,7 +163,7 @@ export class SchedulerService {
       metadata: input.metadata
     };
 
-    await this.storage.save(job);
+    await this.repository.create(job);
     this.metricsService?.incrementCounter('scheduler.scheduled', 1, {
       metadata: {
         jobId: job.id,
@@ -221,7 +225,8 @@ export class SchedulerService {
       };
     }
 
-    const job = await this.storage.get(input.id);
+    const record = await this.repository.getById(input.id);
+    const job = record?.value;
 
     if (!job) {
       this.metricsService?.recordFailure('scheduler.reschedule_failed', `Scheduled job was not found: ${input.id}.`, {
@@ -255,7 +260,9 @@ export class SchedulerService {
       }
     };
 
-    await this.storage.save(updated);
+    await this.repository.reschedule(updated.id, updated.policy, {
+      expectedRevision: record.revision
+    });
     this.metricsService?.incrementCounter('scheduler.rescheduled', 1, {
       metadata: {
         jobId: updated.id,
@@ -376,7 +383,8 @@ export class SchedulerService {
   }
 
   async cancel(id: string, reason = 'Scheduled job cancelled.', now = new Date().toISOString()): Promise<ScheduleResult> {
-    const job = await this.storage.get(id);
+    const record = await this.repository.getById(id);
+    const job = record?.value;
 
     if (!job) {
       this.metricsService?.recordFailure('scheduler.cancel_failed', `Scheduled job was not found: ${id}.`, {
@@ -414,7 +422,9 @@ export class SchedulerService {
       }
     };
 
-    await this.storage.save(updated);
+    await this.repository.cancel(updated.id, reason, {
+      expectedRevision: record.revision
+    });
     this.metricsService?.incrementCounter('scheduler.cancelled', 1, {
       metadata: {
         jobId: updated.id,
@@ -451,15 +461,16 @@ export class SchedulerService {
   }
 
   async get(id: string): Promise<ScheduledJob | null> {
-    return this.storage.get(id);
+    return (await this.repository.getById(id))?.value ?? null;
   }
 
   async list(): Promise<ScheduledJob[]> {
-    return this.storage.list();
+    return (await this.repository.list()).items.map((record) => record.value);
   }
 
   async markCompleted(id: string, now = new Date().toISOString()): Promise<ScheduleResult> {
-    const job = await this.storage.get(id);
+    const record = await this.repository.getById(id);
+    const job = record?.value;
 
     if (!job) {
       return {
@@ -485,7 +496,9 @@ export class SchedulerService {
       }
     };
 
-    await this.storage.save(updated);
+    await this.repository.markCompleted(updated.id, {
+      expectedRevision: record.revision
+    });
 
     return {
       status: 'completed',
@@ -502,13 +515,11 @@ export class SchedulerService {
   }
 
   private async findActiveJobByQueueItem(queueItemId: string): Promise<ScheduledJob | undefined> {
-    return (await this.storage.list()).find(
-      (job) => job.queueItemId === queueItemId && job.status === 'SCHEDULED'
-    );
+    return (await this.repository.findActiveByQueueItemId(queueItemId))?.value;
   }
 
   private async createOperationState(overrides: NonNullable<ScheduleResult['operationState']> = {}): Promise<NonNullable<ScheduleResult['operationState']>> {
-    const jobs = await this.storage.list();
+    const jobs = (await this.repository.list()).items.map((record) => record.value);
 
     return {
       scheduledJobCount: jobs.length,
@@ -537,6 +548,93 @@ export class SchedulerService {
         lookupSucceeded: true
       })
     };
+  }
+}
+
+class SchedulerStorageRepositoryAdapter implements SchedulerRepository {
+  private readonly storage: SchedulerStorage;
+
+  constructor(storage: SchedulerStorage) {
+    this.storage = storage;
+  }
+
+  async create(job: ScheduledJob) {
+    await this.storage.save(job);
+    return { value: job, revision: 1 };
+  }
+
+  async getById(id: string) {
+    const job = await this.storage.get(id);
+    return job ? { value: job, revision: 1 } : undefined;
+  }
+
+  async list() {
+    const jobs = await this.storage.list();
+    return {
+      items: jobs.map((job) => ({ value: job, revision: 1 }))
+    };
+  }
+
+  async findActiveByQueueItemId(queueItemId: string) {
+    const job = (await this.storage.list()).find((candidate) => candidate.queueItemId === queueItemId && candidate.status === 'SCHEDULED');
+    return job ? { value: job, revision: 1 } : undefined;
+  }
+
+  async reschedule(id: string, policy: SchedulePolicy) {
+    const job = await this.require(id);
+    const updated = {
+      ...job,
+      policy,
+      scheduledFor: policy.scheduledFor,
+      updatedAt: new Date().toISOString(),
+      metadata: {
+        ...job.metadata,
+        previousScheduledFor: job.scheduledFor
+      }
+    };
+    await this.storage.save(updated);
+    return { value: updated, revision: 1 };
+  }
+
+  async cancel(id: string, reason: string) {
+    const job = await this.require(id);
+    const updated = {
+      ...job,
+      status: 'CANCELLED' as const,
+      updatedAt: new Date().toISOString(),
+      cancelledAt: new Date().toISOString(),
+      metadata: {
+        ...job.metadata,
+        cancellationReason: reason
+      }
+    };
+    await this.storage.save(updated);
+    return { value: updated, revision: 1 };
+  }
+
+  async markCompleted(id: string) {
+    const job = await this.require(id);
+    const updated = {
+      ...job,
+      status: 'COMPLETED' as const,
+      updatedAt: new Date().toISOString(),
+      metadata: {
+        ...job.metadata,
+        completedAt: new Date().toISOString()
+      }
+    };
+    await this.storage.save(updated);
+    return { value: updated, revision: 1 };
+  }
+
+  private async require(id: string): Promise<ScheduledJob> {
+    const job = await this.storage.get(id);
+
+    if (!job) {
+      throw new Error(`Scheduled job was not found: ${id}.`);
+    }
+
+    return job;
   }
 }
 

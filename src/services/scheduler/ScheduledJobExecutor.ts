@@ -6,6 +6,16 @@ import type { MetricsService } from '../metrics/index.ts';
 import type { PublishRequest, PublishResult } from '../../domain/publisher/index.ts';
 import type { RetryPolicy } from '../../domain/retry/index.ts';
 import type {
+  IdempotencyStore,
+  JobExecutionRepository,
+  LockManager
+} from '../persistence/index.ts';
+import {
+  InMemoryIdempotencyStore,
+  InMemoryJobExecutionRepository,
+  InMemoryLockManager
+} from '../persistence/index.ts';
+import type {
   JobExecutionFailure,
   JobExecutionResult,
   ScheduledJob,
@@ -24,7 +34,10 @@ export interface ScheduledJobExecutionStorage {
 export interface ScheduledJobExecutorOptions {
   scheduler: ScheduledJobReader;
   queue: PublishingQueue;
+  repository?: JobExecutionRepository;
   storage?: ScheduledJobExecutionStorage;
+  idempotencyStore?: IdempotencyStore;
+  lockManager?: LockManager;
   auditLog?: AuditLog;
   retryService?: RetryService;
   publisherService?: PublisherService;
@@ -64,7 +77,9 @@ export class InMemoryScheduledJobExecutionStorage implements ScheduledJobExecuti
 export class ScheduledJobExecutor {
   private readonly scheduler: ScheduledJobReader;
   private readonly queue: PublishingQueue;
-  private readonly storage: ScheduledJobExecutionStorage;
+  private readonly repository: JobExecutionRepository;
+  private readonly idempotencyStore: IdempotencyStore;
+  private readonly lockManager: LockManager;
   private readonly auditLog?: AuditLog;
   private readonly retryService: RetryService;
   private readonly publisherService?: PublisherService;
@@ -74,7 +89,10 @@ export class ScheduledJobExecutor {
   constructor(options: ScheduledJobExecutorOptions) {
     this.scheduler = options.scheduler;
     this.queue = options.queue;
-    this.storage = options.storage ?? new InMemoryScheduledJobExecutionStorage();
+    this.repository = options.repository
+      ?? (options.storage ? new ScheduledJobExecutionStorageRepositoryAdapter(options.storage) : new InMemoryJobExecutionRepository());
+    this.idempotencyStore = options.idempotencyStore ?? new InMemoryIdempotencyStore();
+    this.lockManager = options.lockManager ?? new InMemoryLockManager();
     this.auditLog = options.auditLog;
     this.retryService = options.retryService ?? new RetryService();
     this.publisherService = options.publisherService;
@@ -154,6 +172,46 @@ export class ScheduledJobExecutor {
       });
     }
 
+    const idempotencyKey = createExecutionIdempotencyKey(job.id);
+    const existingClaim = await this.idempotencyStore.get(idempotencyKey, 'scheduled-job-execution');
+
+    if (existingClaim && (existingClaim.status === 'CLAIMED' || existingClaim.status === 'COMPLETED')) {
+      return this.skip<T>({
+        job,
+        due,
+        message: `Scheduled job ${job.id} already has an active execution claim.`,
+        failure: {
+          code: 'duplicate_execution',
+          reason: `Scheduled job ${job.id} already has an active execution claim.`,
+          retryable: false
+        },
+        now,
+        metadata: input.metadata
+      });
+    }
+
+    const lock = await this.lockManager.acquire(idempotencyKey, 'scheduled-job-executor', 30000, now);
+
+    if (!lock) {
+      return this.skip<T>({
+        job,
+        due,
+        message: `Scheduled job ${job.id} is locked by another execution.`,
+        failure: {
+          code: 'duplicate_execution',
+          reason: `Scheduled job ${job.id} is locked by another execution.`,
+          retryable: false
+        },
+        now,
+        metadata: input.metadata
+      });
+    }
+
+    await this.idempotencyStore.claim(idempotencyKey, 'scheduled-job-execution', {
+      jobId: job.id,
+      queueItemId: job.queueItemId
+    });
+
     const queueItem = await this.queue.getItem(job.queueItemId);
 
     if (!queueItem || queueItem.status !== 'SCHEDULED') {
@@ -183,7 +241,7 @@ export class ScheduledJobExecutor {
       metadata: input.metadata
     };
 
-    await this.storage.save(execution);
+    await this.repository.createExecution(execution);
     this.metricsService?.incrementCounter('scheduled_job_execution.started', 1, {
       metadata: {
         jobId: job.id,
@@ -210,6 +268,8 @@ export class ScheduledJobExecutor {
         retryable: false
       };
       const failedExecution = await this.finishExecution(execution, 'FAILED', failure, now);
+      await this.idempotencyStore.fail(idempotencyKey, 'scheduled-job-execution', failure);
+      await this.lockManager.release(lock);
 
       return {
         status: 'FAILED',
@@ -257,6 +317,8 @@ export class ScheduledJobExecutor {
           jobId: job.id
         }
       });
+      await this.idempotencyStore.complete(idempotencyKey, 'scheduled-job-execution', succeeded.id);
+      await this.lockManager.release(lock);
 
       return {
         status: 'SUCCEEDED',
@@ -303,6 +365,12 @@ export class ScheduledJobExecutor {
         failureCode: failure.code
       }
     });
+    await this.idempotencyStore.fail(idempotencyKey, 'scheduled-job-execution', {
+      reason: failure.reason,
+      code: failure.code,
+      retryable: failure.retryable
+    });
+    await this.lockManager.release(lock);
 
     return {
       status: 'FAILED',
@@ -319,9 +387,7 @@ export class ScheduledJobExecutor {
   }
 
   private async findDuplicateExecution(jobId: string): Promise<ScheduledJobExecution | undefined> {
-    return (await this.storage.list()).find(
-      (execution) => execution.jobId === jobId && (execution.status === 'RUNNING' || execution.status === 'SUCCEEDED')
-    );
+    return (await this.repository.findActiveByJobId(jobId))?.value;
   }
 
   private createExecutionOperation<T>(input: ExecuteScheduledJobInput<T>): (attemptNumber: number) => Promise<T> | T {
@@ -371,7 +437,7 @@ export class ScheduledJobExecutor {
       metadata: input.metadata
     };
 
-    await this.storage.save(execution);
+    await this.repository.createExecution(execution);
     this.metricsService?.incrementCounter('scheduled_job_execution.skipped', 1, {
       tags: {
         reason: input.failure.code ?? 'unknown'
@@ -419,7 +485,7 @@ export class ScheduledJobExecutor {
       failure
     };
 
-    await this.storage.save(finished);
+    await this.repository.createExecution(finished);
 
     return finished;
   }
@@ -427,6 +493,94 @@ export class ScheduledJobExecutor {
   private createId(): string {
     return `execution-${this.nextId++}`;
   }
+}
+
+class ScheduledJobExecutionStorageRepositoryAdapter implements JobExecutionRepository {
+  private readonly storage: ScheduledJobExecutionStorage;
+
+  constructor(storage: ScheduledJobExecutionStorage) {
+    this.storage = storage;
+  }
+
+  async createExecution(execution: ScheduledJobExecution) {
+    await this.storage.save(execution);
+    return { value: execution, revision: 1 };
+  }
+
+  async getById(id: string) {
+    const execution = (await this.storage.list()).find((candidate) => candidate.id === id);
+    return execution ? { value: execution, revision: 1 } : undefined;
+  }
+
+  async list() {
+    const executions = await this.storage.list();
+    return {
+      items: executions.map((execution) => ({ value: execution, revision: 1 }))
+    };
+  }
+
+  async findActiveByJobId(jobId: string) {
+    const execution = (await this.storage.list()).find(
+      (candidate) => candidate.jobId === jobId && (candidate.status === 'RUNNING' || candidate.status === 'SUCCEEDED')
+    );
+    return execution ? { value: execution, revision: 1 } : undefined;
+  }
+
+  async recordSuccess(id: string, result: JobExecutionResult) {
+    const execution = await this.require(id);
+    const updated = {
+      ...execution,
+      status: 'SUCCEEDED' as const,
+      attemptCount: result.attemptCount,
+      retryCount: result.retryCount,
+      completedAt: new Date().toISOString(),
+      failure: undefined
+    };
+    await this.storage.save(updated);
+    return { value: updated, revision: 1 };
+  }
+
+  async recordFailure(id: string, failure: JobExecutionFailure) {
+    const execution = await this.require(id);
+    const updated = {
+      ...execution,
+      status: 'FAILED' as const,
+      completedAt: new Date().toISOString(),
+      failure
+    };
+    await this.storage.save(updated);
+    return { value: updated, revision: 1 };
+  }
+
+  async recordSkipped(id: string, reason: string) {
+    const execution = await this.require(id);
+    const updated = {
+      ...execution,
+      status: 'SKIPPED' as const,
+      completedAt: new Date().toISOString(),
+      failure: execution.failure ?? {
+        code: 'execution_skipped',
+        reason,
+        retryable: false
+      }
+    };
+    await this.storage.save(updated);
+    return { value: updated, revision: 1 };
+  }
+
+  private async require(id: string): Promise<ScheduledJobExecution> {
+    const execution = (await this.storage.list()).find((candidate) => candidate.id === id);
+
+    if (!execution) {
+      throw new Error(`Scheduled job execution was not found: ${id}.`);
+    }
+
+    return execution;
+  }
+}
+
+function createExecutionIdempotencyKey(jobId: string): string {
+  return `scheduled-job:${jobId}`;
 }
 
 function createFailureFromRetryResult(reason: { code: string; message: string; retryable: boolean } | undefined): JobExecutionFailure {

@@ -104,17 +104,17 @@ The older core `PublishingPayload`, `PublishingResult`, and `Publisher` contract
 
 `src/services/publisher` contains PublisherService and DryRunPublisher. PublisherService validates provider-neutral publish requests, dispatches to a configured publisher, normalizes publish results, uses RetryService for retryable publisher failures, and records provider-neutral publish audit events. DryRunPublisher generates deterministic preview IDs and preview URLs without network calls.
 
-`src/services/assetLibrary` contains the Asset Library service. It uses `StorageProvider` internally for file upload, download, and metadata lookup while exposing asset-level operations to callers. This keeps storage providers invisible to image selection and future editorial workflows.
+`src/services/assetLibrary` contains the Asset Library service. It uses `StorageProvider` internally for file upload, download, and metadata lookup while exposing asset-level operations to callers through `AssetCatalogRepository` and optional `StorageMetadataRepository` composition. This keeps storage providers invisible to image selection and future editorial workflows.
 
-`src/services/publishingQueue` contains the Publishing Queue service. It uses an in-memory storage implementation for the current foundation and exposes enqueue, lookup, list, guarded status update, cancellation, and failure recording. Persistence is replaceable behind a queue storage boundary.
+`src/services/publishingQueue` contains the Publishing Queue service. It depends on `PublishingQueueRepository`, uses an in-memory repository adapter in current runtime composition, and exposes enqueue, lookup, list, guarded status update, cancellation, and failure recording. Durable persistence is replaceable behind the repository boundary.
 
-`src/services/scheduler` contains the Scheduler service and Scheduled Job Executor. Scheduler uses in-memory storage and exposes schedule, reschedule, retry scheduling, cancel, list, get, and completed-job preview operations for approved queue items. It rejects invalid schedule policies, prevents duplicate active schedules, keeps completed jobs immutable, records audit events and metrics, and does not call external schedulers. The executor checks due scheduled jobs, skips invalid jobs, prevents duplicate execution, moves valid queue items to `PROCESSING`, and can execute scheduled publishing previews through PublisherService. It records preview results and never calls concrete publisher adapters directly.
+`src/services/scheduler` contains the Scheduler service and Scheduled Job Executor. Scheduler depends on `SchedulerRepository`, uses an in-memory repository adapter in current runtime composition, and exposes schedule, reschedule, retry scheduling, cancel, list, get, and completed-job preview operations for approved queue items. It rejects invalid schedule policies, prevents duplicate active schedules, keeps completed jobs immutable, records audit events and metrics, and does not call external schedulers. The executor depends on `JobExecutionRepository`, uses `IdempotencyStore` and `LockManager` for duplicate execution prevention, checks due scheduled jobs, skips invalid jobs, moves valid queue items to `PROCESSING`, and can execute scheduled publishing previews through PublisherService. It records preview results and never calls concrete publisher adapters directly.
 
-`src/services/auditLog` contains the Audit Log service. It uses in-memory storage for the current foundation and exposes event append, event listing, entity filtering, and event type filtering. Persistence and external log sinks are future adapters behind the audit storage boundary.
+`src/services/auditLog` contains the Audit Log service. It composes with `AuditStore`, uses an in-memory store in current runtime composition, and exposes event append, event listing, entity filtering, and event type filtering. External log sinks are future adapters behind the audit storage boundary.
 
 `src/services/retry` contains the Retry Service. It executes provider-neutral operations with configurable max attempts, simulated fixed delay metadata, retryable versus non-retryable classification, and retry history. It does not sleep in tests, call external services, or know which provider category is using it.
 
-`src/services/metrics` contains the Metrics Service. It records counters, durations, and failures in memory, then produces snapshots for dry-run reporting. Metrics are observational only: they do not alter workflow decisions, queue transitions, scheduler behavior, publisher dispatch, retries, or provider calls.
+`src/services/metrics` contains the Metrics Service. It records counters, durations, and failures through `MetricsStore`, uses an in-memory store in current runtime composition, and produces snapshots for dry-run reporting. Metrics are observational only: they do not alter workflow decisions, queue transitions, scheduler behavior, publisher dispatch, retries, or provider calls.
 
 `src/services/instagram` contains the Instagram Content Service. It derives dry-run social preview content from a provider-neutral `PublishingPackage`, `MagazineProfile`, SEO keywords, and selected image metadata. It does not post content, call Instagram APIs, perform OAuth, or publish.
 
@@ -301,7 +301,7 @@ Metrics must not contain secrets or provider SDK response objects. They are summ
 
 ## Persistence Boundary
 
-Persistence is planned through provider-neutral ports but durable persistence is not implemented. The authoritative planning document is `docs/PERSISTENCE_ARCHITECTURE.md`.
+Persistence is implemented through provider-neutral ports plus in-memory adapters for current runtime services. Durable persistence is not implemented. The authoritative planning document is `docs/PERSISTENCE_ARCHITECTURE.md`.
 
 Persistence enters Asteria through repository ports and future adapters, not through domain models, provider SDK records, workflow internals, or direct database access from runtime steps.
 
@@ -318,9 +318,9 @@ Implemented port boundaries include:
 - Lock Manager
 - UnitOfWork transaction boundary
 
-These ports live under `src/services/persistence`. Application services should own transaction boundaries. Durable adapters should implement repository ports. Runtime composition should choose in-memory adapters for dry runs and future durable adapters for production.
+These ports live under `src/services/persistence`. Application services own transaction boundaries. Durable adapters should implement repository ports. Current runtime composition chooses in-memory adapters for dry runs and future durable adapters remain deferred.
 
-Sprint 50 adds tiny in-memory proof adapters for IdempotencyStore, LockManager, and UnitOfWork only. Existing queue, scheduler, audit, metrics, asset, and storage services are not migrated in this sprint, so runtime behavior remains unchanged.
+Sprint 51 migrates PublishingQueue, SchedulerService, ScheduledJobExecutor records, AuditLog, MetricsService, AssetLibrary metadata, and storage metadata onto these ports. Some no-argument constructors and legacy storage options remain as compatibility wrappers around in-memory ports so existing callers and CLI behavior stay unchanged.
 
 Locking should combine optimistic concurrency for entity transitions with short-lived execution locks. Idempotency should be scoped by operation type and entity, especially for queue enqueue, schedule creation, job execution, publisher dispatch, asset registration, and audit append.
 

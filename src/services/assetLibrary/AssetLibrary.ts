@@ -6,17 +6,24 @@ import {
   type ImageAsset
 } from '../../domain/image/index.ts';
 import type { StorageProvider } from '../../domain/storage/index.ts';
+import type { AssetCatalogRepository, StorageMetadataRepository } from '../persistence/index.ts';
+import { InMemoryAssetCatalogRepository } from '../persistence/index.ts';
 
 export interface AssetLibraryOptions {
   storageProvider: StorageProvider;
+  catalogRepository?: AssetCatalogRepository;
+  storageMetadataRepository?: StorageMetadataRepository;
 }
 
 export class AssetLibrary {
   private readonly storageProvider: StorageProvider;
-  private readonly assets = new Map<string, Asset>();
+  private readonly catalogRepository: AssetCatalogRepository;
+  private readonly storageMetadataRepository?: StorageMetadataRepository;
 
   constructor(options: AssetLibraryOptions) {
     this.storageProvider = options.storageProvider;
+    this.catalogRepository = options.catalogRepository ?? new InMemoryAssetCatalogRepository();
+    this.storageMetadataRepository = options.storageMetadataRepository;
   }
 
   async registerAsset(registration: AssetRegistration): Promise<Asset> {
@@ -46,12 +53,15 @@ export class AssetLibrary {
       }
     });
 
-    this.assets.set(asset.id, asset);
-    return asset;
+    if (storageMetadata) {
+      await this.storageMetadataRepository?.recordFile(storageMetadata);
+    }
+
+    return (await this.catalogRepository.register(asset)).value;
   }
 
   async findAsset(id: string): Promise<Asset | null> {
-    return this.assets.get(id) ?? null;
+    return (await this.catalogRepository.getById(id))?.value ?? null;
   }
 
   async getAssetMetadata(id: string): Promise<Asset | null> {
@@ -85,7 +95,7 @@ export class AssetLibrary {
   }
 
   async listAssets(): Promise<Asset[]> {
-    return [...this.assets.values()];
+    return (await this.catalogRepository.list()).items.map((record) => record.value);
   }
 
   async getImageAsset(id: string): Promise<ImageAsset | null> {

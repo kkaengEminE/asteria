@@ -26,6 +26,13 @@ export type { SchedulerQuery, SchedulerRepository } from './SchedulerRepository.
 export type { StorageMetadataQuery, StorageMetadataRepository } from './StorageMetadataRepository.ts';
 export type { UnitOfWork } from './UnitOfWork.ts';
 export { InMemoryIdempotencyStore } from './inMemory/InMemoryIdempotencyStore.ts';
+export { InMemoryAssetCatalogRepository } from './inMemory/InMemoryAssetCatalogRepository.ts';
+export { InMemoryAuditStore } from './inMemory/InMemoryAuditStore.ts';
+export { InMemoryJobExecutionRepository } from './inMemory/InMemoryJobExecutionRepository.ts';
 export { InMemoryLockManager } from './inMemory/InMemoryLockManager.ts';
+export { InMemoryMetricsStore } from './inMemory/InMemoryMetricsStore.ts';
+export { InMemoryPublishingQueueRepository } from './inMemory/InMemoryPublishingQueueRepository.ts';
+export { InMemorySchedulerRepository } from './inMemory/InMemorySchedulerRepository.ts';
+export { InMemoryStorageMetadataRepository } from './inMemory/InMemoryStorageMetadataRepository.ts';
 export { InMemoryUnitOfWork } from './inMemory/InMemoryUnitOfWork.ts';
-
+export { PersistenceRevisionConflictError } from './inMemory/InMemoryRepositoryUtils.ts';

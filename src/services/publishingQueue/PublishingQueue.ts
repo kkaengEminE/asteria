@@ -10,6 +10,8 @@ import type {
 } from '../../domain/publishingQueue/index.ts';
 import type { AuditLog } from '../auditLog/index.ts';
 import type { MetricsService } from '../metrics/index.ts';
+import type { PublishingQueueRepository } from '../persistence/index.ts';
+import { InMemoryPublishingQueueRepository } from '../persistence/index.ts';
 
 export interface PublishingQueueEnqueueInput {
   publishingPackage: PublishingPackage;
@@ -26,6 +28,7 @@ export interface PublishingQueueStorage {
 }
 
 export interface PublishingQueueOptions {
+  repository?: PublishingQueueRepository;
   storage?: PublishingQueueStorage;
   auditLog?: AuditLog;
   metricsService?: MetricsService;
@@ -52,19 +55,20 @@ export class InMemoryPublishingQueueStorage implements PublishingQueueStorage {
 }
 
 export class PublishingQueue {
-  private readonly storage: PublishingQueueStorage;
+  private readonly repository: PublishingQueueRepository;
   private readonly auditLog?: AuditLog;
   private readonly metricsService?: MetricsService;
   private nextId = 1;
 
   constructor(storageOrOptions: PublishingQueueStorage | PublishingQueueOptions = {}) {
     if (isPublishingQueueStorage(storageOrOptions)) {
-      this.storage = storageOrOptions;
+      this.repository = new PublishingQueueStorageRepositoryAdapter(storageOrOptions);
       this.auditLog = undefined;
       return;
     }
 
-    this.storage = storageOrOptions.storage ?? new InMemoryPublishingQueueStorage();
+    this.repository = storageOrOptions.repository
+      ?? (storageOrOptions.storage ? new PublishingQueueStorageRepositoryAdapter(storageOrOptions.storage) : new InMemoryPublishingQueueRepository());
     this.auditLog = storageOrOptions.auditLog;
     this.metricsService = storageOrOptions.metricsService;
   }
@@ -119,7 +123,7 @@ export class PublishingQueue {
       metadata: input.metadata
     };
 
-    await this.storage.save(item);
+    await this.repository.create(item);
     this.metricsService?.incrementCounter('publishing_queue.enqueued', 1, {
       tags: {
         destinationType: item.destination.type
@@ -156,11 +160,11 @@ export class PublishingQueue {
   }
 
   async getItem(id: string): Promise<PublishingQueueItem | null> {
-    return this.storage.get(id);
+    return (await this.repository.getById(id))?.value ?? null;
   }
 
   async listItems(): Promise<PublishingQueueItem[]> {
-    return this.storage.list();
+    return (await this.repository.list()).items.map((record) => record.value);
   }
 
   async updateStatus(
@@ -169,7 +173,8 @@ export class PublishingQueue {
     now = new Date().toISOString(),
     options: PublishingQueueTransitionOptions = {}
   ): Promise<PublishingQueueResult> {
-    const item = await this.storage.get(id);
+    const record = await this.repository.getById(id);
+    const item = record?.value;
 
     if (!item) {
       return createNotFoundResult(id);
@@ -196,7 +201,11 @@ export class PublishingQueue {
       updatedAt: now
     };
 
-    await this.storage.save(updated);
+    const persisted = await this.repository.updateStatus(id, {
+      status,
+      updatedAt: now,
+      expectedRevision: record.revision
+    });
     this.metricsService?.incrementCounter('publishing_queue.status_updated', 1, {
       tags: {
         status
@@ -208,14 +217,15 @@ export class PublishingQueue {
 
     return {
       status: 'updated',
-      item: updated,
-      approvalDecision: updated.approvalDecision,
+      item: persisted.value,
+      approvalDecision: persisted.value.approvalDecision,
       message: `Queue item ${id} status updated to ${status}.`
     };
   }
 
   async cancelItem(id: string, reason = 'Queue item cancelled.', now = new Date().toISOString()): Promise<PublishingQueueResult> {
-    const item = await this.storage.get(id);
+    const record = await this.repository.getById(id);
+    const item = record?.value;
 
     if (!item) {
       return createNotFoundResult(id);
@@ -230,17 +240,15 @@ export class PublishingQueue {
       };
     }
 
-    const updated = {
-      ...item,
-      status: 'CANCELLED' as const,
+    const persisted = await this.repository.updateStatus(id, {
+      status: 'CANCELLED',
       updatedAt: now,
+      expectedRevision: record.revision,
       metadata: {
-        ...item.metadata,
         cancellationReason: reason
       }
-    };
-
-    await this.storage.save(updated);
+    });
+    const updated = persisted.value;
     this.metricsService?.incrementCounter('publishing_queue.cancelled', 1, {
       metadata: {
         queueItemId: updated.id,
@@ -276,7 +284,8 @@ export class PublishingQueue {
     failure: Omit<PublishingQueueFailure, 'occurredAt'> & { occurredAt?: string },
     now = new Date().toISOString()
   ): Promise<PublishingQueueResult> {
-    const item = await this.storage.get(id);
+    const record = await this.repository.getById(id);
+    const item = record?.value;
 
     if (!item) {
       return createNotFoundResult(id);
@@ -302,13 +311,16 @@ export class PublishingQueue {
       failure: queueFailure
     };
 
-    await this.storage.save(updated);
+    const persisted = await this.repository.recordFailure(id, queueFailure, {
+      expectedRevision: record.revision
+    });
+    const persistedItem = persisted.value;
     this.metricsService?.recordFailure('publishing_queue.failed', queueFailure.reason, {
       tags: {
         code: queueFailure.code ?? 'unknown'
       },
       metadata: {
-        queueItemId: updated.id
+        queueItemId: persistedItem.id
       }
     });
     this.auditLog?.append({
@@ -318,11 +330,11 @@ export class PublishingQueue {
         id: 'publishing-queue',
         name: 'PublishingQueue'
       },
-      context: createQueueAuditContext(updated),
+      context: createQueueAuditContext(persistedItem),
       message: queueFailure.reason,
       metadata: {
-        queueItemId: updated.id,
-        queueStatus: updated.status,
+        queueItemId: persistedItem.id,
+        queueStatus: persistedItem.status,
         failureCode: queueFailure.code,
         retryable: queueFailure.retryable
       }
@@ -330,8 +342,8 @@ export class PublishingQueue {
 
     return {
       status: 'failed',
-      item: updated,
-      approvalDecision: updated.approvalDecision,
+      item: persistedItem,
+      approvalDecision: persistedItem.approvalDecision,
       message: queueFailure.reason,
       failure: queueFailure
     };
@@ -339,6 +351,88 @@ export class PublishingQueue {
 
   private createId(): string {
     return `queue-${this.nextId++}`;
+  }
+}
+
+class PublishingQueueStorageRepositoryAdapter implements PublishingQueueRepository {
+  private readonly storage: PublishingQueueStorage;
+
+  constructor(storage: PublishingQueueStorage) {
+    this.storage = storage;
+  }
+
+  async create(item: PublishingQueueItem) {
+    await this.storage.save(item);
+    return { value: item, revision: 1 };
+  }
+
+  async getById(id: string) {
+    const item = await this.storage.get(id);
+    return item ? { value: item, revision: 1 } : undefined;
+  }
+
+  async list() {
+    const items = await this.storage.list();
+    return {
+      items: items.map((item) => ({ value: item, revision: 1 }))
+    };
+  }
+
+  async updateStatus(id: string, transition: { status: PublishingQueueStatus; updatedAt: string; metadata?: Record<string, unknown> }) {
+    const item = await this.require(id);
+    const updated = {
+      ...item,
+      status: transition.status,
+      updatedAt: transition.updatedAt,
+      metadata: {
+        ...item.metadata,
+        ...transition.metadata
+      }
+    };
+    await this.storage.save(updated);
+    return { value: updated, revision: 1 };
+  }
+
+  async recordFailure(id: string, failure: PublishingQueueFailure) {
+    const item = await this.require(id);
+    const updated = {
+      ...item,
+      status: 'FAILED' as const,
+      updatedAt: failure.occurredAt,
+      failure
+    };
+    await this.storage.save(updated);
+    return { value: updated, revision: 1 };
+  }
+
+  async cancel(id: string, reason: string) {
+    const item = await this.require(id);
+    const updated = {
+      ...item,
+      status: 'CANCELLED' as const,
+      updatedAt: new Date().toISOString(),
+      metadata: {
+        ...item.metadata,
+        cancellationReason: reason
+      }
+    };
+    await this.storage.save(updated);
+    return { value: updated, revision: 1 };
+  }
+
+  async findByIdempotencyKey(key: string) {
+    const item = (await this.storage.list()).find((candidate) => candidate.metadata?.idempotencyKey === key);
+    return item ? { value: item, revision: 1 } : undefined;
+  }
+
+  private async require(id: string): Promise<PublishingQueueItem> {
+    const item = await this.storage.get(id);
+
+    if (!item) {
+      throw new Error(`Publishing queue item was not found: ${id}.`);
+    }
+
+    return item;
   }
 }
 

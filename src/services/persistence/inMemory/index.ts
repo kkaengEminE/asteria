@@ -1,4 +1,11 @@
 export { InMemoryIdempotencyStore } from './InMemoryIdempotencyStore.ts';
+export { InMemoryAssetCatalogRepository } from './InMemoryAssetCatalogRepository.ts';
+export { InMemoryAuditStore } from './InMemoryAuditStore.ts';
+export { InMemoryJobExecutionRepository } from './InMemoryJobExecutionRepository.ts';
 export { InMemoryLockManager } from './InMemoryLockManager.ts';
+export { InMemoryMetricsStore } from './InMemoryMetricsStore.ts';
+export { InMemoryPublishingQueueRepository } from './InMemoryPublishingQueueRepository.ts';
+export { InMemorySchedulerRepository } from './InMemorySchedulerRepository.ts';
+export { InMemoryStorageMetadataRepository } from './InMemoryStorageMetadataRepository.ts';
 export { InMemoryUnitOfWork } from './InMemoryUnitOfWork.ts';
-
+export { PersistenceRevisionConflictError } from './InMemoryRepositoryUtils.ts';

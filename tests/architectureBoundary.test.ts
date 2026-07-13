@@ -39,6 +39,21 @@ test('workflows do not import concrete provider implementations', async () => {
   assert.deepEqual(violations, []);
 });
 
+test('workflows do not import concrete persistence adapters', async () => {
+  const files = await listTypeScriptFiles(workflowRoot);
+  const violations: string[] = [];
+
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+
+    if (/from\s+['"][^'"]*services\/persistence\/inMemory[^'"]*['"]/.test(source)) {
+      violations.push(file.replace(`${process.cwd()}/`, ''));
+    }
+  }
+
+  assert.deepEqual(violations, []);
+});
+
 test('domain does not import services workflows runtime or providers', async () => {
   const files = await listTypeScriptFiles(domainRoot);
   const violations: string[] = [];

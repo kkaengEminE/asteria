@@ -1,6 +1,6 @@
 # Persistence Architecture Planning
 
-Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turns that architecture into provider-neutral TypeScript ports only. This document still does not select a database, add schema files, add filesystem storage, run migrations, change runtime behavior, or introduce external services.
+Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrates existing in-memory operational services onto those ports. This document still does not select a database, add schema files, add filesystem storage, run migrations, change runtime behavior, or introduce external services.
 
 ## Goals
 
@@ -13,7 +13,7 @@ Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 tur
 ## Non-Goals
 
 - No SQLite, PostgreSQL, Prisma, Drizzle, filesystem persistence, or database setup.
-- No persistence implementation.
+- No durable persistence implementation.
 - No runtime behavior changes.
 - No production publishing enablement.
 - No external API calls.
@@ -52,6 +52,21 @@ Implemented repository and orchestration ports:
 - `UnitOfWork`
 
 Repository methods should be explicit and behavior-oriented. Avoid generic persistence APIs such as `save(any)` or exposing query-builder details to services.
+
+Current in-memory adapters:
+
+- `InMemoryPublishingQueueRepository`
+- `InMemorySchedulerRepository`
+- `InMemoryJobExecutionRepository`
+- `InMemoryAuditStore`
+- `InMemoryMetricsStore`
+- `InMemoryAssetCatalogRepository`
+- `InMemoryStorageMetadataRepository`
+- `InMemoryIdempotencyStore`
+- `InMemoryLockManager`
+- `InMemoryUnitOfWork`
+
+These adapters are runtime foundations and test doubles only. They are not durable storage and must not be treated as a production persistence layer.
 
 ### PublishingQueueRepository
 
@@ -203,6 +218,12 @@ Persistence boundary:
 - Repository stores `PublishingQueueItem` and related failure metadata.
 - Queue transition rules remain in the queue service/domain policy.
 
+Sprint 51 status:
+
+- PublishingQueue composes through `PublishingQueueRepository`.
+- Current runtime uses `InMemoryPublishingQueueRepository`.
+- The previous storage constructor path remains as a compatibility wrapper only.
+
 ### Scheduler
 
 Scheduler owns scheduled job metadata, schedule policies, duplicate active job detection, cancellation, rescheduling, and completed-job immutability.
@@ -212,6 +233,13 @@ Persistence boundary:
 - SchedulerService depends on `SchedulerRepository`.
 - ScheduledJobExecutor depends on `JobExecutionRepository`.
 - Queue status updates should occur through PublishingQueue service inside a UnitOfWork when durable persistence exists.
+
+Sprint 51 status:
+
+- SchedulerService composes through `SchedulerRepository`.
+- ScheduledJobExecutor composes through `JobExecutionRepository`.
+- ScheduledJobExecutor uses `IdempotencyStore` and `LockManager` for duplicate execution prevention.
+- UnitOfWork remains deferred for scheduler/queue cross-port atomicity until durable persistence exists.
 
 ### Audit
 
@@ -223,6 +251,12 @@ Persistence boundary:
 - Events are append-only.
 - Workflows and services should depend on AuditLog or a smaller AuditRecorder facade, not on persistence adapters.
 
+Sprint 51 status:
+
+- AuditLog composes with `AuditStore`.
+- Current runtime uses `InMemoryAuditStore`.
+- AuditLog preserves its existing synchronous public API through an in-memory compatibility cache while durable async store design remains deferred.
+
 ### Metrics
 
 MetricsService owns observational counters, durations, failures, and snapshots.
@@ -233,6 +267,12 @@ Persistence boundary:
 - Metrics may be eventually consistent.
 - Metrics should never drive queue or scheduler decisions.
 
+Sprint 51 status:
+
+- MetricsService composes with `MetricsStore`.
+- Current runtime uses `InMemoryMetricsStore`.
+- MetricsService preserves its existing synchronous public API while recording through the store boundary.
+
 ### Assets
 
 AssetLibrary owns asset catalog behavior and uses StorageProvider for bytes.
@@ -242,6 +282,12 @@ Persistence boundary:
 - AssetLibrary depends on `AssetCatalogRepository`.
 - Storage metadata can be recorded through `StorageMetadataRepository`.
 - StorageProvider remains responsible for upload/download/list/folder operations.
+
+Sprint 51 status:
+
+- AssetLibrary composes through `AssetCatalogRepository`.
+- Current runtime uses `InMemoryAssetCatalogRepository`.
+- Storage metadata can be recorded through `InMemoryStorageMetadataRepository` when provided.
 
 ### Storage Metadata
 
@@ -377,19 +423,34 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - Small in-memory proof adapters for `IdempotencyStore`, `LockManager`, and `UnitOfWork`.
 - Tests for port shape, optimistic revision handling, idempotency claim/complete/fail, lock acquire/renew/release/expiry, and UnitOfWork commit/rollback behavior.
 
+## Implemented in Sprint 51
+
+- In-memory adapters for Queue, Scheduler, Job Execution, Audit, Metrics, Asset Catalog, and Storage Metadata ports.
+- PublishingQueue migration to `PublishingQueueRepository`.
+- SchedulerService migration to `SchedulerRepository`.
+- ScheduledJobExecutor execution record migration to `JobExecutionRepository`.
+- ScheduledJobExecutor duplicate execution path using `IdempotencyStore` and `LockManager`.
+- AuditLog composition through `AuditStore`.
+- MetricsService composition through `MetricsStore`.
+- AssetLibrary metadata composition through `AssetCatalogRepository`.
+- Optional StorageMetadataRepository recording for asset-backed storage metadata.
+- Architecture boundary coverage preventing workflows from importing concrete persistence adapters.
+- Regression coverage for dry-run and Quality Lab compatibility.
+
 ## Accepted Deferrals
 
 - No database adapter is selected.
 - No schema or migration file is created.
 - No persistence configuration or environment variables are added.
 - No filesystem persistence is introduced.
-- No runtime service constructors are changed.
-- Existing queue, scheduler, audit, metrics, asset, and storage services are not migrated to the new ports yet.
+- No durable runtime data exists beyond process memory.
+- UnitOfWork is not applied broadly because no current migrated operation materially requires multi-port atomicity without durable storage.
+- Compatibility wrappers remain for older storage constructor paths where removing them would create behavior churn.
 
 ## Future Sprint Candidates
 
-1. Persistence Service Migration Sprint: wire existing in-memory Queue, Scheduler, Audit, Metrics, Asset, and Storage services behind the new ports without durable storage.
-2. Durable Queue Adapter Sprint: add first durable queue adapter behind the repository port.
-3. AuditStore Sprint: add durable append-only audit storage behind AuditLog.
-4. Asset Catalog Persistence Sprint: add durable asset metadata catalog behind AssetLibrary.
+1. Durable Queue Adapter Sprint: add first durable queue adapter behind the repository port.
+2. AuditStore Sprint: add durable append-only audit storage behind AuditLog.
+3. Asset Catalog Persistence Sprint: add durable asset metadata catalog behind AssetLibrary.
+4. Scheduler Persistence Sprint: persist scheduled jobs and execution records.
 5. Migration Tooling Sprint: choose and introduce migration tooling after repository ports stabilize.

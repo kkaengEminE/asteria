@@ -1,4 +1,6 @@
 import type { AuditActor, AuditContext, AuditEvent, AuditEventType } from '../../domain/audit/index.ts';
+import type { AuditStore } from '../persistence/index.ts';
+import { InMemoryAuditStore } from '../persistence/index.ts';
 
 export interface AppendAuditEventInput {
   type: AuditEventType;
@@ -33,11 +35,18 @@ export class InMemoryAuditLogStorage implements AuditLogStorage {
 }
 
 export class AuditLog {
-  private readonly storage: AuditLogStorage;
+  private readonly store?: AuditStore;
+  private readonly storage?: AuditLogStorage;
+  private readonly events: AuditEvent[] = [];
   private nextId = 1;
 
-  constructor(storage: AuditLogStorage = new InMemoryAuditLogStorage()) {
-    this.storage = storage;
+  constructor(storageOrStore: AuditLogStorage | AuditStore = new InMemoryAuditStore()) {
+    if (isAuditLogStorage(storageOrStore)) {
+      this.storage = storageOrStore;
+      return;
+    }
+
+    this.store = storageOrStore;
   }
 
   append(input: AppendAuditEventInput): AuditEvent {
@@ -55,13 +64,22 @@ export class AuditLog {
       metadata: input.metadata
     };
 
-    this.storage.save(event);
+    if (this.storage) {
+      this.storage.save(event);
+    } else {
+      this.events.push(event);
+      void this.store?.append(event);
+    }
 
     return event;
   }
 
   listEvents(filter: AuditEventFilter = {}): AuditEvent[] {
-    return this.storage.list().filter((event) => {
+    const events = this.storage
+      ? this.storage.list()
+      : [...this.events].sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+
+    return events.filter((event) => {
       if (filter.entityId && event.context.entityId !== filter.entityId) {
         return false;
       }
@@ -89,4 +107,8 @@ export class AuditLog {
   private createId(): string {
     return `audit-${this.nextId++}`;
   }
+}
+
+function isAuditLogStorage(value: AuditLogStorage | AuditStore): value is AuditLogStorage {
+  return typeof (value as AuditLogStorage).save === 'function';
 }

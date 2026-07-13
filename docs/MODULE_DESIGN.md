@@ -394,27 +394,31 @@ The publisher execution layer is provider-neutral. `PublisherService` validates 
 Current publishing queue foundation:
 
 - `PublishingQueue`
-- `InMemoryPublishingQueueStorage`
+- `PublishingQueueRepository`
+- `InMemoryPublishingQueueRepository`
 
-The Publishing Queue service supports enqueue, item lookup, item listing, guarded status updates, cancellation, and failure recording. It enforces provider-neutral queue transition rules, rejects invalid transitions with clear results, audits queue rejections, uses in-memory storage for this foundation sprint, and keeps persistence replaceable behind a queue storage boundary.
+The Publishing Queue service supports enqueue, item lookup, item listing, guarded status updates, cancellation, and failure recording. It enforces provider-neutral queue transition rules, rejects invalid transitions with clear results, audits queue rejections, and composes through `PublishingQueueRepository`. The current runtime uses `InMemoryPublishingQueueRepository`; the older storage option remains a compatibility wrapper only.
 
 Current scheduler service foundation:
 
 - `SchedulerService`
-- `InMemorySchedulerStorage`
+- `SchedulerRepository`
+- `InMemorySchedulerRepository`
 - `ScheduledJobExecutor`
-- `InMemoryScheduledJobExecutionStorage`
+- `JobExecutionRepository`
+- `InMemoryJobExecutionRepository`
 
-The Scheduler service supports scheduling approved queue items, preventing duplicate active schedules, retrieving jobs, listing jobs, rescheduling, retry scheduling through RetryService, cancelling jobs, rejecting invalid policies, and marking jobs completed for operational preview. Completed jobs are immutable. It updates the Publishing Queue to `SCHEDULED`, records scheduler audit events, records scheduler metrics, uses in-memory storage, and does not execute publishing or external scheduler platforms.
+The Scheduler service supports scheduling approved queue items, preventing duplicate active schedules, retrieving jobs, listing jobs, rescheduling, retry scheduling through RetryService, cancelling jobs, rejecting invalid policies, and marking jobs completed for operational preview. Completed jobs are immutable. It updates the Publishing Queue to `SCHEDULED`, records scheduler audit events, records scheduler metrics, composes through `SchedulerRepository`, and does not execute publishing or external scheduler platforms.
 
-The Scheduled Job Executor supports due checks, execution preview, success recording, failure recording, duplicate execution prevention, skipped invalid jobs, RetryService integration, audit events, and queue transition to `PROCESSING`. It can execute provider-neutral publish requests through PublisherService and does not import concrete publisher adapters.
+The Scheduled Job Executor supports due checks, execution preview, success recording, failure recording, duplicate execution prevention, skipped invalid jobs, RetryService integration, audit events, and queue transition to `PROCESSING`. It records execution state through `JobExecutionRepository`, uses `IdempotencyStore` and `LockManager` for duplicate prevention, can execute provider-neutral publish requests through PublisherService, and does not import concrete publisher adapters.
 
 Current audit log foundation:
 
 - `AuditLog`
-- `InMemoryAuditLogStorage`
+- `AuditStore`
+- `InMemoryAuditStore`
 
-The Audit Log service supports appending events, listing timeline events, filtering by entity, and filtering by event type. Content generation, editorial approval, and publishing queue services can receive an audit log instance through composition. Audit storage is in-memory for this foundation sprint and should later be replaceable through an AuditStore-style port.
+The Audit Log service supports appending events, listing timeline events, filtering by entity, and filtering by event type. Content generation, editorial approval, and publishing queue services can receive an audit log instance through composition. Audit persistence now sits behind `AuditStore`; the current runtime uses `InMemoryAuditStore`.
 
 Current retry service foundation:
 
@@ -425,8 +429,10 @@ The Retry Service executes a generic operation with configurable max attempts, f
 Current metrics service foundation:
 
 - `MetricsService`
+- `MetricsStore`
+- `InMemoryMetricsStore`
 
-The Metrics Service records counters, durations, and failures in memory and produces snapshots for dry-run reporting. ContentGenerationWorkflow, PublishingQueue, SchedulerService, ScheduledJobExecutor, and PublisherService receive it through composition. Metrics are observational only and do not change approval decisions, queue transitions, scheduler decisions, publisher dispatch, retry behavior, or provider calls.
+The Metrics Service records counters, durations, and failures through `MetricsStore` and produces snapshots for dry-run reporting. ContentGenerationWorkflow, PublishingQueue, SchedulerService, ScheduledJobExecutor, and PublisherService receive it through composition. The current runtime uses `InMemoryMetricsStore`. Metrics are observational only and do not change approval decisions, queue transitions, scheduler decisions, publisher dispatch, retry behavior, or provider calls.
 
 Current Instagram content service foundation:
 
@@ -444,8 +450,12 @@ Current asset library foundation:
 
 - `AssetLibrary`
 - `mapAssetToImageAsset`
+- `AssetCatalogRepository`
+- `InMemoryAssetCatalogRepository`
+- `StorageMetadataRepository`
+- `InMemoryStorageMetadataRepository`
 
-The Asset Library service uses a `StorageProvider` internally to upload, download, and look up file metadata. Callers register assets and retrieve asset metadata or image-domain projections without receiving the storage provider itself.
+The Asset Library service uses a `StorageProvider` internally to upload, download, and look up file metadata, stores provider-neutral asset metadata through `AssetCatalogRepository`, and can record storage metadata through `StorageMetadataRepository`. Callers register assets and retrieve asset metadata or image-domain projections without receiving the storage provider itself.
 
 The Google Drive image library adapter now registers mock image records through Asset Library and then exposes image-domain `ImageAsset` values for dry-run selection. This keeps Google Drive as a storage/provider detail rather than the asset model.
 
@@ -462,9 +472,9 @@ Current persistence ports foundation:
 - `LockManager`
 - `UnitOfWork`
 
-These provider-neutral TypeScript ports live under `src/services/persistence`. They expose domain models and provider-neutral query objects only. Services should own transaction boundaries, while adapters should own database or storage-specific details.
+These provider-neutral TypeScript ports live under `src/services/persistence`. They expose domain models and provider-neutral query objects only. Services own transaction boundaries, while adapters own database or storage-specific details.
 
-Sprint 50 also adds small in-memory proof adapters for `IdempotencyStore`, `LockManager`, and `UnitOfWork` so tests can exercise idempotency, lock acquire/release, and transaction commit/rollback semantics. Queue, Scheduler, Audit, Metrics, Assets, and Storage metadata services are not migrated yet and remain on their existing in-memory foundations until a future implementation sprint.
+Sprint 51 adds in-memory adapters for Queue, Scheduler, Job Execution, Audit, Metrics, Asset Catalog, and Storage Metadata and migrates the active in-memory services onto those ports. `IdempotencyStore` and `LockManager` are integrated into ScheduledJobExecutor duplicate execution prevention. `UnitOfWork` remains available for future operations that materially span multiple persistence ports. Durable database, ORM, and filesystem adapters remain deferred.
 
 ## `src/prompts`
 

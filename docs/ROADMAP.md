@@ -321,3 +321,9 @@ Status: Planned in documentation with repository boundaries, persistence ownersh
 Turn the approved persistence architecture into provider-neutral TypeScript ports only.
 
 Status: Implemented with `src/services/persistence` repository/store ports for Publishing Queue, Scheduler, Job Execution, Audit, Metrics, Asset Catalog, Storage Metadata, Idempotency, Locking, and UnitOfWork. Added shared revision, pagination, transaction, lock token, and idempotency record types plus small in-memory proof adapters for IdempotencyStore, LockManager, and UnitOfWork tests. Existing runtime services were not migrated. No database, ORM, filesystem persistence, runtime behavior change, external API call, publishing, or product feature was added.
+
+### Sprint 51: Persistence Service Migration
+
+Migrate existing in-memory operational services onto the persistence ports without adding durable storage.
+
+Status: Implemented with in-memory adapters for PublishingQueueRepository, SchedulerRepository, JobExecutionRepository, AuditStore, MetricsStore, AssetCatalogRepository, and StorageMetadataRepository. PublishingQueue, SchedulerService, ScheduledJobExecutor execution records, AuditLog, MetricsService, AssetLibrary metadata, and storage metadata now compose through ports. ScheduledJobExecutor uses IdempotencyStore and LockManager for duplicate execution prevention. Existing public APIs and dry-run behavior remain compatible through in-memory composition and compatibility wrappers. No database, ORM, filesystem persistence, runtime behavior change, external API call, publishing, or product feature was added.
