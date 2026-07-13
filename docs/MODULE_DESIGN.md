@@ -310,6 +310,20 @@ The LocalStorageProvider implements the shared `StorageProvider` interface for t
 
 The Google Drive StorageProvider implements the same storage interface through a transport abstraction. It supports upload, download, folder creation, file listing, and metadata lookup while keeping Drive-specific records, query strings, IDs, and response parsing inside the adapter. It is disabled by default and requires explicit Google Drive environment configuration before transport calls are allowed.
 
+Current SQLite persistence adapter:
+
+- `providers/persistence/sqlite/SQLiteConnection`
+- `providers/persistence/sqlite/SQLiteMigrations`
+- `providers/persistence/sqlite/SQLitePublishingQueueRepository`
+- `providers/persistence/sqlite/SQLiteSchedulerRepository`
+- `providers/persistence/sqlite/SQLiteJobExecutionRepository`
+- `providers/persistence/sqlite/SQLiteIdempotencyStore`
+- `providers/persistence/sqlite/SQLiteLockManager`
+- `providers/persistence/sqlite/SQLiteUnitOfWork`
+- `providers/persistence/sqlite/SQLitePersistenceComposition`
+
+The SQLite adapter is local/dev and opt-in only. It implements operational persistence for Queue, Scheduler, Job Execution, Idempotency, and Locks. SQLite-specific SQL, schema records, migration execution, row mapping, connection handling, and lock behavior stay inside the adapter. It does not persist Audit, Metrics, Asset Catalog, or Storage Metadata.
+
 ## `src/services`
 
 Contains reusable application services that do not know about specific magazines or vendors.
@@ -479,6 +493,8 @@ Sprint 51 adds in-memory adapters for Queue, Scheduler, Job Execution, Audit, Me
 Architecture Cleanup Patch 006 adds `PersistenceCompositionFactory`, which creates the runtime-owned persistence bundle for dry runs. Operational services receive repositories, stores, lock manager, idempotency store, and UnitOfWork through constructor injection instead of constructing default in-memory adapters internally. This prepares future durable adapters without changing service behavior.
 
 Sprint 52 adds durable adapter planning without implementation. The planned first durable local/dev adapter is SQLite, while PostgreSQL is the production target. The first future implementation should focus on `PublishingQueueRepository`, `SchedulerRepository`, `JobExecutionRepository`, `IdempotencyStore`, and `LockManager`; `AuditStore`, `MetricsStore`, `AssetCatalogRepository`, and `StorageMetadataRepository` remain deferred until the operational path is proven durable.
+
+Sprint 53 implements that SQLite local/dev operational adapter. `ASTERIA_PERSISTENCE_MODE=sqlite` plus `ASTERIA_SQLITE_DATABASE_PATH` selects it in runtime composition. `memory` remains the default mode. PostgreSQL remains the production target for future concurrent worker deployments.
 
 ## `src/prompts`
 

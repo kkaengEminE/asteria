@@ -32,6 +32,13 @@ export interface PersistenceComposition {
   unitOfWork: UnitOfWork;
 }
 
+export type PersistenceCompositionMode = 'memory' | 'sqlite';
+
+export interface CreatePersistenceCompositionOptions {
+  mode?: PersistenceCompositionMode;
+  sqliteComposition?: PersistenceComposition;
+}
+
 export function createInMemoryPersistenceComposition(): PersistenceComposition {
   return {
     publishingQueueRepository: new InMemoryPublishingQueueRepository(),
@@ -45,4 +52,18 @@ export function createInMemoryPersistenceComposition(): PersistenceComposition {
     lockManager: new InMemoryLockManager(),
     unitOfWork: new InMemoryUnitOfWork()
   };
+}
+
+export function createPersistenceComposition(options: CreatePersistenceCompositionOptions = {}): PersistenceComposition {
+  const mode = options.mode ?? 'memory';
+
+  if (mode === 'memory') {
+    return createInMemoryPersistenceComposition();
+  }
+
+  if (options.sqliteComposition) {
+    return options.sqliteComposition;
+  }
+
+  throw new Error('SQLite persistence composition requires a SQLite adapter supplied by runtime composition.');
 }

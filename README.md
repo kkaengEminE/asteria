@@ -4,7 +4,7 @@ Asteria is the foundation for an extensible AI Publishing OS: a reusable content
 
 ## Current Sprint
 
-Sprint 52 plans the first durable persistence adapter path without implementing persistence. The selected path is SQLite for local/dev adapter proof and PostgreSQL as the production target. The first future implementation scope is operational persistence for Queue, Scheduler, Job Execution, Idempotency, and Locks. No database, ORM, filesystem persistence, runtime behavior change, external API call, or publishing enablement is introduced.
+Sprint 53 adds the first opt-in durable local/dev persistence adapter using Node's built-in SQLite support. SQLite can persist Queue, Scheduler, Job Execution, Idempotency, and Locks when explicitly selected. In-memory persistence remains the default, Audit/Metrics/Asset Catalog/Storage Metadata remain in-memory, PostgreSQL remains the production target, and publishing remains disabled.
 
 ## Commands
 
@@ -19,6 +19,16 @@ Run the dry run with a custom topic:
 ```bash
 npm run dry-run -- "indoor enrichment"
 ```
+
+Run the dry run with opt-in SQLite local/dev persistence:
+
+```bash
+ASTERIA_PERSISTENCE_MODE=sqlite \
+ASTERIA_SQLITE_DATABASE_PATH=/tmp/asteria-dev.sqlite \
+npm run dry-run
+```
+
+If `ASTERIA_PERSISTENCE_MODE` is omitted or set to `memory`, Asteria uses the default in-memory persistence composition. SQLite mode requires `ASTERIA_SQLITE_DATABASE_PATH`; missing paths fail before workflow execution.
 
 Run the dry run with production AI mode only when OpenAI configuration is intentionally enabled:
 
@@ -98,7 +108,9 @@ Persistence Architecture is documented under `docs/PERSISTENCE_ARCHITECTURE.md`.
 
 Runtime persistence composition is explicit. `PersistenceCompositionFactory` creates the dry-run in-memory repository/store/lock/idempotency/UnitOfWork bundle, and runtime code injects those ports into Queue, Scheduler, Executor, Audit, Metrics, and Asset services. Services no longer choose default persistence adapters internally.
 
-Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. The plan recommends SQLite as the first local/dev durable adapter and PostgreSQL as the production adapter target, with operational persistence migrating before Audit, Metrics, and Asset Catalog durability.
+Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL remains the production adapter target, and durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
+
+SQLite migrations run on adapter startup, record applied versions in `schema_migrations`, and fail clearly if the database contains a newer unsupported schema version. No destructive rollback is performed automatically. Local backups are the operator's responsibility; copy the SQLite file only when no Asteria process is writing to it. SQLite is appropriate for local/dev and single-node proof, but concurrent production workers should wait for the PostgreSQL adapter path.
 
 Retry Foundation provides a reusable retry service for future AI providers, storage providers, publisher adapters, and scheduler work. It records retry attempts, retry count, final reason, and policy metadata without performing real waits in tests. ContentGenerationWorkflow now uses RetryService for recoverable structured output failures while preserving existing metadata. The current dry run also includes mock retry metadata for report visibility.
 

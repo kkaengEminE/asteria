@@ -1,6 +1,6 @@
 # Persistence Architecture Planning
 
-Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selects a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md` without implementing a database, adding schema files, adding filesystem storage, running migrations, changing runtime behavior, or introducing external services.
+Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selected a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md`. Sprint 53 implements the first opt-in SQLite local/dev operational adapter without changing the default in-memory runtime mode, enabling publishing, adding PostgreSQL, adding an ORM, or persisting observational/catalog stores.
 
 ## Goals
 
@@ -13,10 +13,9 @@ Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 tur
 
 ## Non-Goals
 
-- No SQLite, PostgreSQL, Prisma, Drizzle, filesystem persistence, or database setup.
-- No durable persistence implementation.
-- No durable adapter package or schema file.
-- No runtime behavior changes.
+- No PostgreSQL, Prisma, Drizzle, filesystem persistence, or production database setup.
+- No default durable runtime behavior.
+- No durable Audit, Metrics, Asset Catalog, or Storage Metadata persistence.
 - No production publishing enablement.
 - No external API calls.
 
@@ -69,6 +68,17 @@ Current in-memory adapters:
 - `InMemoryUnitOfWork`
 
 These adapters are runtime foundations and test doubles only. They are not durable storage and must not be treated as a production persistence layer.
+
+Current durable local/dev adapter:
+
+- `SQLitePublishingQueueRepository`
+- `SQLiteSchedulerRepository`
+- `SQLiteJobExecutionRepository`
+- `SQLiteIdempotencyStore`
+- `SQLiteLockManager`
+- `SQLiteUnitOfWork`
+
+These adapters live under `src/providers/persistence/sqlite`. SQLite is selected only when runtime composition receives `ASTERIA_PERSISTENCE_MODE=sqlite` and `ASTERIA_SQLITE_DATABASE_PATH`. In-memory remains the default.
 
 ### PublishingQueueRepository
 
@@ -470,13 +480,23 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - `AuditStore`, `MetricsStore`, `AssetCatalogRepository`, and `StorageMetadataRepository` remain deferred until operational persistence is proven.
 - Proposed schema boundaries, migration policy, transaction boundaries, optimistic revision behavior, idempotency policy, and locking strategy are documented in `docs/DURABLE_PERSISTENCE_PLAN.md`.
 
+## Implemented in Sprint 53
+
+- Opt-in SQLite local/dev persistence adapter under `src/providers/persistence/sqlite`.
+- Initial schema migration for `publishing_queue_items`, `scheduled_jobs`, `job_executions`, `idempotency_records`, `execution_locks`, and `schema_migrations`.
+- Repeatable migration startup check and unsupported future schema version failure.
+- SQLite implementations for `PublishingQueueRepository`, `SchedulerRepository`, `JobExecutionRepository`, `IdempotencyStore`, and `LockManager`.
+- SQLite transaction adapter through `SQLiteUnitOfWork` for future durable multi-port operations.
+- Runtime selection through `ASTERIA_PERSISTENCE_MODE=memory|sqlite` and `ASTERIA_SQLITE_DATABASE_PATH`.
+- Tests for isolated temporary databases, persistence across repository instances, revision conflicts, transaction rollback, idempotency records, locks, dry-run regression, Quality Lab regression, and architecture boundary compliance.
+
 ## Accepted Deferrals
 
-- No database adapter is implemented.
-- No schema or migration file is created.
-- No persistence configuration or environment variables are added.
+- No PostgreSQL adapter is implemented.
+- SQLite is not the default runtime mode.
+- No production persistence configuration is added beyond local/dev SQLite selection.
 - No filesystem persistence is introduced.
-- No durable runtime data exists beyond process memory.
+- No durable runtime data exists unless SQLite mode is explicitly selected.
 - UnitOfWork is not applied broadly because no current migrated operation materially requires multi-port atomicity without durable storage.
 - Compatibility wrappers remain for older storage constructor paths where removing them would create behavior churn.
 

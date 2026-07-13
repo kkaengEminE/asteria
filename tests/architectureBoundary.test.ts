@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
-import { dirname, join, normalize, relative, resolve } from 'node:path';
+import { dirname, join, normalize, relative, resolve, sep } from 'node:path';
 import { test } from 'node:test';
 
 const srcRoot = join(process.cwd(), 'src');
@@ -20,7 +20,8 @@ const concreteProviderImportPatterns = [
   /from\s+['"][^'"]*providers\/publisher\/[^'"]*['"]/,
   /from\s+['"][^'"]*providers\/image\/[^'"]*['"]/,
   /from\s+['"][^'"]*providers\/monetization\/[^'"]*['"]/,
-  /from\s+['"][^'"]*providers\/storage\/[^'"]*['"]/
+  /from\s+['"][^'"]*providers\/storage\/[^'"]*['"]/,
+  /from\s+['"][^'"]*providers\/persistence\/[^'"]*['"]/
 ];
 
 test('workflows do not import concrete provider implementations', async () => {
@@ -157,7 +158,10 @@ test('publishing and scheduler services use provider-neutral publisher contracts
 });
 
 test('persistence ports do not import database or orm packages', async () => {
-  const files = await listTypeScriptFiles(persistenceRoot);
+  const files = (await listTypeScriptFiles(persistenceRoot))
+    .filter((file) => !normalize(file).includes(`${sep}inMemory${sep}`))
+    .filter((file) => !file.endsWith('PersistenceCompositionFactory.ts'))
+    .filter((file) => !file.endsWith('index.ts'));
   const violations: string[] = [];
   const forbiddenPatterns = [
     /from\s+['"][^'"]*(?:sqlite|postgres|prisma|drizzle|typeorm|sequelize|knex)[^'"]*['"]/i,

@@ -339,3 +339,9 @@ Status: Implemented with `PersistenceCompositionFactory`, explicit runtime owner
 Select and design the first durable persistence adapter path before implementation.
 
 Status: Planned in documentation with SQLite recommended as the first local/dev durable adapter path and PostgreSQL recommended as the production adapter target. The first future implementation scope is Queue, Scheduler, Job Execution, Idempotency, and Locks, while Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred. Proposed schema boundaries, migration policy, transaction/concurrency strategy, optimistic revision behavior, idempotency policy, and retry-safe publisher dispatch constraints are documented in `docs/DURABLE_PERSISTENCE_PLAN.md`. No database, ORM, filesystem persistence, runtime behavior change, external API call, publishing, or product feature was added.
+
+### Sprint 53: SQLite Operational Persistence Adapter
+
+Implement the first opt-in durable local/dev persistence adapter without making it the default.
+
+Status: Implemented with `src/providers/persistence/sqlite`, initial schema migration, repeatable migration startup checks, unsupported future schema version failure, SQLite adapters for Publishing Queue, Scheduler, Job Execution, Idempotency, and Locks, SQLite UnitOfWork transaction rollback coverage, runtime selection through `ASTERIA_PERSISTENCE_MODE=sqlite` plus `ASTERIA_SQLITE_DATABASE_PATH`, isolated temporary database tests, dry-run regression, Quality Lab regression, and architecture boundary coverage. In-memory remains default. Publishing, PostgreSQL, Prisma, Drizzle, filesystem persistence, Audit persistence, Metrics persistence, Asset Catalog persistence, Storage Metadata persistence, and external API calls remain disabled/deferred.

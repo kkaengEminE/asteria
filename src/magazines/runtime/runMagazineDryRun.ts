@@ -9,6 +9,10 @@ import {
   type OpenAITransport
 } from '../../providers/ai/index.ts';
 import { GoogleDriveImageLibrary } from '../../providers/image/googleDrive/index.ts';
+import type {
+  SQLitePersistenceComposition,
+  SQLitePersistenceEnvironment
+} from '../../providers/persistence/sqlite/index.ts';
 import {
   CoupangAffiliateProvider,
   createCoupangAffiliateConfigFromEnv,
@@ -19,7 +23,7 @@ import { AuditLog } from '../../services/auditLog/index.ts';
 import { DryRunWorkflowFactory, type DryRunResult } from '../../services/dryRun/index.ts';
 import { MetricsService } from '../../services/metrics/index.ts';
 import {
-  createInMemoryPersistenceComposition,
+  createPersistenceComposition,
   type PersistenceComposition
 } from '../../services/persistence/index.ts';
 import { DryRunPublisher } from '../../services/publisher/index.ts';
@@ -53,6 +57,7 @@ export interface MagazineDryRunOptions {
   affiliateMode?: MagazineDryRunAffiliateMode;
   coupangEnv?: CoupangEnvironment;
   coupangTransport?: CoupangAffiliateTransport;
+  persistenceEnv?: SQLitePersistenceEnvironment;
   persistence?: PersistenceComposition;
   registry?: ProviderRegistry;
   registerMockProviders?: boolean;
@@ -65,6 +70,7 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
   const topic = options.topic ?? 'indoor enrichment for cats';
   const magazineSlug = options.magazineSlug ?? 'cat';
   const registry = options.registry ?? new ProviderRegistry();
+  let ownedPersistence: PersistenceComposition | undefined;
 
   if (options.registerMockProviders ?? true) {
     registerMagazineDryRunMockProviders(registry, {
@@ -100,7 +106,8 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       magazineSlug,
       dryRun: true
     });
-    const persistence = options.persistence ?? createInMemoryPersistenceComposition();
+    const persistence = options.persistence ?? await createMagazineRuntimePersistence(options.persistenceEnv);
+    ownedPersistence = options.persistence ? undefined : persistence;
     const auditLog = new AuditLog(persistence.auditStore);
     const metricsService = new MetricsService({
       store: persistence.metricsStore
@@ -135,10 +142,12 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       }
     });
 
-    return workflowFactory.createResult({
+    const result = workflowFactory.createResult({
       topic,
       workflowResult
     });
+
+    return result;
   } catch (error) {
     return {
       topic,
@@ -154,6 +163,8 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       },
       error: describeError(error)
     };
+  } finally {
+    closePersistence(ownedPersistence);
   }
 }
 
@@ -246,6 +257,35 @@ export function registerMagazineDryRunMockProviders(
       }
     );
   }
+}
+
+async function createMagazineRuntimePersistence(env: SQLitePersistenceEnvironment = process.env): Promise<PersistenceComposition> {
+  const { createSQLitePersistenceConfigFromEnv } = await import('../../providers/persistence/sqlite/SQLiteConfig.ts');
+  const config = createSQLitePersistenceConfigFromEnv(env);
+
+  if (config.mode === 'memory') {
+    return createPersistenceComposition({
+      mode: 'memory'
+    });
+  }
+
+  const { createSQLitePersistenceComposition } = await import('../../providers/persistence/sqlite/index.ts');
+
+  return createPersistenceComposition({
+    mode: 'sqlite',
+    sqliteComposition: createSQLitePersistenceComposition({
+      databasePath: config.databasePath!
+    })
+  });
+}
+
+function closePersistence(persistence: PersistenceComposition | undefined): void {
+  if (!persistence) {
+    return;
+  }
+
+  const sqlitePersistence = persistence as Partial<SQLitePersistenceComposition>;
+  sqlitePersistence.sqliteConnection?.close();
 }
 
 function describeError(error: unknown): string {

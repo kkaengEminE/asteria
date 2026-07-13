@@ -5,7 +5,10 @@ export type { JobExecutionQuery, JobExecutionRepository } from './JobExecutionRe
 export type { LockManager } from './LockManager.ts';
 export type { MetricsSnapshotQuery, MetricsStore } from './MetricsStore.ts';
 export {
+  createPersistenceComposition,
   createInMemoryPersistenceComposition,
+  type CreatePersistenceCompositionOptions,
+  type PersistenceCompositionMode,
   type PersistenceComposition
 } from './PersistenceCompositionFactory.ts';
 export type {

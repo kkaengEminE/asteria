@@ -1,6 +1,6 @@
 # Durable Persistence Adapter Plan
 
-Sprint 52 selects and designs the first durable persistence adapter path for Asteria. This is a planning document only. It does not add a database, ORM, schema file, migration file, filesystem persistence, external API, or runtime behavior change.
+Sprint 52 selected and designed the first durable persistence adapter path for Asteria. Sprint 53 implements the SQLite local/dev operational adapter described here. PostgreSQL remains the production target, and durable Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred.
 
 ## Decision Summary
 
@@ -78,7 +78,7 @@ Rationale:
 - SQLite lets the project prove schema shape, migrations, repository mapping, revision checks, and test lifecycle with low setup cost.
 - PostgreSQL should remain the production design target because scheduler execution, publishing dispatch, idempotency, locking, and multi-worker processing will need stronger concurrency primitives.
 
-This recommendation does not require adding SQLite or PostgreSQL now.
+Sprint 53 implements the SQLite local/dev adapter using Node's built-in SQLite support. PostgreSQL is still not implemented.
 
 ## First Implementation Scope
 
@@ -90,7 +90,7 @@ The first durable adapter sprint should cover the operational path that is most 
 - Idempotency records
 - Locks
 
-Recommended first adapter scope:
+Sprint 53 implemented this first adapter scope:
 
 - `PublishingQueueRepository`
 - `SchedulerRepository`
@@ -98,7 +98,7 @@ Recommended first adapter scope:
 - `IdempotencyStore`
 - `LockManager`
 
-Deferred from the first durable adapter:
+Deferred from the first durable adapter and still deferred after Sprint 53:
 
 - `AuditStore`
 - `MetricsStore`
@@ -417,6 +417,13 @@ Recommended naming:
 
 Migration version state should be tracked in a `schema_migrations` table when durable adapters are implemented.
 
+Sprint 53 status:
+
+- SQLite tracks version `1` in `schema_migrations`.
+- Adapter startup is repeatable.
+- Startup fails when the database contains a schema version newer than the adapter supports.
+- No automatic destructive rollback is performed.
+
 ### Forward Migration
 
 Rules:
@@ -445,6 +452,12 @@ When the first SQLite adapter is implemented:
 - Test data should be cleared by dropping the temporary database.
 - Tests must not depend on developer machine state.
 - In-memory adapters must remain available for fast unit tests.
+
+Sprint 53 status:
+
+- SQLite integration tests use isolated temporary database files.
+- Normal dry-run remains in-memory by default.
+- Explicit SQLite verification uses `ASTERIA_PERSISTENCE_MODE=sqlite` and `ASTERIA_SQLITE_DATABASE_PATH`.
 
 ### Compatibility With In-Memory Adapters
 
@@ -569,11 +582,7 @@ If a publisher returns an unknown result after a timeout, the execution should r
 Recommended future sprint sequence:
 
 1. SQLite Operational Persistence Adapter
-   - Queue
-   - Scheduler
-   - Execution
-   - Idempotency
-   - Locks
+   - Status: implemented in Sprint 53 for Queue, Scheduler, Execution, Idempotency, and Locks.
 
 2. Durable AuditStore Adapter
    - Async write decision
@@ -595,9 +604,8 @@ Recommended future sprint sequence:
 
 ## Non-Goals Confirmed
 
-- No durable persistence is implemented in Sprint 52.
-- No SQLite, PostgreSQL, Prisma, Drizzle, Redis, filesystem persistence, or database package is added.
-- No migration files are created.
-- No runtime behavior is changed.
+- No PostgreSQL, Prisma, Drizzle, Redis, filesystem persistence, or external database package is added in Sprint 53.
+- SQLite is not the default runtime mode.
+- No Audit, Metrics, Asset Catalog, or Storage Metadata durable adapter is added.
 - No external API is added.
 - Publishing remains disabled.

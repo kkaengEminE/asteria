@@ -1,0 +1,13 @@
+export { createSQLitePersistenceConfigFromEnv, SQLitePersistenceConfigError } from './SQLiteConfig.ts';
+export type { AsteriaPersistenceMode, SQLitePersistenceConfig, SQLitePersistenceEnvironment } from './SQLiteConfig.ts';
+export { SQLiteConnection } from './SQLiteConnection.ts';
+export type { SQLiteDatabase, SQLiteRow, SQLiteStatement, SQLiteValue } from './SQLiteConnection.ts';
+export { SQLiteIdempotencyStore } from './SQLiteIdempotencyStore.ts';
+export { SQLiteJobExecutionRepository } from './SQLiteJobExecutionRepository.ts';
+export { SQLiteLockManager } from './SQLiteLockManager.ts';
+export { migrateSQLiteDatabase, SQLITE_SCHEMA_VERSION, SQLiteMigrationError } from './SQLiteMigrations.ts';
+export { createSQLitePersistenceComposition } from './SQLitePersistenceComposition.ts';
+export type { CreateSQLitePersistenceCompositionOptions, SQLitePersistenceComposition } from './SQLitePersistenceComposition.ts';
+export { SQLitePublishingQueueRepository } from './SQLitePublishingQueueRepository.ts';
+export { SQLiteSchedulerRepository } from './SQLiteSchedulerRepository.ts';
+export { SQLiteUnitOfWork } from './SQLiteUnitOfWork.ts';

@@ -80,6 +80,8 @@ Provider adapters must not depend on legacy `src/core` contracts. WordPress maps
 
 `src/providers/storage/googleDrive` contains the Google Drive StorageProvider adapter. It implements the shared storage boundary with upload, download, list, folder creation, and metadata lookup. Google Drive-specific request shapes, response records, file IDs, folder IDs, app properties, and transport behavior stay inside the adapter. The provider is disabled by default and requires `GOOGLE_DRIVE_ENABLED=true`, `GOOGLE_DRIVE_CREDENTIALS`, and `GOOGLE_DRIVE_ROOT_FOLDER` before transport calls are allowed.
 
+`src/providers/persistence/sqlite` contains the SQLite operational persistence adapter. SQLite-specific connection handling, migrations, SQL statements, schema records, row mapping, error mapping, idempotency records, and lock records stay inside this adapter. It implements Queue, Scheduler, Job Execution, Idempotency, and Lock ports only. It does not persist Audit, Metrics, Asset Catalog, or Storage Metadata.
+
 ### Services
 
 `src/services` is reserved for application services that combine core interfaces into useful operations, such as content planning, editorial validation, prompt rendering, and asset preparation.
@@ -301,7 +303,7 @@ Metrics must not contain secrets or provider SDK response objects. They are summ
 
 ## Persistence Boundary
 
-Persistence is implemented through provider-neutral ports plus in-memory adapters for current runtime services. Durable persistence is not implemented. The authoritative architecture document is `docs/PERSISTENCE_ARCHITECTURE.md`; the first durable adapter plan is `docs/DURABLE_PERSISTENCE_PLAN.md`.
+Persistence is implemented through provider-neutral ports plus in-memory adapters for default runtime services. SQLite operational persistence is available only as an explicit local/dev adapter. The authoritative architecture document is `docs/PERSISTENCE_ARCHITECTURE.md`; the durable adapter plan is `docs/DURABLE_PERSISTENCE_PLAN.md`.
 
 Persistence enters Asteria through repository ports and future adapters, not through domain models, provider SDK records, workflow internals, or direct database access from runtime steps.
 
@@ -324,7 +326,9 @@ Sprint 51 migrates PublishingQueue, SchedulerService, ScheduledJobExecutor recor
 
 Architecture Cleanup Patch 006 adds `PersistenceCompositionFactory` so runtime composition owns repositories, stores, idempotency, locking, and UnitOfWork selection. Operational service constructors no longer create default persistence adapters internally. Durable adapters remain deferred, but future runtime composition can swap the persistence bundle without changing queue, scheduler, executor, audit, metrics, or asset services.
 
-Sprint 52 selects SQLite as the first local/dev durable adapter path and PostgreSQL as the production adapter target, without implementing either backend. The first future durable scope should cover Queue, Scheduler, Job Execution, Idempotency, and Locks before Audit, Metrics, Asset Catalog, or Storage Metadata are migrated.
+Sprint 52 selected SQLite as the first local/dev durable adapter path and PostgreSQL as the production adapter target. Sprint 53 implements the SQLite operational adapter only. In-memory remains the default; SQLite is selected only when `ASTERIA_PERSISTENCE_MODE=sqlite` and `ASTERIA_SQLITE_DATABASE_PATH` are provided.
+
+SQLite migrations run on adapter startup, store applied versions in `schema_migrations`, and fail on unsupported future schema versions. Rollback is not automatic or destructive. SQLite is local/dev and single-node oriented; PostgreSQL remains the production target for concurrent workers and stronger operational locking.
 
 Locking should combine optimistic concurrency for entity transitions with short-lived execution locks. Idempotency should be scoped by operation type and entity, especially for queue enqueue, schedule creation, job execution, publisher dispatch, asset registration, and audit append.
 
