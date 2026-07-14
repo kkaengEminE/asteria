@@ -1,7 +1,7 @@
 # Persistence Architecture Planning
 
 Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selected a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md`. Sprint 53 implements the first opt-in SQLite local/dev operational adapter. Architecture Cleanup Patch 007 completes transaction ownership cleanup for scheduler and executor operations. Sprint 55 implements the first PostgreSQL operational adapter boundary without changing the default in-memory runtime mode, enabling publishing, adding an ORM, or persisting observational/catalog stores.
-Sprint 56 adds the concrete PostgreSQL connection/pool adapter using `pg` without changing the default in-memory runtime mode, enabling publishing, adding an ORM, or persisting observational/catalog stores.
+Sprint 56 adds the concrete PostgreSQL connection/pool adapter using `pg` without changing the default in-memory runtime mode, enabling publishing, adding an ORM, or persisting observational/catalog stores. Sprint 57 adds opt-in real PostgreSQL operational validation infrastructure using a disposable Docker database when available; normal tests still do not require PostgreSQL or Docker.
 
 ## Goals
 
@@ -525,6 +525,14 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - Runtime composition can select PostgreSQL only when `ASTERIA_PERSISTENCE_MODE=postgresql` and `ASTERIA_POSTGRESQL_URL` are provided.
 - PostgreSQL UnitOfWork transaction participation is supported through adapter-local transaction context routing.
 - Optional smoke test command `npm run postgresql:smoke` is available for isolated database verification.
+
+## Implemented in Sprint 57
+
+- Dedicated `npm run test:postgresql` command for real PostgreSQL operational validation.
+- Disposable Docker-backed validation target pinned to `postgres:16.6-alpine`.
+- Real database coverage for migration bootstrap, repeated startup, unsupported future schema detection, repository persistence across pool recreation, concurrent revision conflicts, UnitOfWork commit/rollback, idempotency state persistence, lock acquisition/renew/release/TTL behavior, runtime dry-run with PostgreSQL mode, closed-pool handling, and credential redaction.
+- Safe skip behavior when Docker or OrbStack is unavailable; skipped PostgreSQL integration cases do not fail normal development validation.
+- `execution_locks.updated_at` is part of the PostgreSQL schema so lock acquire/renew behavior matches the adapter contract.
 
 ## Accepted Deferrals
 

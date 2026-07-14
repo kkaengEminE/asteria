@@ -498,7 +498,9 @@ Sprint 53 implements that SQLite local/dev operational adapter. `ASTERIA_PERSIST
 
 Architecture Cleanup Patch 007 clarifies transaction ownership before PostgreSQL work. SchedulerService uses UnitOfWork for queue `SCHEDULED` transition plus scheduled job creation, while ScheduledJobExecutor uses UnitOfWork for execution start, queue `PROCESSING` transition, execution completion, idempotency finalization, and lock release. SQLite mutable repositories now use atomic `revision = revision + 1` SQL updates guarded by expected revision.
 
-Sprint 55 implements the initial PostgreSQL adapter boundary under `src/providers/persistence/postgresql`. Sprint 56 adds the concrete `pg` connection/pool adapter in the same provider boundary. The implementation stays focused on Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external scheduler execution remain out of scope. Driver-specific types stay inside the adapter and runtime composition owns concrete connection creation.
+Sprint 55 implements the initial PostgreSQL adapter boundary under `src/providers/persistence/postgresql`. Sprint 56 adds the concrete `pg` connection/pool adapter in the same provider boundary. Sprint 57 adds a dedicated real-database validation suite under `tests/integration` that runs only through `npm run test:postgresql`. The implementation stays focused on Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external scheduler execution remain out of scope. Driver-specific types stay inside the adapter and runtime composition owns concrete connection creation.
+
+The PostgreSQL validation suite uses Docker directly with `postgres:16.6-alpine` to avoid adding a Testcontainers dependency. It validates migrations, repository persistence, revision conflicts, UnitOfWork rollback, idempotency, locks, runtime dry-run configuration, and credential redaction. If Docker is unavailable, the suite marks the real database tests as skipped; normal `npm test` remains infrastructure-free.
 
 ## `src/prompts`
 

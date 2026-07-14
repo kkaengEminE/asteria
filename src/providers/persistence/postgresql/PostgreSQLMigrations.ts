@@ -106,7 +106,8 @@ async function applyVersion1(connection: PostgreSQLConnection): Promise<void> {
       token TEXT NOT NULL,
       acquired_at TIMESTAMPTZ NOT NULL,
       expires_at TIMESTAMPTZ NOT NULL,
-      metadata_json JSONB
+      metadata_json JSONB,
+      updated_at TIMESTAMPTZ NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_pg_execution_locks_expires_at ON execution_locks(expires_at);

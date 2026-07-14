@@ -381,3 +381,9 @@ Status: Completed with health score 87 / 100. Recommendation was HOLD for produc
 Implement the concrete PostgreSQL connection and pool layer while keeping memory as the default runtime.
 
 Status: Implemented with `pg` driver selection, `PostgreSQLPoolConnection`, parameterized query execution, transaction begin/commit/rollback, transaction-scoped query routing, health check, idempotent close, redacted driver errors, explicit env configuration through `ASTERIA_PERSISTENCE_MODE=postgresql` and `ASTERIA_POSTGRESQL_URL`, runtime composition support, mocked pool tests, and optional `npm run postgresql:smoke`. Publishing, ORM adoption, durable Audit, durable Metrics, Asset Catalog persistence, Storage Metadata persistence, and required live PostgreSQL tests remain deferred.
+
+### Sprint 57: PostgreSQL Real Database Operational Validation
+
+Validate the PostgreSQL adapter against an isolated disposable PostgreSQL database without making PostgreSQL required for normal tests.
+
+Status: Implemented with dedicated `npm run test:postgresql`, Docker-backed `postgres:16.6-alpine` validation, real migration bootstrap/repeat/future-version checks, queue/scheduler/execution persistence across pool recreation, concurrent stale revision conflicts, UnitOfWork commit/rollback, idempotency persistence, lock acquisition/renew/release/TTL behavior, explicit PostgreSQL dry-run path, failure redaction, and safe SKIP behavior when Docker or OrbStack is unavailable. In-memory remains default, SQLite remains supported, publishing remains disabled, no ORM was added, and normal `npm test` remains free of Docker/PostgreSQL requirements.

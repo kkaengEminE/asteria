@@ -8,6 +8,7 @@
     "dry-run": "node --experimental-strip-types scripts/dry-run.ts",
     "quality-lab": "node --experimental-strip-types scripts/quality-lab.ts",
     "postgresql:smoke": "node --experimental-strip-types scripts/postgresql-smoke.ts",
+    "test:postgresql": "node --test --experimental-strip-types tests/integration/postgresqlRealDatabase.test.ts",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -17,8 +18,5 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.5.0"
-  },
-  "dependencies": {
-    "pg": "^8.22.0"
   }
 }

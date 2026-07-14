@@ -1,6 +1,6 @@
 # PostgreSQL Readiness Plan
 
-This plan prepared Asteria for the first PostgreSQL operational persistence adapter. Sprint 55 implements the adapter boundary, and Sprint 56 adds a concrete `pg` connection/pool adapter without enabling publishing or changing default runtime behavior.
+This plan prepared Asteria for the first PostgreSQL operational persistence adapter. Sprint 55 implements the adapter boundary, Sprint 56 adds a concrete `pg` connection/pool adapter, and Sprint 57 adds opt-in real-database operational validation without enabling publishing or changing default runtime behavior.
 
 ## Goal
 
@@ -34,6 +34,28 @@ Deferred:
 - durable Audit, Metrics, Asset Catalog, and Storage Metadata
 - production publishing
 - runtime PostgreSQL default mode
+
+## Sprint 57 Validation Status
+
+Implemented:
+
+- `npm run test:postgresql` dedicated validation command
+- Docker-backed disposable PostgreSQL validation using `postgres:16.6-alpine`
+- real migration bootstrap and repeated startup checks
+- unsupported future schema version failure check
+- repository persistence across pool recreation
+- real concurrent stale revision conflict checks
+- UnitOfWork commit and rollback checks
+- idempotency persistence checks
+- lock acquisition, renew, release, TTL, and concurrent owner checks
+- runtime dry-run with explicit PostgreSQL persistence configuration
+- closed pool and credential redaction checks
+
+Execution rule:
+
+- Normal `npm test` does not require Docker or PostgreSQL.
+- If Docker or OrbStack is unavailable, `npm run test:postgresql` reports the real database suite as skipped instead of failing.
+- When Docker is available, the suite starts and stops an isolated disposable database container and emits operational diagnostics.
 
 ## Non-Goals
 
@@ -280,6 +302,30 @@ npm run postgresql:smoke
 
 The smoke test verifies pool creation, health check, migration startup, composition creation, and graceful close. Normal `npm test` does not require a running PostgreSQL server.
 
+## Real Database Validation
+
+The opt-in real database validation command is:
+
+```bash
+npm run test:postgresql
+```
+
+The command uses Docker directly rather than Testcontainers. This keeps the validation path dependency-light, avoids adding another package, and still provides a disposable database for the current architecture stage. The suite uses the pinned image `postgres:16.6-alpine`, binds PostgreSQL to a random localhost port, runs migrations before composition, and stops the container after tests.
+
+Validated behavior includes:
+
+- migration startup and repeated startup
+- unsupported future schema failure
+- queue, scheduler, and execution persistence across pool recreation
+- concurrent stale revision conflicts
+- UnitOfWork commit and rollback
+- idempotency claim, completion, failure, and persistence
+- lock acquire, renew, release, TTL expiry, and concurrent acquisition
+- dry-run execution with explicit PostgreSQL persistence mode
+- failure redaction and closed-pool safeguards
+
+If Docker is not running, the command exits successfully with skipped PostgreSQL integration tests. This preserves the rule that normal development validation must not depend on local infrastructure state.
+
 ## Test Strategy
 
 Future PostgreSQL tests should remain isolated and must not depend on developer machine state.
@@ -303,7 +349,7 @@ Required test categories:
 - architecture boundary compliance
 - dry-run memory mode regression
 
-Integration tests may require an explicit environment flag or a test container strategy in a later implementation sprint. Unit tests should use mocked PostgreSQL transport/connection behavior where practical.
+Real database integration tests are now available through `npm run test:postgresql`. Unit tests continue to use mocked PostgreSQL transport/connection behavior where practical, and normal `npm test` does not start Docker.
 
 ## Production Readiness Gates
 

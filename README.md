@@ -4,7 +4,7 @@ Asteria is the foundation for an extensible AI Publishing OS: a reusable content
 
 ## Current Sprint
 
-Sprint 56 adds the concrete PostgreSQL connection and pool adapter using `pg`. In-memory persistence remains the default, SQLite remains available for explicit local/dev mode, PostgreSQL is opt-in through environment configuration, Audit/Metrics/Asset Catalog/Storage Metadata remain in-memory, and publishing remains disabled.
+Sprint 57 adds real PostgreSQL operational validation infrastructure for the existing PostgreSQL persistence adapter. In-memory persistence remains the default, SQLite remains available for explicit local/dev mode, PostgreSQL is opt-in through environment configuration, Audit/Metrics/Asset Catalog/Storage Metadata remain in-memory, and publishing remains disabled.
 
 ## Commands
 
@@ -60,6 +60,14 @@ npm run postgresql:smoke
 ```
 
 The smoke test checks pool readiness, health check, migration startup, and graceful close. Normal tests do not require PostgreSQL to be installed or running.
+
+Run the opt-in PostgreSQL real-database operational validation suite:
+
+```bash
+npm run test:postgresql
+```
+
+The PostgreSQL validation suite starts a disposable `postgres:16.6-alpine` Docker container when Docker or OrbStack is running. It validates migrations, repeated startup, unsupported schema detection, repository persistence across pool recreation, revision conflicts, UnitOfWork rollback, idempotency, locks, runtime dry-run with PostgreSQL mode, and credential redaction. If Docker is unavailable, the suite exits successfully with all PostgreSQL integration cases marked as skipped. Normal `npm test` never requires Docker or a running PostgreSQL server.
 
 Run the dry run with production AI mode only when OpenAI configuration is intentionally enabled:
 
@@ -139,7 +147,7 @@ Persistence Architecture is documented under `docs/PERSISTENCE_ARCHITECTURE.md`.
 
 Runtime persistence composition is explicit. `PersistenceCompositionFactory` creates the dry-run in-memory repository/store/lock/idempotency/UnitOfWork bundle, and runtime code injects those ports into Queue, Scheduler, Executor, Audit, Metrics, and Asset services. Services no longer choose default persistence adapters internally.
 
-Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL readiness is documented under `docs/POSTGRESQL_READINESS_PLAN.md`, Sprint 55 implements the initial PostgreSQL adapter boundary, and Sprint 56 adds the concrete `pg` connection/pool layer. Durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
+Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL readiness is documented under `docs/POSTGRESQL_READINESS_PLAN.md`, Sprint 55 implements the initial PostgreSQL adapter boundary, Sprint 56 adds the concrete `pg` connection/pool layer, and Sprint 57 adds an opt-in real-database operational validation suite. Durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
 
 SQLite migrations run on adapter startup, record applied versions in `schema_migrations`, and fail clearly if the database contains a newer unsupported schema version. No destructive rollback is performed automatically. Local backups are the operator's responsibility; copy the SQLite file only when no Asteria process is writing to it. SQLite is appropriate for local/dev and single-node proof, but concurrent production workers should wait for the PostgreSQL adapter path.
 
