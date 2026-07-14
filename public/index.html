@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Asteria</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace" aria-labelledby="app-title">
+        <header class="topbar">
+          <div>
+            <h1 id="app-title">Asteria</h1>
+            <p>Magazine generation workspace</p>
+          </div>
+          <span class="mode">Mock default</span>
+        </header>
+
+        <form id="generate-form" class="control-panel" novalidate>
+          <label class="field field-topic">
+            <span>Topic</span>
+            <textarea id="topic" name="topic" rows="3" placeholder="고양이가 밤에 뛰어다니는 이유"></textarea>
+          </label>
+
+          <label class="field">
+            <span>Magazine</span>
+            <select id="magazine" name="magazine">
+              <option value="cat">cat</option>
+              <option value="dog">dog</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Language</span>
+            <select id="language" name="language">
+              <option value="ko-KR">ko-KR</option>
+              <option value="en-US">en-US</option>
+            </select>
+          </label>
+
+          <button id="generate-button" type="submit">Generate</button>
+        </form>
+
+        <p id="form-message" class="message" role="status"></p>
+
+        <section id="result" class="result empty" aria-live="polite">
+          <div class="empty-state">
+            <h2>Ready</h2>
+            <p>Enter a topic, choose a magazine and language, then generate a preview package.</p>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

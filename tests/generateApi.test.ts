@@ -93,6 +93,19 @@ test('createAsteriaApiServer returns an HTTP server without starting it', () => 
   assert.equal(server.listening, false);
 });
 
+test('web app assets are served from the API server', async () => {
+  const server = createAsteriaApiServer();
+  const response = await invokeServer(server, {
+    method: 'GET',
+    url: '/',
+    body: ''
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.body, /<h1 id="app-title">Asteria<\/h1>/);
+  assert.match(String(response.headers['content-type']), /text\/html/);
+});
+
 function createApiResultFixture(topic: string): DryRunResult {
   return {
     topic,
@@ -107,4 +120,39 @@ function createApiResultFixture(topic: string): DryRunResult {
       observability: {}
     }
   };
+}
+
+function invokeServer(
+  server: ReturnType<typeof createAsteriaApiServer>,
+  request: { method: string; url: string; body: string }
+): Promise<{ statusCode: number; headers: Record<string, string | number | string[]>; body: string }> {
+  return new Promise((resolve) => {
+    const chunks: string[] = [];
+    const response = {
+      statusCode: 0,
+      headers: {} as Record<string, string | number | string[]>,
+      setHeader(name: string, value: string | number | readonly string[]) {
+        this.headers[name.toLowerCase()] = Array.isArray(value) ? value : String(value);
+      },
+      end(body: string) {
+        chunks.push(body);
+        resolve({
+          statusCode: this.statusCode,
+          headers: this.headers,
+          body: chunks.join('')
+        });
+      }
+    };
+    const incoming = {
+      method: request.method,
+      url: request.url,
+      async *[Symbol.asyncIterator]() {
+        if (request.body.length > 0) {
+          yield Buffer.from(request.body);
+        }
+      }
+    };
+
+    server.emit('request', incoming, response);
+  });
 }

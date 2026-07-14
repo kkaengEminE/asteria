@@ -1,4 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { extname, join, normalize, relative, resolve } from 'node:path';
 import { runMagazineDryRun, type DryRunResult } from '../magazines/runtime/index.ts';
 import {
   GenerateApiRequestError,
@@ -9,6 +11,7 @@ import {
 export interface AsteriaApiServerOptions {
   generate?: GenerateHandler;
   maxBodyBytes?: number;
+  publicDir?: string;
 }
 
 export type GenerateHandler = (request: GenerateApiRequest) => Promise<DryRunResult>;
@@ -30,11 +33,13 @@ const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
 export function createAsteriaApiServer(options: AsteriaApiServerOptions = {}): Server {
   const generate = options.generate ?? defaultGenerate;
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+  const publicDir = options.publicDir ?? join(process.cwd(), 'public');
 
   return createServer(async (request, response) => {
     await handleAsteriaApiRequest(request, response, {
       generate,
-      maxBodyBytes
+      maxBodyBytes,
+      publicDir
     });
   });
 }
@@ -89,6 +94,13 @@ async function handleAsteriaApiRequest(
   options: Required<AsteriaApiServerOptions>
 ): Promise<void> {
   const path = parsePath(request);
+
+  if (request.method === 'GET' && path !== '/generate') {
+    const staticResponse = await serveStaticAsset(path, options.publicDir);
+    writeStaticResponse(response, staticResponse);
+    return;
+  }
+
   const bodyText = request.method === 'POST'
     ? await readBodyText(request, options.maxBodyBytes)
     : '';
@@ -165,4 +177,69 @@ function writeApiResponse(response: ServerResponse, apiResponse: AsteriaApiRespo
   }
 
   response.end(JSON.stringify(apiResponse.body));
+}
+
+async function serveStaticAsset(path: string, publicDir: string): Promise<{
+  statusCode: number;
+  headers: Record<string, string>;
+  body: string;
+}> {
+  const filename = path === '/' ? 'index.html' : path.replace(/^\/+/, '');
+  const root = resolve(publicDir);
+  const filePath = resolve(root, normalize(filename));
+  const relation = relative(root, filePath);
+
+  if (relation.startsWith('..') || relation === '' || relation.includes('..')) {
+    return {
+      statusCode: 404,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8'
+      },
+      body: 'Not found'
+    };
+  }
+
+  try {
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': contentType(filePath)
+      },
+      body: await readFile(filePath, 'utf8')
+    };
+  } catch {
+    return {
+      statusCode: 404,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8'
+      },
+      body: 'Not found'
+    };
+  }
+}
+
+function contentType(filePath: string): string {
+  switch (extname(filePath)) {
+    case '.html':
+      return 'text/html; charset=utf-8';
+    case '.css':
+      return 'text/css; charset=utf-8';
+    case '.js':
+      return 'text/javascript; charset=utf-8';
+    default:
+      return 'text/plain; charset=utf-8';
+  }
+}
+
+function writeStaticResponse(
+  response: ServerResponse,
+  staticResponse: { statusCode: number; headers: Record<string, string>; body: string }
+): void {
+  response.statusCode = staticResponse.statusCode;
+
+  for (const [name, value] of Object.entries(staticResponse.headers)) {
+    response.setHeader(name, value);
+  }
+
+  response.end(staticResponse.body);
 }

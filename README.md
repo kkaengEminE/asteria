@@ -9,10 +9,37 @@ Sprint 57 adds real PostgreSQL operational validation infrastructure for the exi
 ## Commands
 
 ```bash
+npm run dev
 npm run api
 npm run dry-run
 npm test
 npm run typecheck
+```
+
+Start the Web MVP and Generate API together:
+
+```bash
+npm run dev
+```
+
+Open the browser UI at:
+
+```text
+http://127.0.0.1:3000
+```
+
+The Web MVP uses the existing `POST /generate` API and the default mock provider path, so no external AI API, database, authentication, queue execution, or publishing is required for local demos. Enter a topic, choose `cat` or `dog`, choose `ko-KR` or `en-US`, and click Generate to render the workflow status, article, summary, SEO, FAQ, selected image metadata, monetization preview, quality score, editorial review, and approval decision.
+
+Example Cat topic:
+
+```text
+고양이가 밤에 뛰어다니는 이유
+```
+
+Example Dog topic:
+
+```text
+강아지가 산책 중 냄새를 오래 맡는 이유
 ```
 
 Start the lightweight HTTP API:
