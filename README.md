@@ -9,10 +9,31 @@ Sprint 57 adds real PostgreSQL operational validation infrastructure for the exi
 ## Commands
 
 ```bash
+npm run api
 npm run dry-run
 npm test
 npm run typecheck
 ```
+
+Start the lightweight HTTP API:
+
+```bash
+npm run api
+```
+
+Generate a magazine dry-run package through the API:
+
+```bash
+curl -X POST http://127.0.0.1:3000/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "고양이가 밤에 뛰어다니는 이유",
+    "magazine": "cat",
+    "language": "ko-KR"
+  }'
+```
+
+`POST /generate` calls the existing provider-neutral `runMagazineDryRun` runtime and returns the generation result as JSON. The API adds no authentication, database, publishing, or queue execution. The CLI dry run remains unchanged.
 
 Run the dry run with a custom topic:
 
