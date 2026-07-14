@@ -108,7 +108,7 @@ Persistence Architecture is documented under `docs/PERSISTENCE_ARCHITECTURE.md`.
 
 Runtime persistence composition is explicit. `PersistenceCompositionFactory` creates the dry-run in-memory repository/store/lock/idempotency/UnitOfWork bundle, and runtime code injects those ports into Queue, Scheduler, Executor, Audit, Metrics, and Asset services. Services no longer choose default persistence adapters internally.
 
-Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL readiness is documented under `docs/POSTGRESQL_READINESS_PLAN.md`. PostgreSQL remains the production adapter target, and durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
+Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL readiness is documented under `docs/POSTGRESQL_READINESS_PLAN.md`. PostgreSQL remains the production adapter target, but implementation remains blocked until Architecture Cleanup Patch 007 is accepted. Durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
 
 SQLite migrations run on adapter startup, record applied versions in `schema_migrations`, and fail clearly if the database contains a newer unsupported schema version. No destructive rollback is performed automatically. Local backups are the operator's responsibility; copy the SQLite file only when no Asteria process is writing to it. SQLite is appropriate for local/dev and single-node proof, but concurrent production workers should wait for the PostgreSQL adapter path.
 

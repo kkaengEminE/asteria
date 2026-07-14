@@ -71,7 +71,7 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
       }
     };
 
-    return this.updateItem(item, current.revision + 1, current.revision);
+    return this.updateItem(item, current.revision);
   }
 
   async recordFailure(
@@ -88,7 +88,7 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
       failure
     };
 
-    return this.updateItem(item, current.revision + 1, current.revision);
+    return this.updateItem(item, current.revision);
   }
 
   async cancel(id: string, reason: string, revision?: RevisionCheck): Promise<Revisioned<PublishingQueueItem>> {
@@ -105,7 +105,7 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
       }
     };
 
-    return this.updateItem(item, current.revision + 1, current.revision);
+    return this.updateItem(item, current.revision);
   }
 
   async findByIdempotencyKey(key: string): Promise<Revisioned<PublishingQueueItem> | undefined> {
@@ -125,10 +125,10 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
     return record;
   }
 
-  private updateItem(item: PublishingQueueItem, revision: number, expectedRevision: number): Revisioned<PublishingQueueItem> {
+  private updateItem(item: PublishingQueueItem, expectedRevision: number): Revisioned<PublishingQueueItem> {
     const result = this.database.prepare(`
       UPDATE publishing_queue_items
-      SET status = ?, destination_type = ?, magazine_slug = ?, idempotency_key = ?, data_json = ?, revision = ?, updated_at = ?
+      SET status = ?, destination_type = ?, magazine_slug = ?, idempotency_key = ?, data_json = ?, revision = revision + 1, updated_at = ?
       WHERE id = ? AND revision = ?
     `).run(
       item.status,
@@ -136,7 +136,6 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
       stringOrNull(item.metadata?.magazineSlug),
       stringOrNull(item.metadata?.idempotencyKey),
       stringifyJson(item),
-      revision,
       item.updatedAt,
       item.id,
       expectedRevision
@@ -150,7 +149,7 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
       throw new Error(`Publishing queue item was not found: ${item.id}.`);
     }
 
-    return createRevisioned(item, revision);
+    return createRevisioned(item, expectedRevision + 1);
   }
 }
 

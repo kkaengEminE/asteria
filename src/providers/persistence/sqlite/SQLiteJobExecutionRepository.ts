@@ -24,7 +24,7 @@ export class SQLiteJobExecutionRepository implements JobExecutionRepository {
     const existing = await this.getById(execution.id);
 
     if (existing) {
-      return this.updateExecution(execution, existing.revision + 1, existing.revision);
+      return this.updateExecution(execution, existing.revision);
     }
 
     const revision = 1;
@@ -85,7 +85,7 @@ export class SQLiteJobExecutionRepository implements JobExecutionRepository {
       failure: undefined
     };
 
-    return this.updateExecution(execution, current.revision + 1, current.revision);
+    return this.updateExecution(execution, current.revision);
   }
 
   async recordFailure(
@@ -102,7 +102,7 @@ export class SQLiteJobExecutionRepository implements JobExecutionRepository {
       failure
     };
 
-    return this.updateExecution(execution, current.revision + 1, current.revision);
+    return this.updateExecution(execution, current.revision);
   }
 
   async recordSkipped(id: string, reason: string, revision?: RevisionCheck): Promise<Revisioned<ScheduledJobExecution>> {
@@ -119,7 +119,7 @@ export class SQLiteJobExecutionRepository implements JobExecutionRepository {
       }
     };
 
-    return this.updateExecution(execution, current.revision + 1, current.revision);
+    return this.updateExecution(execution, current.revision);
   }
 
   private async require(id: string): Promise<Revisioned<ScheduledJobExecution>> {
@@ -134,19 +134,17 @@ export class SQLiteJobExecutionRepository implements JobExecutionRepository {
 
   private updateExecution(
     execution: ScheduledJobExecution,
-    revision: number,
     expectedRevision: number
   ): Revisioned<ScheduledJobExecution> {
     const result = this.database.prepare(`
       UPDATE job_executions
-      SET job_id = ?, queue_item_id = ?, status = ?, data_json = ?, revision = ?, started_at = ?, completed_at = ?
+      SET job_id = ?, queue_item_id = ?, status = ?, data_json = ?, revision = revision + 1, started_at = ?, completed_at = ?
       WHERE id = ? AND revision = ?
     `).run(
       execution.jobId,
       execution.queueItemId ?? null,
       execution.status,
       stringifyJson(execution),
-      revision,
       execution.startedAt ?? null,
       execution.completedAt ?? null,
       execution.id,
@@ -161,7 +159,7 @@ export class SQLiteJobExecutionRepository implements JobExecutionRepository {
       throw new Error(`Scheduled job execution was not found: ${execution.id}.`);
     }
 
-    return createRevisioned(execution, revision);
+    return createRevisioned(execution, expectedRevision + 1);
   }
 }
 

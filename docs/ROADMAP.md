@@ -356,10 +356,10 @@ Status: Implemented with operational SQLite integration coverage for Queue, Sche
 
 Complete transaction ownership cleanup before PostgreSQL work.
 
-Status: Implemented with SchedulerService UnitOfWork adoption for queue `SCHEDULED` transition plus scheduled job creation, ScheduledJobExecutor UnitOfWork adoption for execution start/completion/idempotency/lock cleanup, SQLite atomic revision-checked updates, SQLite concurrency and rollback tests, and Architecture Review 005 documentation. PostgreSQL, publishing, external APIs, and production behavior remain disabled/deferred.
+Status: Implemented with SchedulerService UnitOfWork adoption for queue `SCHEDULED` transition plus scheduled job creation, ScheduledJobExecutor UnitOfWork adoption for execution start/completion/idempotency/lock cleanup, SQLite atomic `revision = revision + 1` updates, SQLite concurrency and rollback tests, stale execution revision coverage, and Architecture Review 005 documentation. PostgreSQL, publishing, external APIs, and production behavior remain disabled/deferred.
 
 ### PostgreSQL Readiness Planning
 
 Plan the production-target PostgreSQL adapter path without implementation.
 
-Status: Planned in `docs/POSTGRESQL_READINESS_PLAN.md` with adapter boundary, environment configuration, initial implementation scope, schema targets, transaction ownership, concurrency strategy, table-backed lock strategy, migration rules, test strategy, and production readiness gates. No PostgreSQL dependency, database, ORM, runtime behavior change, publishing, or external API call was added.
+Status: Planned in `docs/POSTGRESQL_READINESS_PLAN.md` with adapter boundary, environment configuration, initial implementation scope, schema targets, transaction ownership, concurrency strategy, table-backed lock strategy, migration rules, test strategy, and production readiness gates. PostgreSQL implementation remains blocked until Architecture Cleanup Patch 007 is accepted. No PostgreSQL dependency, database, ORM, runtime behavior change, publishing, or external API call was added.

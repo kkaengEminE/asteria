@@ -267,6 +267,47 @@ test('sqlite concurrency rejects stale queue and scheduler revisions', async () 
   persistence.sqliteConnection.close();
 });
 
+test('sqlite execution repository rejects stale execution revisions', async () => {
+  const persistence = createSQLitePersistenceComposition({ databasePath: await createDatabasePath() });
+  const execution = await persistence.jobExecutionRepository.createExecution({
+    id: 'execution-stale',
+    jobId: 'schedule-stale',
+    queueItemId: 'queue-stale',
+    status: 'RUNNING',
+    due: true,
+    attemptCount: 0,
+    retryCount: 0,
+    startedAt: '2026-07-11T00:00:00.000Z'
+  });
+
+  await persistence.jobExecutionRepository.recordFailure(execution.value.id, {
+    code: 'first_failure',
+    reason: 'First failure wins.',
+    retryable: false
+  }, {
+    expectedRevision: execution.revision
+  });
+
+  await assert.rejects(
+    () =>
+      persistence.jobExecutionRepository.recordSuccess(execution.value.id, {
+        status: 'SUCCEEDED',
+        job: createScheduledJobFixture('schedule-stale', 'queue-stale'),
+        execution: execution.value,
+        due: true,
+        attemptCount: 1,
+        retryCount: 0,
+        message: 'Stale success should not overwrite failure.'
+      }, {
+        expectedRevision: execution.revision
+      }),
+    PersistenceRevisionConflictError
+  );
+
+  assert.equal((await persistence.jobExecutionRepository.getById(execution.value.id))?.value.status, 'FAILED');
+  persistence.sqliteConnection.close();
+});
+
 test('scheduler transaction rolls back queue transition when job creation fails', async () => {
   const persistence = createSQLitePersistenceComposition({ databasePath: await createDatabasePath() });
   const setup = await createOperationalSetup(persistence);

@@ -1,6 +1,6 @@
 # Persistence Architecture Planning
 
-Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selected a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md`. Sprint 53 implements the first opt-in SQLite local/dev operational adapter without changing the default in-memory runtime mode, enabling publishing, adding PostgreSQL, adding an ORM, or persisting observational/catalog stores. Architecture Cleanup Patch 007 completes the first transaction ownership cleanup for scheduler and executor operations.
+Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selected a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md`. Sprint 53 implements the first opt-in SQLite local/dev operational adapter without changing the default in-memory runtime mode, enabling publishing, adding PostgreSQL, adding an ORM, or persisting observational/catalog stores. Architecture Cleanup Patch 007 completes the first transaction ownership cleanup for scheduler and executor operations. PostgreSQL implementation remains blocked until this cleanup passes tests, type checking, dry-run, SQLite operational validation, and architecture boundary validation.
 
 ## Goals
 
@@ -342,7 +342,7 @@ Current transaction boundaries:
 
 Audit and metrics may be written in the same transaction when correctness requires a complete operational trail. Metrics can be eventually consistent if a future adapter makes that tradeoff explicit.
 
-SQLite repositories enforce optimistic concurrency with atomic `UPDATE ... WHERE id = ? AND revision = ?` statements. A zero-row update after a known record is loaded maps to provider-neutral `PersistenceRevisionConflictError`, so stale writes are rejected by the adapter instead of relying only on pre-update reads.
+SQLite repositories enforce optimistic concurrency with atomic `UPDATE ... SET revision = revision + 1 WHERE id = ? AND revision = ?` statements. A zero-row update after a known record is loaded maps to provider-neutral `PersistenceRevisionConflictError`, so stale writes are rejected by the adapter instead of relying on unconditional updates after pre-update reads.
 
 ## Locking Strategy
 
@@ -505,8 +505,8 @@ Migration ownership belongs to persistence adapters and release operations, not 
 
 - SchedulerService adopts injected `UnitOfWork` for queue `SCHEDULED` transition plus scheduled job creation.
 - ScheduledJobExecutor adopts injected `UnitOfWork` for execution start, queue `PROCESSING` transition, execution completion, idempotency finalization, and lock release.
-- SQLite Queue, Scheduler, and Job Execution repositories now use atomic revision-checked SQL updates.
-- SQLite operational tests cover stale queue revisions, stale scheduler revisions, scheduler transaction rollback, and executor atomicity after a queue transition failure.
+- SQLite Queue, Scheduler, and Job Execution repositories now use atomic `revision = revision + 1` SQL updates guarded by expected revision.
+- SQLite operational tests cover stale queue revisions, stale scheduler revisions, stale execution revisions, scheduler transaction rollback, executor start rollback, executor completion cleanup, no leaked locks, no leaked idempotency claims, and runtime recreation regression.
 
 ## Accepted Deferrals
 
@@ -531,7 +531,7 @@ The first PostgreSQL implementation should mirror the proven operational SQLite 
 - Locks
 - UnitOfWork
 
-Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external scheduler execution remain deferred from the first PostgreSQL adapter sprint.
+Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external scheduler execution remain deferred from the first PostgreSQL adapter sprint. PostgreSQL implementation must not begin until Architecture Cleanup Patch 007 is accepted.
 
 ## Future Sprint Candidates
 

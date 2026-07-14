@@ -65,7 +65,7 @@ export class SQLiteSchedulerRepository implements SchedulerRepository {
       }
     };
 
-    return this.updateJob(job, current.revision + 1, current.revision);
+    return this.updateJob(job, current.revision);
   }
 
   async cancel(id: string, reason: string, revision?: RevisionCheck): Promise<Revisioned<ScheduledJob>> {
@@ -83,7 +83,7 @@ export class SQLiteSchedulerRepository implements SchedulerRepository {
       }
     };
 
-    return this.updateJob(job, current.revision + 1, current.revision);
+    return this.updateJob(job, current.revision);
   }
 
   async markCompleted(id: string, revision?: RevisionCheck): Promise<Revisioned<ScheduledJob>> {
@@ -100,7 +100,7 @@ export class SQLiteSchedulerRepository implements SchedulerRepository {
       }
     };
 
-    return this.updateJob(job, current.revision + 1, current.revision);
+    return this.updateJob(job, current.revision);
   }
 
   private async require(id: string): Promise<Revisioned<ScheduledJob>> {
@@ -113,12 +113,12 @@ export class SQLiteSchedulerRepository implements SchedulerRepository {
     return record;
   }
 
-  private updateJob(job: ScheduledJob, revision: number, expectedRevision: number): Revisioned<ScheduledJob> {
+  private updateJob(job: ScheduledJob, expectedRevision: number): Revisioned<ScheduledJob> {
     const result = this.database.prepare(`
       UPDATE scheduled_jobs
-      SET queue_item_id = ?, status = ?, scheduled_for = ?, data_json = ?, revision = ?, updated_at = ?
+      SET queue_item_id = ?, status = ?, scheduled_for = ?, data_json = ?, revision = revision + 1, updated_at = ?
       WHERE id = ? AND revision = ?
-    `).run(job.queueItemId, job.status, job.scheduledFor, stringifyJson(job), revision, job.updatedAt, job.id, expectedRevision);
+    `).run(job.queueItemId, job.status, job.scheduledFor, stringifyJson(job), job.updatedAt, job.id, expectedRevision);
 
     if (result.changes !== 1) {
       const row = this.database.prepare('SELECT revision FROM scheduled_jobs WHERE id = ?').get(job.id);
@@ -128,7 +128,7 @@ export class SQLiteSchedulerRepository implements SchedulerRepository {
       throw new Error(`Scheduled job was not found: ${job.id}.`);
     }
 
-    return createRevisioned(job, revision);
+    return createRevisioned(job, expectedRevision + 1);
   }
 }
 

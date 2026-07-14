@@ -4,7 +4,7 @@ This plan prepares Asteria for a future PostgreSQL operational persistence adapt
 
 ## Goal
 
-PostgreSQL is the production-target durable adapter after SQLite validates operational persistence locally.
+PostgreSQL is the production-target durable adapter after SQLite validates operational persistence locally. Implementation remains blocked until Architecture Cleanup Patch 007 passes and is accepted.
 
 The future PostgreSQL adapter should implement the same provider-neutral ports already used by SQLite:
 
@@ -269,6 +269,7 @@ Integration tests may require an explicit environment flag or a test container s
 
 Before PostgreSQL can be considered production-ready:
 
+- Architecture Cleanup Patch 007 is accepted.
 - In-memory remains default.
 - PostgreSQL mode is explicit.
 - All operational migrations are repeatable.

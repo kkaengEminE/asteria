@@ -1,6 +1,6 @@
 # Durable Persistence Adapter Plan
 
-Sprint 52 selected and designed the first durable persistence adapter path for Asteria. Sprint 53 implements the SQLite local/dev operational adapter described here. Architecture Cleanup Patch 007 clarified scheduler/executor transaction ownership after SQLite validation. PostgreSQL remains the production target, and durable Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred. PostgreSQL readiness details are documented in `docs/POSTGRESQL_READINESS_PLAN.md`.
+Sprint 52 selected and designed the first durable persistence adapter path for Asteria. Sprint 53 implements the SQLite local/dev operational adapter described here. Architecture Cleanup Patch 007 clarified scheduler/executor transaction ownership after SQLite validation. PostgreSQL remains the production target, but implementation remains blocked until Architecture Cleanup Patch 007 is accepted. Durable Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred. PostgreSQL readiness details are documented in `docs/POSTGRESQL_READINESS_PLAN.md`.
 
 ## Decision Summary
 
