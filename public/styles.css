@@ -120,6 +120,36 @@ button:disabled {
   opacity: 0.66;
 }
 
+.copy-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.secondary-button {
+  width: auto;
+  min-width: 132px;
+  border-color: #c8d2dc;
+  background: #ffffff;
+  color: #25364a;
+}
+
+.secondary-button:disabled {
+  cursor: not-allowed;
+}
+
+.copy-feedback {
+  min-height: 20px;
+  color: #526274;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.copy-feedback.error {
+  color: #a43131;
+}
+
 .message {
   min-height: 22px;
   margin: 10px 2px 14px;
@@ -211,6 +241,16 @@ summary {
   .status-row {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .copy-panel {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .secondary-button {
+    width: 100%;
   }
 
   .topbar {

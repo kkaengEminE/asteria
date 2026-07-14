@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  buildArticleCopyText,
   buildGenerateRequest,
+  buildMarkdownCopyText,
+  getCopyButtonState,
+  getCopyFeedbackState,
   getGenerateButtonState,
   renderError,
   renderResult,
@@ -48,6 +52,49 @@ test('web loading state disables generate button', () => {
   assert.deepEqual(getGenerateButtonState(false), {
     disabled: false,
     label: 'Generate'
+  });
+});
+
+test('web copy buttons are disabled before generation succeeds', () => {
+  assert.deepEqual(getCopyButtonState(false), {
+    disabled: true
+  });
+  assert.deepEqual(getCopyButtonState(true), {
+    disabled: false
+  });
+});
+
+test('web copy article includes title body and preserves Korean text', () => {
+  const text = buildArticleCopyText(createUiResultFixture());
+
+  assert.match(text, /Mock Article: 고양이가 밤에 뛰어다니는 이유/);
+  assert.match(text, /고양이는 밤에 에너지가 남거나 놀이가 부족할 때/);
+});
+
+test('web copy markdown includes reusable sections and preserves Korean text', () => {
+  const markdown = buildMarkdownCopyText(createUiResultFixture());
+
+  assert.match(markdown, /^# Mock Article: 고양이가 밤에 뛰어다니는 이유/);
+  assert.match(markdown, /## Summary/);
+  assert.match(markdown, /밤마다 우다다를 하는 이유 요약|짧은 요약/);
+  assert.match(markdown, /## Article/);
+  assert.match(markdown, /고양이는 밤에 에너지가 남거나 놀이가 부족할 때/);
+  assert.match(markdown, /## SEO/);
+  assert.match(markdown, /Title: SEO 제목/);
+  assert.match(markdown, /Description: SEO 설명/);
+  assert.match(markdown, /## FAQ/);
+  assert.match(markdown, /왜 밤에 뛰나요?/);
+  assert.match(markdown, /놀이와 활동 리듬 때문일 수 있습니다/);
+});
+
+test('web copy feedback exposes copied and failed states', () => {
+  assert.deepEqual(getCopyFeedbackState(true), {
+    className: 'copy-feedback',
+    text: 'Copied'
+  });
+  assert.deepEqual(getCopyFeedbackState(false), {
+    className: 'copy-feedback error',
+    text: 'Copy failed'
   });
 });
 

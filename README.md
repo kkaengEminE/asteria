@@ -28,7 +28,7 @@ Open the browser UI at:
 http://127.0.0.1:3000
 ```
 
-The Web MVP uses the existing `POST /generate` API and the default mock provider path, so no external AI API, database, authentication, queue execution, or publishing is required for local demos. Enter a topic, choose `cat` or `dog`, choose `ko-KR` or `en-US`, and click Generate to render the workflow status, article, summary, SEO, FAQ, selected image metadata, monetization preview, quality score, editorial review, and approval decision.
+The Web MVP uses the existing `POST /generate` API and the default mock provider path, so no external AI API, database, authentication, queue execution, or publishing is required for local demos. Enter a topic, choose `cat` or `dog`, choose `ko-KR` or `en-US`, and click Generate to render the workflow status, article, summary, SEO, FAQ, selected image metadata, monetization preview, quality score, editorial review, and approval decision. After generation succeeds, use Copy Article or Copy Markdown to reuse the article title/body or a Markdown package containing summary, article, SEO, and FAQ sections.
 
 Example Cat topic:
 

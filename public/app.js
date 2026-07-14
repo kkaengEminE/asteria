@@ -12,11 +12,17 @@ if (typeof document !== 'undefined') {
   }
 }
 
-export function initAsteriaWebApp(doc, fetchImpl = fetch) {
+export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = navigator.clipboard) {
   const form = doc.querySelector('#generate-form');
   const button = doc.querySelector('#generate-button');
   const message = doc.querySelector('#form-message');
   const result = doc.querySelector('#result');
+  const copyArticleButton = doc.querySelector('#copy-article-button');
+  const copyMarkdownButton = doc.querySelector('#copy-markdown-button');
+  const copyFeedback = doc.querySelector('#copy-feedback');
+  let currentResult = null;
+
+  setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -29,6 +35,8 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch) {
       return;
     }
 
+    currentResult = null;
+    setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
     setLoading(button, message, result, true);
 
     try {
@@ -49,13 +57,33 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch) {
       message.textContent = 'Generation complete.';
       result.className = 'result';
       result.innerHTML = renderResult(payload);
+      currentResult = payload;
+      setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, true);
     } catch (error) {
       showError(message, error instanceof Error ? error.message : 'Generate request failed.');
       result.className = 'result';
       result.innerHTML = renderError(error instanceof Error ? error.message : 'Generate request failed.');
+      currentResult = null;
+      setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
     } finally {
       setLoading(button, message, result, false);
     }
+  });
+
+  copyArticleButton?.addEventListener('click', async () => {
+    await copyGeneratedText(
+      buildArticleCopyText(currentResult),
+      clipboardImpl,
+      copyFeedback
+    );
+  });
+
+  copyMarkdownButton?.addEventListener('click', async () => {
+    await copyGeneratedText(
+      buildMarkdownCopyText(currentResult),
+      clipboardImpl,
+      copyFeedback
+    );
   });
 }
 
@@ -93,6 +121,56 @@ export function getGenerateButtonState(isLoading) {
     disabled: isLoading,
     label: isLoading ? 'Generating...' : 'Generate'
   };
+}
+
+export function getCopyButtonState(hasResult) {
+  return {
+    disabled: !hasResult
+  };
+}
+
+export function getCopyFeedbackState(success) {
+  return {
+    className: success ? 'copy-feedback' : 'copy-feedback error',
+    text: success ? 'Copied' : 'Copy failed'
+  };
+}
+
+export function buildArticleCopyText(result) {
+  const article = result?.publishingPackage?.article ?? {};
+  const title = article.title ?? 'Untitled';
+  const body = article.body ?? '';
+
+  return `${title}\n\n${body}`.trim();
+}
+
+export function buildMarkdownCopyText(result) {
+  const packageData = result?.publishingPackage ?? {};
+  const article = packageData.article ?? {};
+  const summary = packageData.summary ?? {};
+  const seo = packageData.seo ?? {};
+  const faq = Array.isArray(packageData.faq) ? packageData.faq : [];
+  const title = article.title ?? 'Untitled';
+  const summaryText = summary.text ?? article.summary ?? '';
+  const body = article.body ?? '';
+  const seoTitle = seo.metaTitle ?? '';
+  const seoDescription = seo.metaDescription ?? '';
+  const faqText = faq.length > 0
+    ? faq.map((item) => `### ${item.question ?? ''}\n\n${item.answer ?? ''}`.trim()).join('\n\n')
+    : 'No FAQ available.';
+
+  return [
+    `# ${title}`,
+    '## Summary',
+    summaryText,
+    '## Article',
+    body,
+    '## SEO',
+    `Title: ${seoTitle}`,
+    `Description: ${seoDescription}`,
+    '## FAQ',
+    faqText
+  ].join('\n\n').trim();
 }
 
 export function renderResult(result) {
@@ -162,6 +240,44 @@ function setLoading(button, message, result, isLoading) {
     result.className = 'result';
     result.innerHTML = section('Generating', '<p>Preparing article, SEO, review, image, monetization, and channel previews.</p>');
   }
+}
+
+function setCopyControls(buttons, feedback, hasResult) {
+  const state = getCopyButtonState(hasResult);
+
+  for (const copyButton of buttons) {
+    if (copyButton) {
+      copyButton.disabled = state.disabled;
+    }
+  }
+
+  if (feedback) {
+    feedback.className = 'copy-feedback';
+    feedback.textContent = '';
+  }
+}
+
+async function copyGeneratedText(text, clipboard, feedback) {
+  try {
+    if (!text || !clipboard?.writeText) {
+      throw new Error('Clipboard unavailable.');
+    }
+
+    await clipboard.writeText(text);
+    setCopyFeedback(feedback, true);
+  } catch {
+    setCopyFeedback(feedback, false);
+  }
+}
+
+function setCopyFeedback(feedback, success) {
+  if (!feedback) {
+    return;
+  }
+
+  const state = getCopyFeedbackState(success);
+  feedback.className = state.className;
+  feedback.textContent = state.text;
 }
 
 function showError(message, text) {
