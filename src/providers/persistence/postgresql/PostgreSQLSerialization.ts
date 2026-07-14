@@ -51,6 +51,14 @@ export function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+export function timestampString(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  return String(value);
+}
+
 export function rowRevision(row: PostgreSQLRow): number {
   return Number(row.revision);
 }

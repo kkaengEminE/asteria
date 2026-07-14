@@ -1,6 +1,6 @@
 import type { LockManager, LockToken } from '../../../services/persistence/index.ts';
 import type { PostgreSQLConnection, PostgreSQLRow } from './PostgreSQLConnection.ts';
-import { parseJson } from './PostgreSQLSerialization.ts';
+import { parseJson, timestampString } from './PostgreSQLSerialization.ts';
 
 export class PostgreSQLLockManager implements LockManager {
   private readonly connection: PostgreSQLConnection;
@@ -92,8 +92,8 @@ function mapLockRow(row: PostgreSQLRow): LockToken {
     key: String(row.key),
     owner: String(row.owner),
     token: String(row.token),
-    acquiredAt: String(row.acquired_at),
-    expiresAt: String(row.expires_at),
+    acquiredAt: timestampString(row.acquired_at),
+    expiresAt: timestampString(row.expires_at),
     metadata: row.metadata_json ? parseJson<Record<string, unknown>>(row.metadata_json) : undefined
   };
 }

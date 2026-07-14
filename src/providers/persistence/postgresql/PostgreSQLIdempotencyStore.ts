@@ -4,7 +4,7 @@ import type {
   PersistenceFailure
 } from '../../../services/persistence/index.ts';
 import type { PostgreSQLConnection, PostgreSQLRow } from './PostgreSQLConnection.ts';
-import { optionalString, parseJson, stringifyJson } from './PostgreSQLSerialization.ts';
+import { optionalString, parseJson, stringifyJson, timestampString } from './PostgreSQLSerialization.ts';
 
 export class PostgreSQLIdempotencyStore implements IdempotencyStore {
   private readonly connection: PostgreSQLConnection;
@@ -80,8 +80,8 @@ function mapIdempotencyRow(row: PostgreSQLRow): IdempotencyRecord {
     key: String(row.key),
     scope: String(row.scope),
     status: row.status as IdempotencyRecord['status'],
-    createdAt: String(row.created_at),
-    updatedAt: String(row.updated_at),
+    createdAt: timestampString(row.created_at),
+    updatedAt: timestampString(row.updated_at),
     resultReference: optionalString(row.result_reference),
     failure: row.failure_json ? parseJson<IdempotencyRecord['failure']>(row.failure_json) : undefined,
     metadata: row.metadata_json ? parseJson<Record<string, unknown>>(row.metadata_json) : undefined

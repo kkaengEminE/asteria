@@ -144,6 +144,7 @@ test('postgresql repositories persist queue scheduler and execution records acro
   }, {
     expectedRevision: execution.revision
   });
+  await first.persistence.publishingQueueRepository.create(createQueueItem(`${id}-queue-page-2`));
   await first.connection.close();
 
   const second = await createRealPersistence();
