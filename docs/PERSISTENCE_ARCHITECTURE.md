@@ -1,6 +1,6 @@
 # Persistence Architecture Planning
 
-Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selected a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md`. Sprint 53 implements the first opt-in SQLite local/dev operational adapter without changing the default in-memory runtime mode, enabling publishing, adding PostgreSQL, adding an ORM, or persisting observational/catalog stores. Architecture Cleanup Patch 007 completes the first transaction ownership cleanup for scheduler and executor operations. PostgreSQL implementation remains blocked until this cleanup passes tests, type checking, dry-run, SQLite operational validation, and architecture boundary validation.
+Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selected a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md`. Sprint 53 implements the first opt-in SQLite local/dev operational adapter. Architecture Cleanup Patch 007 completes transaction ownership cleanup for scheduler and executor operations. Sprint 55 implements the first PostgreSQL operational adapter boundary without changing the default in-memory runtime mode, enabling publishing, adding an ORM, or persisting observational/catalog stores.
 
 ## Goals
 
@@ -13,7 +13,7 @@ Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 tur
 
 ## Non-Goals
 
-- No PostgreSQL, Prisma, Drizzle, filesystem persistence, or production database setup.
+- No bundled PostgreSQL driver, Prisma, Drizzle, filesystem persistence, or production database setup.
 - No default durable runtime behavior.
 - No durable Audit, Metrics, Asset Catalog, or Storage Metadata persistence.
 - No production publishing enablement.
@@ -508,13 +508,21 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - SQLite Queue, Scheduler, and Job Execution repositories now use atomic `revision = revision + 1` SQL updates guarded by expected revision.
 - SQLite operational tests cover stale queue revisions, stale scheduler revisions, stale execution revisions, scheduler transaction rollback, executor start rollback, executor completion cleanup, no leaked locks, no leaked idempotency claims, and runtime recreation regression.
 
+## Implemented in Sprint 55
+
+- PostgreSQL operational persistence adapter boundary under `src/providers/persistence/postgresql`.
+- Initial PostgreSQL schema migration for `publishing_queue_items`, `scheduled_jobs`, `job_executions`, `idempotency_records`, `execution_locks`, and `schema_migrations`.
+- PostgreSQL implementations for `PublishingQueueRepository`, `SchedulerRepository`, `JobExecutionRepository`, `IdempotencyStore`, `LockManager`, and `UnitOfWork`.
+- Atomic revision-aware PostgreSQL writes for queue, scheduler, and job execution updates using `UPDATE ... SET revision = revision + 1 WHERE id = $n AND revision = $n`.
+- Runtime persistence factory support for explicit PostgreSQL composition while memory remains the default.
+- PostgreSQL adapter tests use an injected fake connection. A real PostgreSQL driver/pool remains deferred so no database dependency or network behavior is introduced by default.
+
 ## Accepted Deferrals
 
-- No PostgreSQL adapter is implemented.
 - SQLite is not the default runtime mode.
-- No production persistence configuration is added beyond local/dev SQLite selection.
+- PostgreSQL is not the default runtime mode and no bundled driver/pool is included yet.
 - No filesystem persistence is introduced.
-- No durable runtime data exists unless SQLite mode is explicitly selected.
+- No durable runtime data exists unless SQLite mode is explicitly selected or a future runtime supplies a concrete PostgreSQL connection.
 - UnitOfWork is applied only where scheduler/executor operations materially span multiple operational ports. Audit, Metrics, Asset Catalog, and Storage Metadata transaction boundaries remain deferred.
 - Compatibility wrappers remain for older storage constructor paths where removing them would create behavior churn.
 

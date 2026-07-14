@@ -362,4 +362,10 @@ Status: Implemented with SchedulerService UnitOfWork adoption for queue `SCHEDUL
 
 Plan the production-target PostgreSQL adapter path without implementation.
 
-Status: Planned in `docs/POSTGRESQL_READINESS_PLAN.md` with adapter boundary, environment configuration, initial implementation scope, schema targets, transaction ownership, concurrency strategy, table-backed lock strategy, migration rules, test strategy, and production readiness gates. PostgreSQL implementation remains blocked until Architecture Cleanup Patch 007 is accepted. No PostgreSQL dependency, database, ORM, runtime behavior change, publishing, or external API call was added.
+Status: Planned in `docs/POSTGRESQL_READINESS_PLAN.md` with adapter boundary, environment configuration, initial implementation scope, schema targets, transaction ownership, concurrency strategy, table-backed lock strategy, migration rules, test strategy, and production readiness gates. This planning work unblocked Sprint 55 after Architecture Cleanup Patch 007 was accepted. No PostgreSQL dependency, database, ORM, runtime behavior change, publishing, or external API call was added during the planning step.
+
+### Sprint 55: PostgreSQL Operational Persistence Adapter
+
+Implement the first PostgreSQL operational persistence adapter while keeping in-memory as the default runtime.
+
+Status: Implemented with `src/providers/persistence/postgresql`, injectable `PostgreSQLConnection`, schema migration definitions, PostgreSQL repositories for Publishing Queue, Scheduler, Job Execution, Idempotency, and Locks, PostgreSQL UnitOfWork transaction boundary, explicit `PersistenceCompositionFactory` support, mocked PostgreSQL integration tests, SQLite regression coverage, and architecture boundary coverage. No PostgreSQL driver, PostgreSQL database dependency, publishing, external API call, Audit persistence, Metrics persistence, Asset Catalog persistence, or Storage Metadata persistence was added.

@@ -4,7 +4,7 @@ Asteria is the foundation for an extensible AI Publishing OS: a reusable content
 
 ## Current Sprint
 
-Sprint 53 adds the first opt-in durable local/dev persistence adapter using Node's built-in SQLite support. SQLite can persist Queue, Scheduler, Job Execution, Idempotency, and Locks when explicitly selected. Architecture Cleanup Patch 007 tightened transaction ownership for Scheduler and Executor operations. In-memory persistence remains the default, Audit/Metrics/Asset Catalog/Storage Metadata remain in-memory, PostgreSQL remains the production target, and publishing remains disabled.
+Sprint 55 adds the first PostgreSQL operational persistence adapter boundary for Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. In-memory persistence remains the default, SQLite remains available for explicit local/dev mode, PostgreSQL requires explicit runtime composition, Audit/Metrics/Asset Catalog/Storage Metadata remain in-memory, and publishing remains disabled.
 
 ## Commands
 
@@ -29,6 +29,8 @@ npm run dry-run
 ```
 
 If `ASTERIA_PERSISTENCE_MODE` is omitted or set to `memory`, Asteria uses the default in-memory persistence composition. SQLite mode requires `ASTERIA_SQLITE_DATABASE_PATH`; missing paths fail before workflow execution.
+
+PostgreSQL operational persistence is available as an adapter boundary under `src/providers/persistence/postgresql`. It defines SQL, migrations, repositories, lock/idempotency behavior, and transaction composition behind the existing provider-neutral ports. No PostgreSQL driver is bundled yet, so runtime must inject a `PostgreSQLConnection` implementation explicitly; dry-run remains memory by default.
 
 Run the dry run with production AI mode only when OpenAI configuration is intentionally enabled:
 
@@ -108,7 +110,7 @@ Persistence Architecture is documented under `docs/PERSISTENCE_ARCHITECTURE.md`.
 
 Runtime persistence composition is explicit. `PersistenceCompositionFactory` creates the dry-run in-memory repository/store/lock/idempotency/UnitOfWork bundle, and runtime code injects those ports into Queue, Scheduler, Executor, Audit, Metrics, and Asset services. Services no longer choose default persistence adapters internally.
 
-Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL readiness is documented under `docs/POSTGRESQL_READINESS_PLAN.md`. PostgreSQL remains the production adapter target, but implementation remains blocked until Architecture Cleanup Patch 007 is accepted. Durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
+Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL readiness is documented under `docs/POSTGRESQL_READINESS_PLAN.md`, and Sprint 55 implements the initial PostgreSQL adapter boundary without adding a bundled database driver. Durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
 
 SQLite migrations run on adapter startup, record applied versions in `schema_migrations`, and fail clearly if the database contains a newer unsupported schema version. No destructive rollback is performed automatically. Local backups are the operator's responsibility; copy the SQLite file only when no Asteria process is writing to it. SQLite is appropriate for local/dev and single-node proof, but concurrent production workers should wait for the PostgreSQL adapter path.
 

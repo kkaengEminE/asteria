@@ -326,7 +326,7 @@ Sprint 51 migrates PublishingQueue, SchedulerService, ScheduledJobExecutor recor
 
 Architecture Cleanup Patch 006 adds `PersistenceCompositionFactory` so runtime composition owns repositories, stores, idempotency, locking, and UnitOfWork selection. Operational service constructors no longer create default persistence adapters internally. Durable adapters remain deferred, but future runtime composition can swap the persistence bundle without changing queue, scheduler, executor, audit, metrics, or asset services.
 
-Sprint 52 selected SQLite as the first local/dev durable adapter path and PostgreSQL as the production adapter target. Sprint 53 implements the SQLite operational adapter only. In-memory remains the default; SQLite is selected only when `ASTERIA_PERSISTENCE_MODE=sqlite` and `ASTERIA_SQLITE_DATABASE_PATH` are provided.
+Sprint 52 selected SQLite as the first local/dev durable adapter path and PostgreSQL as the production adapter target. Sprint 53 implements the SQLite operational adapter. Sprint 55 adds the initial PostgreSQL operational adapter boundary for Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. In-memory remains the default; SQLite is selected only when `ASTERIA_PERSISTENCE_MODE=sqlite` and `ASTERIA_SQLITE_DATABASE_PATH` are provided. PostgreSQL is selected only when runtime composition explicitly supplies a PostgreSQL persistence composition.
 
 SQLite migrations run on adapter startup, store applied versions in `schema_migrations`, and fail on unsupported future schema versions. Rollback is not automatic or destructive. SQLite is local/dev and single-node oriented; PostgreSQL remains the production target for concurrent workers and stronger operational locking.
 
@@ -334,7 +334,7 @@ Architecture Cleanup Patch 007 defines concrete transaction ownership for schedu
 
 Locking should combine optimistic concurrency for entity transitions with short-lived execution locks. SQLite repository updates use atomic `UPDATE ... SET revision = revision + 1 WHERE id = ? AND revision = ?` statements and map stale writes to provider-neutral revision conflicts. Idempotency should be scoped by operation type and entity, especially for queue enqueue, schedule creation, job execution, publisher dispatch, asset registration, and audit append.
 
-The future PostgreSQL adapter should mirror the proven SQLite operational scope first: Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. It should not expand the first PostgreSQL implementation into Audit, Metrics, Asset Catalog, Storage Metadata, publishing, or external scheduler execution. PostgreSQL implementation remains blocked until Architecture Cleanup Patch 007 is accepted.
+The PostgreSQL adapter mirrors the proven SQLite operational scope first: Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. It does not expand into Audit, Metrics, Asset Catalog, Storage Metadata, publishing, or external scheduler execution. PostgreSQL-specific SQL, migration, serialization, lock, and transaction details stay under `src/providers/persistence/postgresql`.
 
 Migration implementation is deferred to a later sprint. Future migrations should be explicit, versioned, additive where possible, and owned by persistence adapters and release operations. No migration may enable publishing automatically.
 

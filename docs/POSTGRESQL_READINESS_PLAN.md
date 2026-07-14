@@ -1,12 +1,12 @@
 # PostgreSQL Readiness Plan
 
-This plan prepares Asteria for a future PostgreSQL operational persistence adapter. It does not implement PostgreSQL, add a database dependency, enable publishing, or change runtime behavior.
+This plan prepared Asteria for the first PostgreSQL operational persistence adapter. Sprint 55 implements the adapter boundary without bundling a PostgreSQL driver, adding a database dependency, enabling publishing, or changing default runtime behavior.
 
 ## Goal
 
-PostgreSQL is the production-target durable adapter after SQLite validates operational persistence locally. Implementation remains blocked until Architecture Cleanup Patch 007 passes and is accepted.
+PostgreSQL is the production-target durable adapter after SQLite validates operational persistence locally. Architecture Cleanup Patch 007 has been accepted, and Sprint 55 implements the first adapter boundary for the proven operational scope.
 
-The future PostgreSQL adapter should implement the same provider-neutral ports already used by SQLite:
+The PostgreSQL adapter implements the same provider-neutral ports already used by SQLite:
 
 - `PublishingQueueRepository`
 - `SchedulerRepository`
@@ -16,6 +16,24 @@ The future PostgreSQL adapter should implement the same provider-neutral ports a
 - `UnitOfWork`
 
 Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred unless a later sprint explicitly expands the scope.
+
+## Sprint 55 Implementation Status
+
+Implemented:
+
+- provider-specific boundary under `src/providers/persistence/postgresql`
+- schema migrations for operational persistence tables
+- repositories for Queue, Scheduler, Job Execution, Idempotency, and Locks
+- PostgreSQL UnitOfWork boundary
+- injectable PostgreSQL connection contract
+- mocked adapter integration tests
+
+Deferred:
+
+- bundled PostgreSQL driver or pool
+- durable Audit, Metrics, Asset Catalog, and Storage Metadata
+- production publishing
+- runtime PostgreSQL default mode
 
 ## Non-Goals
 
@@ -32,7 +50,7 @@ Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred unless a lat
 Future PostgreSQL code should live under a provider adapter boundary such as:
 
 ```text
-src/providers/persistence/postgres/
+src/providers/persistence/postgresql/
 ```
 
 PostgreSQL-specific details must stay inside the adapter:
@@ -55,7 +73,7 @@ Future configuration should extend the existing persistence mode pattern.
 Suggested variables:
 
 ```text
-ASTERIA_PERSISTENCE_MODE=memory|sqlite|postgres
+ASTERIA_PERSISTENCE_MODE=memory|sqlite|postgresql
 ASTERIA_POSTGRES_CONNECTION_URL=
 ASTERIA_POSTGRES_SSL_MODE=disable|require|verify-full
 ASTERIA_POSTGRES_SCHEMA=asteria
@@ -64,7 +82,7 @@ ASTERIA_POSTGRES_SCHEMA=asteria
 Rules:
 
 - `memory` remains the default.
-- `postgres` must be explicit.
+- `postgresql` must be explicit.
 - Missing connection configuration must fail before workflow execution.
 - Production publishing must remain disabled independently of persistence mode.
 - Secrets must come from environment variables only and must not appear in dry-run output.
@@ -228,7 +246,7 @@ PostgreSQL migrations should be explicit SQL files owned by the adapter.
 Suggested layout:
 
 ```text
-src/providers/persistence/postgres/migrations/
+src/providers/persistence/postgresql/migrations/
 0001_create_operational_persistence.sql
 ```
 

@@ -32,11 +32,12 @@ export interface PersistenceComposition {
   unitOfWork: UnitOfWork;
 }
 
-export type PersistenceCompositionMode = 'memory' | 'sqlite';
+export type PersistenceCompositionMode = 'memory' | 'sqlite' | 'postgresql';
 
 export interface CreatePersistenceCompositionOptions {
   mode?: PersistenceCompositionMode;
   sqliteComposition?: PersistenceComposition;
+  postgreSQLComposition?: PersistenceComposition;
 }
 
 export function createInMemoryPersistenceComposition(): PersistenceComposition {
@@ -61,9 +62,17 @@ export function createPersistenceComposition(options: CreatePersistenceCompositi
     return createInMemoryPersistenceComposition();
   }
 
-  if (options.sqliteComposition) {
-    return options.sqliteComposition;
+  if (mode === 'sqlite') {
+    if (options.sqliteComposition) {
+      return options.sqliteComposition;
+    }
+
+    throw new Error('SQLite persistence composition requires a SQLite adapter supplied by runtime composition.');
   }
 
-  throw new Error('SQLite persistence composition requires a SQLite adapter supplied by runtime composition.');
+  if (options.postgreSQLComposition) {
+    return options.postgreSQLComposition;
+  }
+
+  throw new Error('PostgreSQL persistence composition requires a PostgreSQL adapter supplied by runtime composition.');
 }

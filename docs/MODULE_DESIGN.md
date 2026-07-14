@@ -498,7 +498,7 @@ Sprint 53 implements that SQLite local/dev operational adapter. `ASTERIA_PERSIST
 
 Architecture Cleanup Patch 007 clarifies transaction ownership before PostgreSQL work. SchedulerService uses UnitOfWork for queue `SCHEDULED` transition plus scheduled job creation, while ScheduledJobExecutor uses UnitOfWork for execution start, queue `PROCESSING` transition, execution completion, idempotency finalization, and lock release. SQLite mutable repositories now use atomic `revision = revision + 1` SQL updates guarded by expected revision.
 
-`docs/POSTGRESQL_READINESS_PLAN.md` defines the future PostgreSQL adapter scope. The first PostgreSQL implementation should stay focused on Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external scheduler execution remain out of scope for that first adapter. PostgreSQL implementation remains blocked until Architecture Cleanup Patch 007 is accepted.
+Sprint 55 implements the initial PostgreSQL adapter boundary under `src/providers/persistence/postgresql`. The implementation stays focused on Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external scheduler execution remain out of scope. The adapter uses an injectable `PostgreSQLConnection`, so no PostgreSQL driver or network dependency is introduced by default.
 
 ## `src/prompts`
 

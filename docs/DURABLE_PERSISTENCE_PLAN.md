@@ -1,6 +1,6 @@
 # Durable Persistence Adapter Plan
 
-Sprint 52 selected and designed the first durable persistence adapter path for Asteria. Sprint 53 implements the SQLite local/dev operational adapter described here. Architecture Cleanup Patch 007 clarified scheduler/executor transaction ownership after SQLite validation. PostgreSQL remains the production target, but implementation remains blocked until Architecture Cleanup Patch 007 is accepted. Durable Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred. PostgreSQL readiness details are documented in `docs/POSTGRESQL_READINESS_PLAN.md`.
+Sprint 52 selected and designed the first durable persistence adapter path for Asteria. Sprint 53 implements the SQLite local/dev operational adapter described here. Architecture Cleanup Patch 007 clarified scheduler/executor transaction ownership after SQLite validation. Sprint 55 implements the initial PostgreSQL operational adapter boundary while keeping in-memory as the default. Durable Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred. PostgreSQL readiness details are documented in `docs/POSTGRESQL_READINESS_PLAN.md`.
 
 ## Decision Summary
 
@@ -78,7 +78,7 @@ Rationale:
 - SQLite lets the project prove schema shape, migrations, repository mapping, revision checks, and test lifecycle with low setup cost.
 - PostgreSQL should remain the production design target because scheduler execution, publishing dispatch, idempotency, locking, and multi-worker processing will need stronger concurrency primitives.
 
-Sprint 53 implements the SQLite local/dev adapter using Node's built-in SQLite support. PostgreSQL is still not implemented.
+Sprint 53 implements the SQLite local/dev adapter using Node's built-in SQLite support. Sprint 55 implements the initial PostgreSQL operational adapter boundary with an injectable connection contract and no bundled database driver.
 
 ## First Implementation Scope
 
