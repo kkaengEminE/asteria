@@ -7,7 +7,7 @@ import type {
   SchedulerRepository
 } from '../../../services/persistence/index.ts';
 import type { SQLiteDatabase, SQLiteRow } from './SQLiteConnection.ts';
-import { assertRevision, createRevisioned, pageItems, parseJson, stringifyJson } from './SQLiteSerialization.ts';
+import { assertRevision, createRevisionConflict, createRevisioned, pageItems, parseJson, stringifyJson } from './SQLiteSerialization.ts';
 
 export class SQLiteSchedulerRepository implements SchedulerRepository {
   private readonly database: SQLiteDatabase;
@@ -65,7 +65,7 @@ export class SQLiteSchedulerRepository implements SchedulerRepository {
       }
     };
 
-    return this.updateJob(job, current.revision + 1);
+    return this.updateJob(job, current.revision + 1, current.revision);
   }
 
   async cancel(id: string, reason: string, revision?: RevisionCheck): Promise<Revisioned<ScheduledJob>> {
@@ -83,7 +83,7 @@ export class SQLiteSchedulerRepository implements SchedulerRepository {
       }
     };
 
-    return this.updateJob(job, current.revision + 1);
+    return this.updateJob(job, current.revision + 1, current.revision);
   }
 
   async markCompleted(id: string, revision?: RevisionCheck): Promise<Revisioned<ScheduledJob>> {
@@ -100,7 +100,7 @@ export class SQLiteSchedulerRepository implements SchedulerRepository {
       }
     };
 
-    return this.updateJob(job, current.revision + 1);
+    return this.updateJob(job, current.revision + 1, current.revision);
   }
 
   private async require(id: string): Promise<Revisioned<ScheduledJob>> {
@@ -113,14 +113,18 @@ export class SQLiteSchedulerRepository implements SchedulerRepository {
     return record;
   }
 
-  private updateJob(job: ScheduledJob, revision: number): Revisioned<ScheduledJob> {
+  private updateJob(job: ScheduledJob, revision: number, expectedRevision: number): Revisioned<ScheduledJob> {
     const result = this.database.prepare(`
       UPDATE scheduled_jobs
       SET queue_item_id = ?, status = ?, scheduled_for = ?, data_json = ?, revision = ?, updated_at = ?
-      WHERE id = ?
-    `).run(job.queueItemId, job.status, job.scheduledFor, stringifyJson(job), revision, job.updatedAt, job.id);
+      WHERE id = ? AND revision = ?
+    `).run(job.queueItemId, job.status, job.scheduledFor, stringifyJson(job), revision, job.updatedAt, job.id, expectedRevision);
 
     if (result.changes !== 1) {
+      const row = this.database.prepare('SELECT revision FROM scheduled_jobs WHERE id = ?').get(job.id);
+      if (row) {
+        throw createRevisionConflict('record', expectedRevision, Number(row.revision));
+      }
       throw new Error(`Scheduled job was not found: ${job.id}.`);
     }
 

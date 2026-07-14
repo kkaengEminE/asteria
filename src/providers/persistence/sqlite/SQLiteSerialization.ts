@@ -25,6 +25,10 @@ export function assertRevision(entityName: string, actualRevision: number, revis
   }
 }
 
+export function createRevisionConflict(entityName: string, expectedRevision: number, actualRevision: number): PersistenceRevisionConflictError {
+  return new PersistenceRevisionConflictError(entityName, expectedRevision, actualRevision);
+}
+
 export function pageItems<T>(items: T[], query: PageRequest = {}): PageResult<T> {
   const offset = query.cursor ? Number.parseInt(query.cursor.value, 10) : 0;
   const start = Number.isFinite(offset) && offset > 0 ? offset : 0;

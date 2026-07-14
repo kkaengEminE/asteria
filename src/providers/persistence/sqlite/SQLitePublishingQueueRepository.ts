@@ -11,7 +11,7 @@ import type {
   Revisioned
 } from '../../../services/persistence/index.ts';
 import type { SQLiteDatabase, SQLiteRow } from './SQLiteConnection.ts';
-import { assertRevision, createRevisioned, pageItems, parseJson, stringifyJson } from './SQLiteSerialization.ts';
+import { assertRevision, createRevisionConflict, createRevisioned, pageItems, parseJson, stringifyJson } from './SQLiteSerialization.ts';
 
 export class SQLitePublishingQueueRepository implements PublishingQueueRepository {
   private readonly database: SQLiteDatabase;
@@ -71,7 +71,7 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
       }
     };
 
-    return this.updateItem(item, current.revision + 1);
+    return this.updateItem(item, current.revision + 1, current.revision);
   }
 
   async recordFailure(
@@ -88,7 +88,7 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
       failure
     };
 
-    return this.updateItem(item, current.revision + 1);
+    return this.updateItem(item, current.revision + 1, current.revision);
   }
 
   async cancel(id: string, reason: string, revision?: RevisionCheck): Promise<Revisioned<PublishingQueueItem>> {
@@ -105,7 +105,7 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
       }
     };
 
-    return this.updateItem(item, current.revision + 1);
+    return this.updateItem(item, current.revision + 1, current.revision);
   }
 
   async findByIdempotencyKey(key: string): Promise<Revisioned<PublishingQueueItem> | undefined> {
@@ -125,11 +125,11 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
     return record;
   }
 
-  private updateItem(item: PublishingQueueItem, revision: number): Revisioned<PublishingQueueItem> {
+  private updateItem(item: PublishingQueueItem, revision: number, expectedRevision: number): Revisioned<PublishingQueueItem> {
     const result = this.database.prepare(`
       UPDATE publishing_queue_items
       SET status = ?, destination_type = ?, magazine_slug = ?, idempotency_key = ?, data_json = ?, revision = ?, updated_at = ?
-      WHERE id = ?
+      WHERE id = ? AND revision = ?
     `).run(
       item.status,
       item.destination.type,
@@ -138,10 +138,15 @@ export class SQLitePublishingQueueRepository implements PublishingQueueRepositor
       stringifyJson(item),
       revision,
       item.updatedAt,
-      item.id
+      item.id,
+      expectedRevision
     );
 
     if (result.changes !== 1) {
+      const row = this.database.prepare('SELECT revision FROM publishing_queue_items WHERE id = ?').get(item.id);
+      if (row) {
+        throw createRevisionConflict('record', expectedRevision, Number(row.revision));
+      }
       throw new Error(`Publishing queue item was not found: ${item.id}.`);
     }
 

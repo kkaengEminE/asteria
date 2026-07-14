@@ -110,7 +110,7 @@ The older core `PublishingPayload`, `PublishingResult`, and `Publisher` contract
 
 `src/services/publishingQueue` contains the Publishing Queue service. It depends on `PublishingQueueRepository`, uses an in-memory repository adapter in current runtime composition, and exposes enqueue, lookup, list, guarded status update, cancellation, and failure recording. Durable persistence is replaceable behind the repository boundary.
 
-`src/services/scheduler` contains the Scheduler service and Scheduled Job Executor. Scheduler depends on `SchedulerRepository`, uses an in-memory repository adapter in current runtime composition, and exposes schedule, reschedule, retry scheduling, cancel, list, get, and completed-job preview operations for approved queue items. It rejects invalid schedule policies, prevents duplicate active schedules, keeps completed jobs immutable, records audit events and metrics, and does not call external schedulers. The executor depends on `JobExecutionRepository`, uses `IdempotencyStore` and `LockManager` for duplicate execution prevention, checks due scheduled jobs, skips invalid jobs, moves valid queue items to `PROCESSING`, and can execute scheduled publishing previews through PublisherService. It records preview results and never calls concrete publisher adapters directly.
+`src/services/scheduler` contains the Scheduler service and Scheduled Job Executor. Scheduler depends on `SchedulerRepository`, uses runtime-composed persistence ports, and exposes schedule, reschedule, retry scheduling, cancel, list, get, and completed-job preview operations for approved queue items. It rejects invalid schedule policies, prevents duplicate active schedules, keeps completed jobs immutable, records audit events and metrics, and does not call external schedulers. SchedulerService uses injected `UnitOfWork` so the queue `SCHEDULED` transition and scheduled job creation share one transaction boundary. The executor depends on `JobExecutionRepository`, uses `IdempotencyStore` and `LockManager` for duplicate execution prevention, checks due scheduled jobs, skips invalid jobs, moves valid queue items to `PROCESSING`, and can execute scheduled publishing previews through PublisherService. ScheduledJobExecutor uses injected `UnitOfWork` for execution start, completion, idempotency finalization, and lock release. It records preview results and never calls concrete publisher adapters directly.
 
 `src/services/auditLog` contains the Audit Log service. It composes with `AuditStore`, uses an in-memory store in current runtime composition, and exposes event append, event listing, entity filtering, and event type filtering. External log sinks are future adapters behind the audit storage boundary.
 
@@ -275,7 +275,7 @@ Scheduler operations are provider-neutral. The service supports listing, lookup 
 
 The Scheduled Job Executor processes due scheduled jobs through either a supplied provider-neutral operation or a provider-neutral publish request executed by PublisherService. It must not import concrete publisher adapters, must not know about WordPress network execution, and must not publish content. Retry behavior is composed through RetryService and remains simulated/no-wait for the current foundation.
 
-The current scheduler storage is in-memory. Future persistence or platform execution should sit behind scheduler storage/executor boundaries without changing scheduler domain models.
+Scheduler and executor persistence is selected by runtime composition. In-memory remains the default, while explicit SQLite mode uses the same provider-neutral repository, idempotency, lock, and UnitOfWork ports. Future platform execution should sit behind scheduler/executor boundaries without changing scheduler domain models.
 
 ## Audit Log Boundary
 
@@ -330,7 +330,9 @@ Sprint 52 selected SQLite as the first local/dev durable adapter path and Postgr
 
 SQLite migrations run on adapter startup, store applied versions in `schema_migrations`, and fail on unsupported future schema versions. Rollback is not automatic or destructive. SQLite is local/dev and single-node oriented; PostgreSQL remains the production target for concurrent workers and stronger operational locking.
 
-Locking should combine optimistic concurrency for entity transitions with short-lived execution locks. Idempotency should be scoped by operation type and entity, especially for queue enqueue, schedule creation, job execution, publisher dispatch, asset registration, and audit append.
+Architecture Cleanup Patch 007 defines concrete transaction ownership for scheduler/executor paths: schedule creation wraps queue `SCHEDULED` transition plus scheduled job creation, and scheduled execution wraps start, queue `PROCESSING` transition, completion, idempotency finalization, and lock release where those operations materially span multiple ports.
+
+Locking should combine optimistic concurrency for entity transitions with short-lived execution locks. SQLite repository updates use atomic `UPDATE ... WHERE id = ? AND revision = ?` statements and map stale writes to provider-neutral revision conflicts. Idempotency should be scoped by operation type and entity, especially for queue enqueue, schedule creation, job execution, publisher dispatch, asset registration, and audit append.
 
 Migration implementation is deferred to a later sprint. Future migrations should be explicit, versioned, additive where possible, and owned by persistence adapters and release operations. No migration may enable publishing automatically.
 

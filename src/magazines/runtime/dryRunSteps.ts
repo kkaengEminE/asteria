@@ -23,7 +23,8 @@ export function createMagazineDryRunSteps(options: MagazineDryRunStepOptions): W
     repository: options.persistence.schedulerRepository,
     auditLog: options.auditLog,
     queue: publishingQueue,
-    metricsService: options.metricsService
+    metricsService: options.metricsService,
+    unitOfWork: options.persistence.unitOfWork
   });
   const publisherService = new PublisherService({
     auditLog: options.auditLog,
@@ -41,7 +42,8 @@ export function createMagazineDryRunSteps(options: MagazineDryRunStepOptions): W
     metricsService: options.metricsService,
     queue: publishingQueue,
     scheduler: schedulerService,
-    publisherService
+    publisherService,
+    unitOfWork: options.persistence.unitOfWork
   });
 
   return [

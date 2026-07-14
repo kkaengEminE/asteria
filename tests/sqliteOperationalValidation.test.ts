@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { test } from 'node:test';
 import type { ApprovalResult } from '../src/domain/approval/index.ts';
 import { createPublishingPackage, createTag, type PublishingPackage } from '../src/domain/content/index.ts';
+import type { PublishingQueueItem } from '../src/domain/publishingQueue/index.ts';
+import type { ScheduledJob } from '../src/domain/scheduler/index.ts';
 import { createSQLitePersistenceComposition, type SQLitePersistenceComposition } from '../src/providers/persistence/sqlite/index.ts';
 import { runMagazineDryRun } from '../src/magazines/runtime/index.ts';
 import type { LockManager, LockToken, UnitOfWork } from '../src/services/persistence/index.ts';
@@ -215,6 +217,130 @@ test('sqlite operational validation supports dry-run and quality lab mode', asyn
   }
 });
 
+test('sqlite concurrency rejects stale queue and scheduler revisions', async () => {
+  const persistence = createSQLitePersistenceComposition({ databasePath: await createDatabasePath() });
+  const setup = await createOperationalSetup(persistence);
+
+  const enqueued = await setup.queue.enqueue({
+    publishingPackage: createPackageFixture(),
+    approvalResult: createApprovalFixture('APPROVED'),
+    destination: createDestination(),
+    now: '2026-07-11T00:00:00.000Z'
+  });
+  const queueSnapshot = await persistence.publishingQueueRepository.getById(enqueued.item!.id);
+
+  await persistence.publishingQueueRepository.updateStatus(enqueued.item!.id, {
+    status: 'SCHEDULED',
+    updatedAt: '2026-07-11T00:01:00.000Z',
+    expectedRevision: queueSnapshot!.revision
+  });
+
+  await assert.rejects(
+    () =>
+      persistence.publishingQueueRepository.updateStatus(enqueued.item!.id, {
+        status: 'PROCESSING',
+        updatedAt: '2026-07-11T00:02:00.000Z',
+        expectedRevision: queueSnapshot!.revision
+      }),
+    PersistenceRevisionConflictError
+  );
+
+  const scheduled = await persistence.schedulerRepository.create(createScheduledJobFixture('schedule-concurrent', enqueued.item!.id));
+  await persistence.schedulerRepository.reschedule(scheduled.value.id, {
+    scheduledFor: '2026-07-11T03:00:00.000Z',
+    timezone: 'UTC'
+  }, {
+    expectedRevision: scheduled.revision
+  });
+
+  await assert.rejects(
+    () =>
+      persistence.schedulerRepository.reschedule(scheduled.value.id, {
+        scheduledFor: '2026-07-11T04:00:00.000Z',
+        timezone: 'UTC'
+      }, {
+        expectedRevision: scheduled.revision
+      }),
+    PersistenceRevisionConflictError
+  );
+
+  persistence.sqliteConnection.close();
+});
+
+test('scheduler transaction rolls back queue transition when job creation fails', async () => {
+  const persistence = createSQLitePersistenceComposition({ databasePath: await createDatabasePath() });
+  const setup = await createOperationalSetup(persistence);
+  const enqueued = await setup.queue.enqueue({
+    publishingPackage: createPackageFixture(),
+    approvalResult: createApprovalFixture('APPROVED'),
+    destination: createDestination(),
+    now: '2026-07-12T00:00:00.000Z'
+  });
+
+  await persistence.schedulerRepository.create(createScheduledJobFixture('schedule-1', 'other-queue-item'));
+
+  await assert.rejects(
+    () =>
+      setup.scheduler.schedule({
+        queueItem: enqueued.item!,
+        policy: {
+          scheduledFor: '2026-07-12T03:00:00.000Z',
+          timezone: 'UTC'
+        },
+        now: '2026-07-12T00:01:00.000Z'
+      }),
+    /UNIQUE|constraint/i
+  );
+
+  assert.equal((await setup.queue.getItem(enqueued.item!.id))?.status, 'APPROVED');
+  persistence.sqliteConnection.close();
+});
+
+test('executor transaction avoids leaked running execution when queue transition throws', async () => {
+  const persistence = createSQLitePersistenceComposition({ databasePath: await createDatabasePath() });
+  const job = createScheduledJobFixture('schedule-atomicity', 'queue-atomicity');
+  const queueItem = createQueueItemFixture(job.queueItemId, 'SCHEDULED');
+  const executor = new ScheduledJobExecutor({
+    scheduler: {
+      async get(id: string) {
+        return id === job.id ? job : null;
+      }
+    },
+    queue: {
+      async getItem(id: string) {
+        return id === queueItem.id ? queueItem : null;
+      },
+      async updateStatus() {
+        throw new Error('Simulated queue transition failure.');
+      },
+      async recordFailure() {
+        throw new Error('recordFailure should not be called for queue transition throw.');
+      },
+      async cancelItem() {
+        throw new Error('cancelItem should not be called.');
+      }
+    } as unknown as PublishingQueue,
+    repository: persistence.jobExecutionRepository,
+    idempotencyStore: persistence.idempotencyStore,
+    lockManager: persistence.lockManager,
+    unitOfWork: persistence.unitOfWork
+  });
+
+  const result = await executor.execute({
+    jobId: job.id,
+    now: '2026-07-13T00:00:00.000Z',
+    operation: () => ({ ok: true })
+  });
+
+  assert.equal(result.status, 'SKIPPED');
+  assert.equal(result.failure?.reason, 'Simulated queue transition failure.');
+  assert.equal(await persistence.lockManager.get(`scheduled-job:${job.id}`), undefined);
+  assert.equal(await persistence.idempotencyStore.get(`scheduled-job:${job.id}`, 'scheduled-job-execution'), undefined);
+  const executions = (await persistence.jobExecutionRepository.list({ jobId: job.id })).items.map((record) => record.value);
+  assert.deepEqual(executions.map((execution) => execution.status), ['SKIPPED']);
+  persistence.sqliteConnection.close();
+});
+
 interface OperationalMetrics {
   migrationMs: number;
   startupCount: number;
@@ -305,14 +431,16 @@ async function createOperationalSetup(persistence: PersistenceComposition) {
   });
   const scheduler = new SchedulerService({
     repository: persistence.schedulerRepository,
-    queue
+    queue,
+    unitOfWork: persistence.unitOfWork
   });
   const executor = new ScheduledJobExecutor({
     repository: persistence.jobExecutionRepository,
     idempotencyStore: persistence.idempotencyStore,
     lockManager: persistence.lockManager,
     queue,
-    scheduler
+    scheduler,
+    unitOfWork: persistence.unitOfWork
   });
 
   return {
@@ -383,6 +511,34 @@ function createDestination() {
     name: 'WordPress Preview',
     enabled: false,
     dryRunOnly: true
+  };
+}
+
+function createScheduledJobFixture(id: string, queueItemId: string): ScheduledJob {
+  return {
+    id,
+    queueItemId,
+    status: 'SCHEDULED',
+    policy: {
+      scheduledFor: '2026-07-11T02:00:00.000Z',
+      timezone: 'UTC'
+    },
+    scheduledFor: '2026-07-11T02:00:00.000Z',
+    createdAt: '2026-07-11T00:00:00.000Z',
+    updatedAt: '2026-07-11T00:00:00.000Z'
+  };
+}
+
+function createQueueItemFixture(id: string, status: PublishingQueueItem['status']): PublishingQueueItem {
+  return {
+    id,
+    status,
+    publishingPackage: createPackageFixture(),
+    approvalDecision: 'APPROVED',
+    destination: createDestination(),
+    createdAt: '2026-07-13T00:00:00.000Z',
+    updatedAt: '2026-07-13T00:00:00.000Z',
+    metadata: {}
   };
 }
 

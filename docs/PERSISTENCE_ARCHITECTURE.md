@@ -1,6 +1,6 @@
 # Persistence Architecture Planning
 
-Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selected a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md`. Sprint 53 implements the first opt-in SQLite local/dev operational adapter without changing the default in-memory runtime mode, enabling publishing, adding PostgreSQL, adding an ORM, or persisting observational/catalog stores.
+Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selected a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md`. Sprint 53 implements the first opt-in SQLite local/dev operational adapter without changing the default in-memory runtime mode, enabling publishing, adding PostgreSQL, adding an ORM, or persisting observational/catalog stores. Architecture Cleanup Patch 007 completes the first transaction ownership cleanup for scheduler and executor operations.
 
 ## Goals
 
@@ -251,7 +251,8 @@ Sprint 51 status:
 - SchedulerService composes through `SchedulerRepository`.
 - ScheduledJobExecutor composes through `JobExecutionRepository`.
 - ScheduledJobExecutor uses `IdempotencyStore` and `LockManager` for duplicate execution prevention.
-- UnitOfWork remains deferred for scheduler/queue cross-port atomicity until durable persistence exists.
+- SchedulerService uses `UnitOfWork` when scheduling moves a queue item to `SCHEDULED` and creates the corresponding scheduled job.
+- ScheduledJobExecutor uses `UnitOfWork` around execution start, queue `PROCESSING` transition, execution completion, idempotency finalization, and lock release.
 
 ### Audit
 
@@ -328,17 +329,20 @@ Persistence boundary:
 
 Transactions should be owned by application services, not domain models and not adapters.
 
-Initial transaction boundaries:
+Current transaction boundaries:
 
-- Queue enqueue: create queue item and append queue audit event.
-- Queue status update: update queue item and append audit/metrics records.
-- Schedule creation: create scheduled job, update queue status to `SCHEDULED`, append audit, record metrics.
-- Schedule cancellation: cancel job, update queue item if needed, append audit, record metrics.
-- Job execution start: claim lock, create execution record, transition queue to `PROCESSING`, append audit.
-- Job execution result: record execution result, append audit, record metrics.
-- Asset registration: register asset metadata and record storage metadata.
+- Schedule creation: update queue status to `SCHEDULED` and create the scheduled job in one `UnitOfWork` boundary. Audit and metrics remain observational after the state change.
+- Job execution start: claim idempotency, create the execution record, and transition the queue item to `PROCESSING` in one `UnitOfWork` boundary after a lock is acquired.
+- Job execution success: record the successful execution, complete the idempotency record, and release the lock in one `UnitOfWork` boundary.
+- Job execution failure: record the failed execution, update queue failure state when applicable, fail the idempotency record, and release the lock in one `UnitOfWork` boundary.
+- Job execution skip after a post-lock validation failure: fail or roll back idempotency as appropriate and release the lock before recording the skipped preview result.
+- Queue enqueue and standalone queue status updates remain single-repository operations unless a future durable adapter requires audit co-commit semantics.
+- Schedule cancellation and reschedule remain single-scheduler operations except for queue cancellation where the service already coordinates through the queue service.
+- Asset registration may use a future transaction when asset catalog and storage metadata need durable co-commit behavior.
 
 Audit and metrics may be written in the same transaction when correctness requires a complete operational trail. Metrics can be eventually consistent if a future adapter makes that tradeoff explicit.
+
+SQLite repositories enforce optimistic concurrency with atomic `UPDATE ... WHERE id = ? AND revision = ?` statements. A zero-row update after a known record is loaded maps to provider-neutral `PersistenceRevisionConflictError`, so stale writes are rejected by the adapter instead of relying only on pre-update reads.
 
 ## Locking Strategy
 
@@ -497,6 +501,13 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - ScheduledJobExecutor now avoids execution id collisions after process recreation by checking the execution repository before creating a new execution id.
 - SQLite Quality Lab mode remains compatible with local/dev persistence.
 
+## Implemented in Architecture Cleanup Patch 007
+
+- SchedulerService adopts injected `UnitOfWork` for queue `SCHEDULED` transition plus scheduled job creation.
+- ScheduledJobExecutor adopts injected `UnitOfWork` for execution start, queue `PROCESSING` transition, execution completion, idempotency finalization, and lock release.
+- SQLite Queue, Scheduler, and Job Execution repositories now use atomic revision-checked SQL updates.
+- SQLite operational tests cover stale queue revisions, stale scheduler revisions, scheduler transaction rollback, and executor atomicity after a queue transition failure.
+
 ## Accepted Deferrals
 
 - No PostgreSQL adapter is implemented.
@@ -504,7 +515,7 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - No production persistence configuration is added beyond local/dev SQLite selection.
 - No filesystem persistence is introduced.
 - No durable runtime data exists unless SQLite mode is explicitly selected.
-- UnitOfWork is not applied broadly because no current migrated operation materially requires multi-port atomicity without durable storage.
+- UnitOfWork is applied only where scheduler/executor operations materially span multiple operational ports. Audit, Metrics, Asset Catalog, and Storage Metadata transaction boundaries remain deferred.
 - Compatibility wrappers remain for older storage constructor paths where removing them would create behavior churn.
 
 ## Future Sprint Candidates

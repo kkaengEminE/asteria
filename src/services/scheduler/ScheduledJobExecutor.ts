@@ -8,7 +8,9 @@ import type { RetryPolicy } from '../../domain/retry/index.ts';
 import type {
   IdempotencyStore,
   JobExecutionRepository,
-  LockManager
+  LockManager,
+  TransactionContext,
+  UnitOfWork
 } from '../persistence/index.ts';
 import type {
   JobExecutionFailure,
@@ -37,6 +39,7 @@ export interface ScheduledJobExecutorOptions {
   retryService?: RetryService;
   publisherService?: PublisherService;
   metricsService?: MetricsService;
+  unitOfWork?: UnitOfWork;
 }
 
 export interface ExecuteScheduledJobInput<T> {
@@ -79,6 +82,7 @@ export class ScheduledJobExecutor {
   private readonly retryService: RetryService;
   private readonly publisherService?: PublisherService;
   private readonly metricsService?: MetricsService;
+  private readonly unitOfWork?: UnitOfWork;
   private nextId = 1;
 
   constructor(options: ScheduledJobExecutorOptions) {
@@ -92,6 +96,7 @@ export class ScheduledJobExecutor {
     this.retryService = options.retryService ?? new RetryService();
     this.publisherService = options.publisherService;
     this.metricsService = options.metricsService;
+    this.unitOfWork = options.unitOfWork;
   }
 
   isDue(job: ScheduledJob, now = new Date().toISOString()): boolean {
@@ -202,11 +207,6 @@ export class ScheduledJobExecutor {
       });
     }
 
-    await this.idempotencyStore.claim(idempotencyKey, 'scheduled-job-execution', {
-      jobId: job.id,
-      queueItemId: job.queueItemId
-    });
-
     let lockReleased = false;
     let idempotencyFinalized = false;
     const releaseLock = async () => {
@@ -217,11 +217,17 @@ export class ScheduledJobExecutor {
     };
     const failClaim = async (failure: JobExecutionFailure) => {
       if (!idempotencyFinalized) {
-        await this.idempotencyStore.fail(idempotencyKey, 'scheduled-job-execution', {
-          reason: failure.reason,
-          code: failure.code,
-          retryable: failure.retryable
-        });
+        try {
+          await this.idempotencyStore.fail(idempotencyKey, 'scheduled-job-execution', {
+            reason: failure.reason,
+            code: failure.code,
+            retryable: failure.retryable
+          });
+        } catch (error) {
+          if (!isMissingIdempotencyRecordError(error)) {
+            throw error;
+          }
+        }
         idempotencyFinalized = true;
       }
     };
@@ -233,41 +239,96 @@ export class ScheduledJobExecutor {
     };
 
     try {
-      const queueItem = await this.queue.getItem(job.queueItemId);
+      const start = await this.runInTransaction(async () => {
+        await this.idempotencyStore.claim(idempotencyKey, 'scheduled-job-execution', {
+          jobId: job.id,
+          queueItemId: job.queueItemId
+        });
 
-      if (!queueItem || queueItem.status !== 'SCHEDULED') {
-        const failure = {
-          code: 'invalid_queue_status',
-          reason: `Execution requires SCHEDULED queue item status. Current status: ${queueItem?.status ?? 'MISSING'}.`,
-          retryable: false
+        const queueItem = await this.queue.getItem(job.queueItemId);
+
+        if (!queueItem || queueItem.status !== 'SCHEDULED') {
+          const failure = {
+            code: 'invalid_queue_status',
+            reason: `Execution requires SCHEDULED queue item status. Current status: ${queueItem?.status ?? 'MISSING'}.`,
+            retryable: false
+          };
+
+          await failClaim(failure);
+          await releaseLock();
+
+          return {
+            status: 'invalid_queue_status' as const,
+            failure
+          };
+        }
+
+        const execution: ScheduledJobExecution = {
+          id: await this.createId(),
+          jobId: job.id,
+          queueItemId: job.queueItemId,
+          status: 'RUNNING',
+          due,
+          attemptCount: 0,
+          retryCount: 0,
+          startedAt: now,
+          metadata: input.metadata
         };
 
-        await failClaim(failure);
-        await releaseLock();
+        await this.repository.createExecution(execution);
+        const queueResult = await this.queue.updateStatus(job.queueItemId, 'PROCESSING', now);
 
+        if (queueResult.status !== 'updated') {
+          const failure = {
+            code: 'queue_transition_failed',
+            reason: queueResult.message,
+            retryable: false
+          };
+          const failedExecution = await this.finishExecution(execution, 'FAILED', failure, now);
+          await failClaim(failure);
+          await releaseLock();
+
+          return {
+            status: 'queue_transition_failed' as const,
+            execution: failedExecution,
+            queueResult,
+            failure
+          };
+        }
+
+        return {
+          status: 'started' as const,
+          execution,
+          queueResult
+        };
+      });
+
+      if (start.status === 'invalid_queue_status') {
         return this.skip<T>({
           job,
           due,
-          message: failure.reason,
-          failure,
+          message: start.failure.reason,
+          failure: start.failure,
           now,
           metadata: input.metadata
         });
       }
 
-      const execution: ScheduledJobExecution = {
-        id: await this.createId(),
-        jobId: job.id,
-        queueItemId: job.queueItemId,
-        status: 'RUNNING',
-        due,
-        attemptCount: 0,
-        retryCount: 0,
-        startedAt: now,
-        metadata: input.metadata
-      };
+      if (start.status === 'queue_transition_failed') {
+        return {
+          status: 'FAILED',
+          job,
+          execution: start.execution,
+          due,
+          attemptCount: 0,
+          retryCount: 0,
+          queueResult: start.queueResult,
+          failure: start.failure,
+          message: start.failure.reason
+        };
+      }
 
-      await this.repository.createExecution(execution);
+      const { execution, queueResult } = start;
       this.metricsService?.incrementCounter('scheduled_job_execution.started', 1, {
         metadata: {
           jobId: job.id,
@@ -285,40 +346,20 @@ export class ScheduledJobExecutor {
         }
       });
 
-      const queueResult = await this.queue.updateStatus(job.queueItemId, 'PROCESSING', now);
-
-      if (queueResult.status !== 'updated') {
-        const failure = {
-          code: 'queue_transition_failed',
-          reason: queueResult.message,
-          retryable: false
-        };
-        const failedExecution = await this.finishExecution(execution, 'FAILED', failure, now);
-        await failClaim(failure);
-        await releaseLock();
-
-        return {
-          status: 'FAILED',
-          job,
-          execution: failedExecution,
-          due,
-          attemptCount: 0,
-          retryCount: 0,
-          queueResult,
-          failure,
-          message: queueResult.message
-        };
-      }
-
       const retryResult = await this.retryService.execute(this.createExecutionOperation(input), {
         policy: input.retryPolicy,
         now: () => now
       });
 
       if (retryResult.status === 'success') {
-        const succeeded = await this.finishExecution(execution, 'SUCCEEDED', undefined, now, {
-          attemptCount: retryResult.attemptCount,
-          retryCount: retryResult.retryCount
+        const succeeded = await this.runInTransaction(async () => {
+          const finished = await this.finishExecution(execution, 'SUCCEEDED', undefined, now, {
+            attemptCount: retryResult.attemptCount,
+            retryCount: retryResult.retryCount
+          });
+          await completeClaim(finished.id);
+          await releaseLock();
+          return finished;
         });
 
         this.auditLog?.append({
@@ -343,9 +384,6 @@ export class ScheduledJobExecutor {
             jobId: job.id
           }
         });
-        await completeClaim(succeeded.id);
-        await releaseLock();
-
         return {
           status: 'SUCCEEDED',
           job,
@@ -370,15 +408,20 @@ export class ScheduledJobExecutor {
           queueItemId: job.queueItemId
         }
       });
-      const failed = await this.finishExecution(execution, 'FAILED', failure, now, {
-        attemptCount: retryResult.attemptCount,
-        retryCount: retryResult.retryCount
+      const failed = await this.runInTransaction(async () => {
+        const finished = await this.finishExecution(execution, 'FAILED', failure, now, {
+          attemptCount: retryResult.attemptCount,
+          retryCount: retryResult.retryCount
+        });
+        await this.queue.recordFailure(job.queueItemId, {
+          code: failure.code,
+          reason: failure.reason,
+          retryable: failure.retryable
+        }, now);
+        await failClaim(failure);
+        await releaseLock();
+        return finished;
       });
-      await this.queue.recordFailure(job.queueItemId, {
-        code: failure.code,
-        reason: failure.reason,
-        retryable: failure.retryable
-      }, now);
       this.auditLog?.append({
         type: 'JOB_EXECUTION_FAILED',
         actor: createExecutorActor(),
@@ -408,8 +451,10 @@ export class ScheduledJobExecutor {
       };
     } catch (error) {
       const failure = createFailureFromUnknownError(error);
-      await failClaim(failure);
-      await releaseLock();
+      await this.runInTransaction(async () => {
+        await failClaim(failure);
+        await releaseLock();
+      });
       return this.skip<T>({
         job,
         due,
@@ -535,6 +580,19 @@ export class ScheduledJobExecutor {
       }
     }
   }
+
+  private async runInTransaction<T>(callback: (context: TransactionContext) => Promise<T>): Promise<T> {
+    if (this.unitOfWork) {
+      return this.unitOfWork.runInTransaction(callback);
+    }
+
+    return callback({
+      id: 'scheduled-job-executor-inline-transaction',
+      metadata: {
+        fallback: true
+      }
+    });
+  }
 }
 
 class ScheduledJobExecutionStorageRepositoryAdapter implements JobExecutionRepository {
@@ -653,6 +711,10 @@ function createFailureFromUnknownError(error: unknown): JobExecutionFailure {
     reason: error instanceof Error ? error.message : String(error),
     retryable: candidate.retryable ?? false
   };
+}
+
+function isMissingIdempotencyRecordError(error: unknown): boolean {
+  return error instanceof Error && /Idempotency record not found/i.test(error.message);
 }
 
 function createExecutorActor() {

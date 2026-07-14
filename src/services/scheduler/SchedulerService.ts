@@ -9,7 +9,7 @@ import type { PublishingQueueItem } from '../../domain/publishingQueue/index.ts'
 import type { PublishingQueue } from '../publishingQueue/index.ts';
 import type { MetricsService } from '../metrics/index.ts';
 import { RetryService } from '../retry/index.ts';
-import type { SchedulerRepository } from '../persistence/index.ts';
+import type { TransactionContext, SchedulerRepository, UnitOfWork } from '../persistence/index.ts';
 
 export interface ScheduleJobInput {
   queueItem: PublishingQueueItem;
@@ -45,6 +45,7 @@ export interface SchedulerServiceOptions {
   auditLog?: AuditLog;
   queue?: PublishingQueue;
   metricsService?: MetricsService;
+  unitOfWork?: UnitOfWork;
 }
 
 export class InMemorySchedulerStorage implements SchedulerStorage {
@@ -68,6 +69,7 @@ export class SchedulerService {
   private readonly auditLog?: AuditLog;
   private readonly queue?: PublishingQueue;
   private readonly metricsService?: MetricsService;
+  private readonly unitOfWork?: UnitOfWork;
   private readonly retryService = new RetryService();
   private nextId = 1;
 
@@ -77,6 +79,7 @@ export class SchedulerService {
     this.auditLog = options.auditLog;
     this.queue = options.queue;
     this.metricsService = options.metricsService;
+    this.unitOfWork = options.unitOfWork;
   }
 
   async schedule(input: ScheduleJobInput): Promise<ScheduleResult> {
@@ -133,9 +136,28 @@ export class SchedulerService {
     }
 
     const now = input.now ?? new Date().toISOString();
-    const queueResult = this.queue
-      ? await this.queue.updateStatus(input.queueItem.id, 'SCHEDULED', now)
-      : undefined;
+    const job: ScheduledJob = {
+      id: this.createId(),
+      queueItemId: input.queueItem.id,
+      status: 'SCHEDULED',
+      policy,
+      scheduledFor: policy.scheduledFor,
+      createdAt: now,
+      updatedAt: now,
+      metadata: input.metadata
+    };
+    const queueResult = await this.runInTransaction(async () => {
+      const result = this.queue
+        ? await this.queue.updateStatus(input.queueItem.id, 'SCHEDULED', now)
+        : undefined;
+
+      if (result && result.status !== 'updated') {
+        return result;
+      }
+
+      await this.repository.create(job);
+      return result;
+    });
 
     if (queueResult && queueResult.status !== 'updated') {
       this.metricsService?.recordFailure('scheduler.rejected', queueResult.message, {
@@ -150,19 +172,6 @@ export class SchedulerService {
         operationState: await this.createOperationState()
       };
     }
-
-    const job: ScheduledJob = {
-      id: this.createId(),
-      queueItemId: input.queueItem.id,
-      status: 'SCHEDULED',
-      policy,
-      scheduledFor: policy.scheduledFor,
-      createdAt: now,
-      updatedAt: now,
-      metadata: input.metadata
-    };
-
-    await this.repository.create(job);
     this.metricsService?.incrementCounter('scheduler.scheduled', 1, {
       metadata: {
         jobId: job.id,
@@ -547,6 +556,19 @@ export class SchedulerService {
         lookupSucceeded: true
       })
     };
+  }
+
+  private async runInTransaction<T>(callback: (context: TransactionContext) => Promise<T>): Promise<T> {
+    if (this.unitOfWork) {
+      return this.unitOfWork.runInTransaction(callback);
+    }
+
+    return callback({
+      id: 'scheduler-inline-transaction',
+      metadata: {
+        fallback: true
+      }
+    });
   }
 }
 
