@@ -496,6 +496,10 @@ Sprint 52 adds durable adapter planning without implementation. The planned firs
 
 Sprint 53 implements that SQLite local/dev operational adapter. `ASTERIA_PERSISTENCE_MODE=sqlite` plus `ASTERIA_SQLITE_DATABASE_PATH` selects it in runtime composition. `memory` remains the default mode. PostgreSQL remains the production target for future concurrent worker deployments.
 
+Architecture Cleanup Patch 007 clarifies transaction ownership before PostgreSQL work. SchedulerService uses UnitOfWork for queue `SCHEDULED` transition plus scheduled job creation, while ScheduledJobExecutor uses UnitOfWork for execution start, queue `PROCESSING` transition, execution completion, idempotency finalization, and lock release. SQLite mutable repositories now use atomic revision-checked SQL updates.
+
+`docs/POSTGRESQL_READINESS_PLAN.md` defines the future PostgreSQL adapter scope. The first PostgreSQL implementation should stay focused on Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external scheduler execution remain out of scope for that first adapter.
+
 ## `src/prompts`
 
 Contains prompt management logic:

@@ -4,7 +4,7 @@ Asteria is the foundation for an extensible AI Publishing OS: a reusable content
 
 ## Current Sprint
 
-Sprint 53 adds the first opt-in durable local/dev persistence adapter using Node's built-in SQLite support. SQLite can persist Queue, Scheduler, Job Execution, Idempotency, and Locks when explicitly selected. In-memory persistence remains the default, Audit/Metrics/Asset Catalog/Storage Metadata remain in-memory, PostgreSQL remains the production target, and publishing remains disabled.
+Sprint 53 adds the first opt-in durable local/dev persistence adapter using Node's built-in SQLite support. SQLite can persist Queue, Scheduler, Job Execution, Idempotency, and Locks when explicitly selected. Architecture Cleanup Patch 007 tightened transaction ownership for Scheduler and Executor operations. In-memory persistence remains the default, Audit/Metrics/Asset Catalog/Storage Metadata remain in-memory, PostgreSQL remains the production target, and publishing remains disabled.
 
 ## Commands
 
@@ -84,7 +84,7 @@ Asset Library sits above StorageProvider. It registers assets, stores or retriev
 
 Publishing Queue sits between editorial approval and future publisher execution. It stores provider-neutral queue items through `PublishingQueueRepository`, uses the in-memory repository in current runtime composition, records approval decisions and destinations, rejects `NEEDS_REVIEW`, `REJECTED`, or missing approval packages, audits queue rejections, enforces explicit status transition rules, and does not invoke publisher adapters during dry-run queue preview.
 
-Scheduler Operations sit after Publishing Queue. SchedulerService composes through `SchedulerRepository` with an in-memory runtime adapter and can create, list, get, reschedule, retry scheduling, cancel, and mark jobs completed for operational preview. It prevents duplicate active jobs, rejects invalid schedules, keeps completed jobs immutable, emits scheduler audit events, records scheduler metrics, and displays operational state in dry-run output. It does not run cron, call external schedulers, publish content, or introduce durable persistence.
+Scheduler Operations sit after Publishing Queue. SchedulerService composes through `SchedulerRepository` with runtime-selected persistence and can create, list, get, reschedule, retry scheduling, cancel, and mark jobs completed for operational preview. It prevents duplicate active jobs, rejects invalid schedules, keeps completed jobs immutable, emits scheduler audit events, records scheduler metrics, and displays operational state in dry-run output. Scheduling uses UnitOfWork so the queue `SCHEDULED` transition and scheduled job creation share one transaction boundary when durable persistence is selected. It does not run cron, call external schedulers, or publish content.
 
 Scheduled Job Executor sits after Scheduler. It checks due status, skips future/cancelled/invalid jobs, records executions through `JobExecutionRepository`, uses `IdempotencyStore` and `LockManager` for duplicate execution prevention, moves valid queue items to `PROCESSING`, and can execute scheduled publishing previews through PublisherService without transitioning to `PUBLISHED`. It uses RetryService for recoverable execution failures and does not call WordPress or any network publisher adapter.
 
@@ -108,7 +108,7 @@ Persistence Architecture is documented under `docs/PERSISTENCE_ARCHITECTURE.md`.
 
 Runtime persistence composition is explicit. `PersistenceCompositionFactory` creates the dry-run in-memory repository/store/lock/idempotency/UnitOfWork bundle, and runtime code injects those ports into Queue, Scheduler, Executor, Audit, Metrics, and Asset services. Services no longer choose default persistence adapters internally.
 
-Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL remains the production adapter target, and durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
+Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL readiness is documented under `docs/POSTGRESQL_READINESS_PLAN.md`. PostgreSQL remains the production adapter target, and durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
 
 SQLite migrations run on adapter startup, record applied versions in `schema_migrations`, and fail clearly if the database contains a newer unsupported schema version. No destructive rollback is performed automatically. Local backups are the operator's responsibility; copy the SQLite file only when no Asteria process is writing to it. SQLite is appropriate for local/dev and single-node proof, but concurrent production workers should wait for the PostgreSQL adapter path.
 

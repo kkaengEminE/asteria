@@ -518,6 +518,21 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - UnitOfWork is applied only where scheduler/executor operations materially span multiple operational ports. Audit, Metrics, Asset Catalog, and Storage Metadata transaction boundaries remain deferred.
 - Compatibility wrappers remain for older storage constructor paths where removing them would create behavior churn.
 
+## PostgreSQL Readiness
+
+`docs/POSTGRESQL_READINESS_PLAN.md` records the production-target adapter scope after SQLite validation and transaction ownership cleanup.
+
+The first PostgreSQL implementation should mirror the proven operational SQLite scope:
+
+- Queue
+- Scheduler
+- Job Execution
+- Idempotency
+- Locks
+- UnitOfWork
+
+Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external scheduler execution remain deferred from the first PostgreSQL adapter sprint.
+
 ## Future Sprint Candidates
 
 1. SQLite Operational Persistence Adapter Sprint: add first durable local/dev adapter for queue, scheduler, execution, idempotency, and locks.

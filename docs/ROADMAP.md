@@ -351,3 +351,15 @@ Status: Implemented with `src/providers/persistence/sqlite`, initial schema migr
 Validate SQLite operational behavior under realistic runtime scenarios without adding new persistence features.
 
 Status: Implemented with operational SQLite integration coverage for Queue, Scheduler, ScheduledJobExecutor, RetryService, IdempotencyStore, LockManager, and UnitOfWork. Validation covers queue enqueue, queue status transitions, scheduling, rescheduling, execution, duplicate execution prevention, retry after recoverable failure, lock expiration, stale revision conflicts, transaction rollback, restart with an existing SQLite database, repeated startup migration, persistence across runtime recreation, SQLite dry-run mode, and SQLite Quality Lab mode. ScheduledJobExecutor was hardened to avoid execution id collisions after process recreation. Publishing, PostgreSQL, external APIs, and new persistence features remain disabled/deferred.
+
+### Architecture Cleanup Patch 007
+
+Complete transaction ownership cleanup before PostgreSQL work.
+
+Status: Implemented with SchedulerService UnitOfWork adoption for queue `SCHEDULED` transition plus scheduled job creation, ScheduledJobExecutor UnitOfWork adoption for execution start/completion/idempotency/lock cleanup, SQLite atomic revision-checked updates, SQLite concurrency and rollback tests, and Architecture Review 005 documentation. PostgreSQL, publishing, external APIs, and production behavior remain disabled/deferred.
+
+### PostgreSQL Readiness Planning
+
+Plan the production-target PostgreSQL adapter path without implementation.
+
+Status: Planned in `docs/POSTGRESQL_READINESS_PLAN.md` with adapter boundary, environment configuration, initial implementation scope, schema targets, transaction ownership, concurrency strategy, table-backed lock strategy, migration rules, test strategy, and production readiness gates. No PostgreSQL dependency, database, ORM, runtime behavior change, publishing, or external API call was added.

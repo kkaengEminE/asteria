@@ -303,7 +303,7 @@ Metrics must not contain secrets or provider SDK response objects. They are summ
 
 ## Persistence Boundary
 
-Persistence is implemented through provider-neutral ports plus in-memory adapters for default runtime services. SQLite operational persistence is available only as an explicit local/dev adapter. The authoritative architecture document is `docs/PERSISTENCE_ARCHITECTURE.md`; the durable adapter plan is `docs/DURABLE_PERSISTENCE_PLAN.md`.
+Persistence is implemented through provider-neutral ports plus in-memory adapters for default runtime services. SQLite operational persistence is available only as an explicit local/dev adapter. The authoritative architecture document is `docs/PERSISTENCE_ARCHITECTURE.md`; the durable adapter plan is `docs/DURABLE_PERSISTENCE_PLAN.md`; PostgreSQL readiness planning is documented in `docs/POSTGRESQL_READINESS_PLAN.md`.
 
 Persistence enters Asteria through repository ports and future adapters, not through domain models, provider SDK records, workflow internals, or direct database access from runtime steps.
 
@@ -333,6 +333,8 @@ SQLite migrations run on adapter startup, store applied versions in `schema_migr
 Architecture Cleanup Patch 007 defines concrete transaction ownership for scheduler/executor paths: schedule creation wraps queue `SCHEDULED` transition plus scheduled job creation, and scheduled execution wraps start, queue `PROCESSING` transition, completion, idempotency finalization, and lock release where those operations materially span multiple ports.
 
 Locking should combine optimistic concurrency for entity transitions with short-lived execution locks. SQLite repository updates use atomic `UPDATE ... WHERE id = ? AND revision = ?` statements and map stale writes to provider-neutral revision conflicts. Idempotency should be scoped by operation type and entity, especially for queue enqueue, schedule creation, job execution, publisher dispatch, asset registration, and audit append.
+
+The future PostgreSQL adapter should mirror the proven SQLite operational scope first: Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. It should not expand the first PostgreSQL implementation into Audit, Metrics, Asset Catalog, Storage Metadata, publishing, or external scheduler execution.
 
 Migration implementation is deferred to a later sprint. Future migrations should be explicit, versioned, additive where possible, and owned by persistence adapters and release operations. No migration may enable publishing automatically.
 
