@@ -13,6 +13,10 @@ import type {
   SQLitePersistenceComposition,
   SQLitePersistenceEnvironment
 } from '../../providers/persistence/sqlite/index.ts';
+import type {
+  PostgreSQLPersistenceComposition,
+  PostgreSQLPersistenceEnvironment
+} from '../../providers/persistence/postgresql/index.ts';
 import {
   CoupangAffiliateProvider,
   createCoupangAffiliateConfigFromEnv,
@@ -57,7 +61,7 @@ export interface MagazineDryRunOptions {
   affiliateMode?: MagazineDryRunAffiliateMode;
   coupangEnv?: CoupangEnvironment;
   coupangTransport?: CoupangAffiliateTransport;
-  persistenceEnv?: SQLitePersistenceEnvironment;
+  persistenceEnv?: MagazinePersistenceEnvironment;
   persistence?: PersistenceComposition;
   registry?: ProviderRegistry;
   registerMockProviders?: boolean;
@@ -65,6 +69,7 @@ export interface MagazineDryRunOptions {
 
 export type MagazineDryRunAIMode = 'mock' | 'openai' | 'gemini';
 export type MagazineDryRunAffiliateMode = 'mock' | 'coupang';
+type MagazinePersistenceEnvironment = SQLitePersistenceEnvironment & PostgreSQLPersistenceEnvironment;
 
 export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Promise<DryRunResult> {
   const topic = options.topic ?? 'indoor enrichment for cats';
@@ -164,7 +169,7 @@ export async function runMagazineDryRun(options: MagazineDryRunOptions = {}): Pr
       error: describeError(error)
     };
   } finally {
-    closePersistence(ownedPersistence);
+    await closePersistence(ownedPersistence);
   }
 }
 
@@ -259,7 +264,27 @@ export function registerMagazineDryRunMockProviders(
   }
 }
 
-async function createMagazineRuntimePersistence(env: SQLitePersistenceEnvironment = process.env): Promise<PersistenceComposition> {
+async function createMagazineRuntimePersistence(env: MagazinePersistenceEnvironment = process.env): Promise<PersistenceComposition> {
+  const requestedMode = env.ASTERIA_PERSISTENCE_MODE;
+
+  if (requestedMode === 'postgresql' || requestedMode === 'postgres') {
+    const {
+      createPostgreSQLPersistenceConfigFromEnv,
+      createPostgreSQLPersistenceComposition,
+      createPostgreSQLPoolConnection
+    } = await import('../../providers/persistence/postgresql/index.ts');
+    const config = createPostgreSQLPersistenceConfigFromEnv(env);
+    const connection = createPostgreSQLPoolConnection(config);
+    const postgreSQLComposition = await createPostgreSQLPersistenceComposition({
+      connection
+    });
+
+    return createPersistenceComposition({
+      mode: 'postgresql',
+      postgreSQLComposition
+    });
+  }
+
   const { createSQLitePersistenceConfigFromEnv } = await import('../../providers/persistence/sqlite/SQLiteConfig.ts');
   const config = createSQLitePersistenceConfigFromEnv(env);
 
@@ -279,13 +304,16 @@ async function createMagazineRuntimePersistence(env: SQLitePersistenceEnvironmen
   });
 }
 
-function closePersistence(persistence: PersistenceComposition | undefined): void {
+async function closePersistence(persistence: PersistenceComposition | undefined): Promise<void> {
   if (!persistence) {
     return;
   }
 
   const sqlitePersistence = persistence as Partial<SQLitePersistenceComposition>;
   sqlitePersistence.sqliteConnection?.close();
+
+  const postgreSQLPersistence = persistence as Partial<PostgreSQLPersistenceComposition>;
+  await postgreSQLPersistence.postgreSQLConnection?.close?.();
 }
 
 function describeError(error: unknown): string {

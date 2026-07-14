@@ -1,6 +1,7 @@
 # Persistence Architecture Planning
 
 Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 turned that architecture into provider-neutral TypeScript ports. Sprint 51 migrated existing in-memory operational services onto those ports. Architecture Cleanup Patch 006 centralized runtime persistence composition. Sprint 52 selected a durable adapter path in `docs/DURABLE_PERSISTENCE_PLAN.md`. Sprint 53 implements the first opt-in SQLite local/dev operational adapter. Architecture Cleanup Patch 007 completes transaction ownership cleanup for scheduler and executor operations. Sprint 55 implements the first PostgreSQL operational adapter boundary without changing the default in-memory runtime mode, enabling publishing, adding an ORM, or persisting observational/catalog stores.
+Sprint 56 adds the concrete PostgreSQL connection/pool adapter using `pg` without changing the default in-memory runtime mode, enabling publishing, adding an ORM, or persisting observational/catalog stores.
 
 ## Goals
 
@@ -13,7 +14,7 @@ Sprint 49 defined the future persistence architecture for Asteria. Sprint 50 tur
 
 ## Non-Goals
 
-- No bundled PostgreSQL driver, Prisma, Drizzle, filesystem persistence, or production database setup.
+- No Prisma, Drizzle, filesystem persistence, or production database setup.
 - No default durable runtime behavior.
 - No durable Audit, Metrics, Asset Catalog, or Storage Metadata persistence.
 - No production publishing enablement.
@@ -515,14 +516,22 @@ Migration ownership belongs to persistence adapters and release operations, not 
 - PostgreSQL implementations for `PublishingQueueRepository`, `SchedulerRepository`, `JobExecutionRepository`, `IdempotencyStore`, `LockManager`, and `UnitOfWork`.
 - Atomic revision-aware PostgreSQL writes for queue, scheduler, and job execution updates using `UPDATE ... SET revision = revision + 1 WHERE id = $n AND revision = $n`.
 - Runtime persistence factory support for explicit PostgreSQL composition while memory remains the default.
-- PostgreSQL adapter tests use an injected fake connection. A real PostgreSQL driver/pool remains deferred so no database dependency or network behavior is introduced by default.
+- PostgreSQL adapter tests use an injected fake connection. A real PostgreSQL driver/pool remains deferred from Sprint 55 and is added in Sprint 56.
+
+## Implemented in Sprint 56
+
+- `pg` selected as the minimal production-suitable PostgreSQL driver.
+- `PostgreSQLPoolConnection` implements `PostgreSQLConnection` with pool query execution, transaction begin/commit/rollback, health check, idempotent close, and redacted driver errors.
+- Runtime composition can select PostgreSQL only when `ASTERIA_PERSISTENCE_MODE=postgresql` and `ASTERIA_POSTGRESQL_URL` are provided.
+- PostgreSQL UnitOfWork transaction participation is supported through adapter-local transaction context routing.
+- Optional smoke test command `npm run postgresql:smoke` is available for isolated database verification.
 
 ## Accepted Deferrals
 
 - SQLite is not the default runtime mode.
-- PostgreSQL is not the default runtime mode and no bundled driver/pool is included yet.
+- PostgreSQL is not the default runtime mode and requires explicit environment configuration.
 - No filesystem persistence is introduced.
-- No durable runtime data exists unless SQLite mode is explicitly selected or a future runtime supplies a concrete PostgreSQL connection.
+- No durable runtime data exists unless SQLite mode is explicitly selected or PostgreSQL mode is explicitly configured.
 - UnitOfWork is applied only where scheduler/executor operations materially span multiple operational ports. Audit, Metrics, Asset Catalog, and Storage Metadata transaction boundaries remain deferred.
 - Compatibility wrappers remain for older storage constructor paths where removing them would create behavior churn.
 
@@ -539,7 +548,7 @@ The first PostgreSQL implementation should mirror the proven operational SQLite 
 - Locks
 - UnitOfWork
 
-Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external scheduler execution remain deferred from the first PostgreSQL adapter sprint. PostgreSQL implementation must not begin until Architecture Cleanup Patch 007 is accepted.
+Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external scheduler execution remain deferred from the first PostgreSQL adapter sequence.
 
 ## Future Sprint Candidates
 
@@ -547,4 +556,4 @@ Audit, Metrics, Asset Catalog, Storage Metadata, publishing, and external schedu
 2. Durable AuditStore Sprint: add durable append-only audit storage behind AuditLog after async write direction is confirmed.
 3. Durable MetricsStore Sprint: decide whether metrics are stored as durable events or exported asynchronously.
 4. Asset Catalog Persistence Sprint: add durable asset metadata catalog behind AssetLibrary.
-5. PostgreSQL Operational Persistence Adapter Sprint: implement the production-target adapter after SQLite validates schema and repository behavior.
+5. PostgreSQL Real Database Validation Sprint: validate the production-target adapter against an isolated PostgreSQL database.

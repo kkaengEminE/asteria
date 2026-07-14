@@ -1,6 +1,6 @@
 # Durable Persistence Adapter Plan
 
-Sprint 52 selected and designed the first durable persistence adapter path for Asteria. Sprint 53 implements the SQLite local/dev operational adapter described here. Architecture Cleanup Patch 007 clarified scheduler/executor transaction ownership after SQLite validation. Sprint 55 implements the initial PostgreSQL operational adapter boundary while keeping in-memory as the default. Durable Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred. PostgreSQL readiness details are documented in `docs/POSTGRESQL_READINESS_PLAN.md`.
+Sprint 52 selected and designed the first durable persistence adapter path for Asteria. Sprint 53 implements the SQLite local/dev operational adapter described here. Architecture Cleanup Patch 007 clarified scheduler/executor transaction ownership after SQLite validation. Sprint 55 implements the initial PostgreSQL operational adapter boundary while keeping in-memory as the default. Sprint 56 adds the concrete `pg` connection/pool adapter for opt-in PostgreSQL runtime composition. Durable Audit, Metrics, Asset Catalog, and Storage Metadata remain deferred. PostgreSQL readiness details are documented in `docs/POSTGRESQL_READINESS_PLAN.md`.
 
 ## Decision Summary
 
@@ -78,7 +78,7 @@ Rationale:
 - SQLite lets the project prove schema shape, migrations, repository mapping, revision checks, and test lifecycle with low setup cost.
 - PostgreSQL should remain the production design target because scheduler execution, publishing dispatch, idempotency, locking, and multi-worker processing will need stronger concurrency primitives.
 
-Sprint 53 implements the SQLite local/dev adapter using Node's built-in SQLite support. Sprint 55 implements the initial PostgreSQL operational adapter boundary with an injectable connection contract and no bundled database driver.
+Sprint 53 implements the SQLite local/dev adapter using Node's built-in SQLite support. Sprint 55 implements the initial PostgreSQL operational adapter boundary with an injectable connection contract. Sprint 56 selects `pg` and adds the concrete PostgreSQL pool connection while keeping PostgreSQL opt-in.
 
 ## First Implementation Scope
 

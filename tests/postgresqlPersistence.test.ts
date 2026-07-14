@@ -470,6 +470,10 @@ class FakePostgreSQLConnection implements PostgreSQLConnection {
     }
   }
 
+  async healthCheck(): Promise<boolean> {
+    return true;
+  }
+
   schemaVersions(): number[] {
     return [...this.tables.migrations.keys()].sort((left, right) => left - right);
   }

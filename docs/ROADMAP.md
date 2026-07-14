@@ -369,3 +369,15 @@ Status: Planned in `docs/POSTGRESQL_READINESS_PLAN.md` with adapter boundary, en
 Implement the first PostgreSQL operational persistence adapter while keeping in-memory as the default runtime.
 
 Status: Implemented with `src/providers/persistence/postgresql`, injectable `PostgreSQLConnection`, schema migration definitions, PostgreSQL repositories for Publishing Queue, Scheduler, Job Execution, Idempotency, and Locks, PostgreSQL UnitOfWork transaction boundary, explicit `PersistenceCompositionFactory` support, mocked PostgreSQL integration tests, SQLite regression coverage, and architecture boundary coverage. No PostgreSQL driver, PostgreSQL database dependency, publishing, external API call, Audit persistence, Metrics persistence, Asset Catalog persistence, or Storage Metadata persistence was added.
+
+### Architecture Review 006: Production Persistence Readiness
+
+Review production persistence readiness after Sprint 55.
+
+Status: Completed with health score 87 / 100. Recommendation was HOLD for production persistence enablement and GO for the concrete PostgreSQL connection/pool adapter sprint.
+
+### Sprint 56: PostgreSQL Connection and Pool Adapter
+
+Implement the concrete PostgreSQL connection and pool layer while keeping memory as the default runtime.
+
+Status: Implemented with `pg` driver selection, `PostgreSQLPoolConnection`, parameterized query execution, transaction begin/commit/rollback, transaction-scoped query routing, health check, idempotent close, redacted driver errors, explicit env configuration through `ASTERIA_PERSISTENCE_MODE=postgresql` and `ASTERIA_POSTGRESQL_URL`, runtime composition support, mocked pool tests, and optional `npm run postgresql:smoke`. Publishing, ORM adoption, durable Audit, durable Metrics, Asset Catalog persistence, Storage Metadata persistence, and required live PostgreSQL tests remain deferred.

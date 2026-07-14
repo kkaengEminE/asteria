@@ -4,7 +4,7 @@ Asteria is the foundation for an extensible AI Publishing OS: a reusable content
 
 ## Current Sprint
 
-Sprint 55 adds the first PostgreSQL operational persistence adapter boundary for Queue, Scheduler, Job Execution, Idempotency, Locks, and UnitOfWork. In-memory persistence remains the default, SQLite remains available for explicit local/dev mode, PostgreSQL requires explicit runtime composition, Audit/Metrics/Asset Catalog/Storage Metadata remain in-memory, and publishing remains disabled.
+Sprint 56 adds the concrete PostgreSQL connection and pool adapter using `pg`. In-memory persistence remains the default, SQLite remains available for explicit local/dev mode, PostgreSQL is opt-in through environment configuration, Audit/Metrics/Asset Catalog/Storage Metadata remain in-memory, and publishing remains disabled.
 
 ## Commands
 
@@ -30,7 +30,36 @@ npm run dry-run
 
 If `ASTERIA_PERSISTENCE_MODE` is omitted or set to `memory`, Asteria uses the default in-memory persistence composition. SQLite mode requires `ASTERIA_SQLITE_DATABASE_PATH`; missing paths fail before workflow execution.
 
-PostgreSQL operational persistence is available as an adapter boundary under `src/providers/persistence/postgresql`. It defines SQL, migrations, repositories, lock/idempotency behavior, and transaction composition behind the existing provider-neutral ports. No PostgreSQL driver is bundled yet, so runtime must inject a `PostgreSQLConnection` implementation explicitly; dry-run remains memory by default.
+PostgreSQL operational persistence is available under `src/providers/persistence/postgresql`. It defines SQL, migrations, repositories, lock/idempotency behavior, transaction composition, and a concrete `pg` pool connection behind the existing provider-neutral ports. Dry-run remains memory by default unless PostgreSQL mode is explicitly configured.
+
+Run the dry run with explicit PostgreSQL operational persistence:
+
+```bash
+ASTERIA_PERSISTENCE_MODE=postgresql \
+ASTERIA_POSTGRESQL_URL=postgresql://user:password@localhost:5432/asteria \
+npm run dry-run
+```
+
+Optional PostgreSQL pool variables:
+
+```bash
+ASTERIA_POSTGRESQL_POOL_MIN=0
+ASTERIA_POSTGRESQL_POOL_MAX=10
+ASTERIA_POSTGRESQL_CONNECTION_TIMEOUT_MS=5000
+ASTERIA_POSTGRESQL_IDLE_TIMEOUT_MS=30000
+ASTERIA_POSTGRESQL_STATEMENT_TIMEOUT_MS=30000
+ASTERIA_POSTGRESQL_SSL_MODE=disable
+```
+
+Run the opt-in PostgreSQL smoke test against an isolated database:
+
+```bash
+ASTERIA_PERSISTENCE_MODE=postgresql \
+ASTERIA_POSTGRESQL_URL=postgresql://user:password@localhost:5432/asteria \
+npm run postgresql:smoke
+```
+
+The smoke test checks pool readiness, health check, migration startup, and graceful close. Normal tests do not require PostgreSQL to be installed or running.
 
 Run the dry run with production AI mode only when OpenAI configuration is intentionally enabled:
 
@@ -110,7 +139,7 @@ Persistence Architecture is documented under `docs/PERSISTENCE_ARCHITECTURE.md`.
 
 Runtime persistence composition is explicit. `PersistenceCompositionFactory` creates the dry-run in-memory repository/store/lock/idempotency/UnitOfWork bundle, and runtime code injects those ports into Queue, Scheduler, Executor, Audit, Metrics, and Asset services. Services no longer choose default persistence adapters internally.
 
-Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL readiness is documented under `docs/POSTGRESQL_READINESS_PLAN.md`, and Sprint 55 implements the initial PostgreSQL adapter boundary without adding a bundled database driver. Durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
+Durable Persistence planning is documented under `docs/DURABLE_PERSISTENCE_PLAN.md`. SQLite is implemented as the first local/dev durable adapter for operational persistence only. PostgreSQL readiness is documented under `docs/POSTGRESQL_READINESS_PLAN.md`, Sprint 55 implements the initial PostgreSQL adapter boundary, and Sprint 56 adds the concrete `pg` connection/pool layer. Durable Audit, Metrics, Asset Catalog, and Storage Metadata adapters remain deferred.
 
 SQLite migrations run on adapter startup, record applied versions in `schema_migrations`, and fail clearly if the database contains a newer unsupported schema version. No destructive rollback is performed automatically. Local backups are the operator's responsibility; copy the SQLite file only when no Asteria process is writing to it. SQLite is appropriate for local/dev and single-node proof, but concurrent production workers should wait for the PostgreSQL adapter path.
 

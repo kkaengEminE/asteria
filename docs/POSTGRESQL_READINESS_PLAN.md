@@ -1,6 +1,6 @@
 # PostgreSQL Readiness Plan
 
-This plan prepared Asteria for the first PostgreSQL operational persistence adapter. Sprint 55 implements the adapter boundary without bundling a PostgreSQL driver, adding a database dependency, enabling publishing, or changing default runtime behavior.
+This plan prepared Asteria for the first PostgreSQL operational persistence adapter. Sprint 55 implements the adapter boundary, and Sprint 56 adds a concrete `pg` connection/pool adapter without enabling publishing or changing default runtime behavior.
 
 ## Goal
 
@@ -30,14 +30,13 @@ Implemented:
 
 Deferred:
 
-- bundled PostgreSQL driver or pool
+- full real-database operational integration suite
 - durable Audit, Metrics, Asset Catalog, and Storage Metadata
 - production publishing
 - runtime PostgreSQL default mode
 
 ## Non-Goals
 
-- No PostgreSQL implementation in this planning step.
 - No ORM selection.
 - No Prisma or Drizzle.
 - No production publishing.
@@ -53,9 +52,10 @@ Future PostgreSQL code should live under a provider adapter boundary such as:
 src/providers/persistence/postgresql/
 ```
 
-PostgreSQL-specific details must stay inside the adapter:
+PostgreSQL-specific details stay inside the adapter:
 
 - connection pooling
+- `pg` driver integration
 - SQL statements
 - migrations
 - row records
@@ -70,22 +70,28 @@ Services, workflows, runtime steps, and domain models must continue to depend on
 
 Future configuration should extend the existing persistence mode pattern.
 
-Suggested variables:
+Supported variables:
 
 ```text
 ASTERIA_PERSISTENCE_MODE=memory|sqlite|postgresql
-ASTERIA_POSTGRES_CONNECTION_URL=
-ASTERIA_POSTGRES_SSL_MODE=disable|require|verify-full
-ASTERIA_POSTGRES_SCHEMA=asteria
+ASTERIA_POSTGRESQL_URL=
+ASTERIA_POSTGRESQL_POOL_MIN=
+ASTERIA_POSTGRESQL_POOL_MAX=
+ASTERIA_POSTGRESQL_CONNECTION_TIMEOUT_MS=
+ASTERIA_POSTGRESQL_IDLE_TIMEOUT_MS=
+ASTERIA_POSTGRESQL_STATEMENT_TIMEOUT_MS=
+ASTERIA_POSTGRESQL_SSL_MODE=disable|require|verify-full
 ```
 
 Rules:
 
 - `memory` remains the default.
 - `postgresql` must be explicit.
-- Missing connection configuration must fail before workflow execution.
+- Missing connection configuration fails before workflow execution.
 - Production publishing must remain disabled independently of persistence mode.
 - Secrets must come from environment variables only and must not appear in dry-run output.
+
+`ASTERIA_POSTGRES_CONNECTION_URL` remains accepted as a compatibility alias, but new configuration should use `ASTERIA_POSTGRESQL_URL`.
 
 ## Initial Implementation Scope
 
@@ -206,7 +212,7 @@ Required transaction boundaries:
 - execution success: execution completion, idempotency completion, lock release
 - execution failure: execution failure record, queue failure when applicable, idempotency failure, lock release
 
-PostgreSQL `UnitOfWork` should own transaction lifecycle. Repositories must participate in the active transaction without exposing transaction handles to domain models or workflows.
+PostgreSQL `UnitOfWork` owns transaction lifecycle. `PostgreSQLPoolConnection` routes repository queries through the active transaction-scoped client without exposing transaction handles to domain models, workflows, or services.
 
 ## Concurrency Strategy
 
@@ -257,6 +263,22 @@ Rules:
 - Do not run destructive rollback automatically.
 - Keep SQLite and PostgreSQL schemas behaviorally compatible even when SQL syntax differs.
 - Document manual backup and restore expectations before production use.
+
+## Driver Choice
+
+Sprint 56 selects `pg` because it is the standard minimal Node.js PostgreSQL driver, supports connection pooling, parameterized queries, explicit transaction control, and does not introduce an ORM or query-builder abstraction.
+
+## Smoke Test
+
+The optional smoke test is:
+
+```bash
+ASTERIA_PERSISTENCE_MODE=postgresql \
+ASTERIA_POSTGRESQL_URL=postgresql://user:password@localhost:5432/asteria \
+npm run postgresql:smoke
+```
+
+The smoke test verifies pool creation, health check, migration startup, composition creation, and graceful close. Normal `npm test` does not require a running PostgreSQL server.
 
 ## Test Strategy
 

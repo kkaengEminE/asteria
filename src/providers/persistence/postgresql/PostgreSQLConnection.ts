@@ -15,5 +15,6 @@ export interface PostgreSQLConnection {
     values?: readonly PostgreSQLValue[]
   ): Promise<PostgreSQLQueryResult<Row>>;
   transaction<T>(callback: (connection: PostgreSQLConnection) => Promise<T>): Promise<T>;
+  healthCheck(): Promise<boolean>;
   close?(): Promise<void>;
 }
