@@ -7,14 +7,20 @@ import {
   addHistoryEntry,
   clearHistoryEntries,
   createHistoryEntry,
+  buildCompareFields,
+  canCompare,
+  findDifferingCompareFields,
   formatRelativeTimestamp,
+  getSelectedHistoryEntries,
   getCopyButtonState,
   getCopyFeedbackState,
   getGenerateButtonState,
   renderHistoryEntries,
+  renderCompareView,
   renderError,
   renderResult,
   restoreHistoryEntry,
+  toggleCompareSelection,
   validateGenerateForm
 } from '../public/app.js';
 
@@ -178,6 +184,7 @@ test('web history rendering shows metadata relative time and current highlight',
   assert.match(html, /gemini · cat · ko-KR · 5m ago/);
   assert.match(html, /history-item current/);
   assert.match(html, /aria-current="true"/);
+  assert.match(html, /data-compare-id=/);
 });
 
 test('web history relative timestamps support session-friendly labels', () => {
@@ -189,6 +196,119 @@ test('web history relative timestamps support session-friendly labels', () => {
     formatRelativeTimestamp('2026-07-15T00:00:00.000Z', new Date('2026-07-15T02:00:00.000Z')),
     '2h ago'
   );
+});
+
+test('web compare selection supports selecting history items with a max of three', () => {
+  let selected = [];
+
+  selected = toggleCompareSelection(selected, 'one', true);
+  selected = toggleCompareSelection(selected, 'two', true);
+  selected = toggleCompareSelection(selected, 'three', true);
+  selected = toggleCompareSelection(selected, 'four', true);
+
+  assert.deepEqual(selected, ['one', 'two', 'three']);
+  assert.equal(canCompare(selected), true);
+
+  selected = toggleCompareSelection(selected, 'two', false);
+
+  assert.deepEqual(selected, ['one', 'three']);
+  assert.equal(canCompare(selected), true);
+  assert.equal(canCompare(['one']), false);
+  assert.equal(canCompare(['one', 'two', 'three', 'four']), false);
+});
+
+test('web compare mode renders selected generations in parallel columns', () => {
+  const first = createHistoryEntry({
+    topic: '고양이가 밤에 뛰어다니는 이유',
+    magazine: 'cat',
+    language: 'ko-KR',
+    provider: 'mock'
+  }, createUiResultFixture({
+    title: 'Cat Night Zoomies',
+    summary: 'Cat summary',
+    qualityScore: 91,
+    approvalDecision: 'NEEDS_REVIEW'
+  }), new Date('2026-07-15T00:00:00.000Z'));
+  const second = createHistoryEntry({
+    topic: '강아지가 산책 중 냄새를 오래 맡는 이유',
+    magazine: 'dog',
+    language: 'ko-KR',
+    provider: 'gemini'
+  }, createUiResultFixture({
+    title: 'Dog Walk Sniffing',
+    summary: 'Dog summary',
+    qualityScore: 98,
+    approvalDecision: 'APPROVED'
+  }), new Date('2026-07-15T00:02:00.000Z'));
+  const entries = getSelectedHistoryEntries([first, second], [first.id, second.id]);
+  const html = renderCompareView(entries);
+
+  assert.match(html, /Compare/);
+  assert.match(html, /compare-grid/);
+  assert.match(html, /Cat Night Zoomies/);
+  assert.match(html, /Dog Walk Sniffing/);
+  assert.match(html, /mock/);
+  assert.match(html, /gemini/);
+  assert.match(html, /Generation timestamp/);
+  assert.match(html, /SEO title/);
+  assert.match(html, /Instagram preview/);
+  assert.match(html, /Podcast preview/);
+});
+
+test('web compare highlights configured differing fields', () => {
+  const first = createHistoryEntry({
+    topic: 'Topic A',
+    magazine: 'cat',
+    language: 'ko-KR',
+    provider: 'mock'
+  }, createUiResultFixture({
+    title: 'Title A',
+    summaryText: 'Summary A',
+    qualityScore: 80,
+    approvalDecision: 'REJECTED'
+  }));
+  const second = createHistoryEntry({
+    topic: 'Topic B',
+    magazine: 'cat',
+    language: 'ko-KR',
+    provider: 'openai'
+  }, createUiResultFixture({
+    title: 'Title B',
+    summaryText: 'Summary B',
+    qualityScore: 99,
+    approvalDecision: 'APPROVED'
+  }));
+  const fields = buildCompareFields([first, second]);
+  const differing = findDifferingCompareFields(fields, ['provider', 'title', 'summary', 'qualityScore', 'approval']);
+  const html = renderCompareView([first, second]);
+
+  assert.equal(differing.has('provider'), true);
+  assert.equal(differing.has('title'), true);
+  assert.equal(differing.has('summary'), true);
+  assert.equal(differing.has('qualityScore'), true);
+  assert.equal(differing.has('approval'), true);
+  assert.match(html, /compare-different/);
+});
+
+test('web compare uses stored history entries without api requests', () => {
+  let apiRequestCount = 0;
+  const first = createHistoryEntry({
+    topic: 'Topic A',
+    magazine: 'cat',
+    language: 'ko-KR',
+    provider: 'mock'
+  }, createUiResultFixture());
+  const second = createHistoryEntry({
+    topic: 'Topic B',
+    magazine: 'dog',
+    language: 'ko-KR',
+    provider: 'mock'
+  }, createUiResultFixture({ title: 'Second Result' }));
+  const selected = getSelectedHistoryEntries([first, second], [first.id, second.id]);
+
+  renderCompareView(selected);
+
+  assert.equal(apiRequestCount, 0);
 });
 
 test('web result rendering shows useful generation sections', () => {
@@ -231,30 +351,30 @@ test('web error rendering shows api errors', () => {
   assert.match(html, /Generate request failed/);
 });
 
-function createUiResultFixture() {
+function createUiResultFixture(overrides = {}) {
   return {
-    topic: '고양이가 밤에 뛰어다니는 이유',
+    topic: overrides.topic ?? '고양이가 밤에 뛰어다니는 이유',
     workflowStatus: 'success',
     contentGenerationMetadata: {
-      providerName: 'mock-ai',
+      providerName: overrides.providerName ?? 'mock-ai',
       generationDurationMs: 123,
-      qualityScore: 100,
+      qualityScore: overrides.qualityScore ?? 100,
       reviewResult: 'WARNING',
-      reviewScore: 92,
-      approvalDecision: 'REJECTED'
+      reviewScore: overrides.reviewScore ?? 92,
+      approvalDecision: overrides.approvalDecision ?? 'REJECTED'
     },
     publishingPackage: {
       article: {
-        title: 'Mock Article: 고양이가 밤에 뛰어다니는 이유',
-        summary: '밤마다 우다다를 하는 이유 요약',
-        body: '고양이는 밤에 에너지가 남거나 놀이가 부족할 때 활발해질 수 있습니다.'
+        title: overrides.title ?? 'Mock Article: 고양이가 밤에 뛰어다니는 이유',
+        summary: overrides.summary ?? '밤마다 우다다를 하는 이유 요약',
+        body: overrides.body ?? '고양이는 밤에 에너지가 남거나 놀이가 부족할 때 활발해질 수 있습니다.'
       },
       summary: {
-        text: '짧은 요약'
+        text: overrides.summaryText ?? '짧은 요약'
       },
       seo: {
-        metaTitle: 'SEO 제목',
-        metaDescription: 'SEO 설명'
+        metaTitle: overrides.seoTitle ?? 'SEO 제목',
+        metaDescription: overrides.seoDescription ?? 'SEO 설명'
       },
       faq: [
         {

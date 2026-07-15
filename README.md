@@ -32,6 +32,8 @@ The Web MVP uses the existing `POST /generate` API and the default mock provider
 
 The browser also keeps a session-only generation history in memory. Each generated result is listed with topic, provider, magazine, language, and relative timestamp. Selecting a history item restores the saved result without making a new API request. Clear History removes only the current browser-session list; no database or authentication is involved.
 
+History entries can also be compared side-by-side. Select two or three history checkboxes, click Compare, and Asteria renders parallel columns for provider, topic, magazine, language, generation timestamp, article, SEO, FAQ, quality score, editorial score, approval decision, and available Instagram or Podcast previews. Differing provider, title, summary, quality score, and approval values are highlighted. Compare mode uses stored browser-session results only and does not call `POST /generate`.
+
 AI provider options in the browser:
 
 - Mock: default, deterministic, no external API required.

@@ -23,12 +23,25 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
   const copyFeedback = doc.querySelector('#copy-feedback');
   const historyList = doc.querySelector('#history-list');
   const clearHistoryButton = doc.querySelector('#clear-history-button');
+  const compareButton = doc.querySelector('#compare-button');
+  const exitCompareButton = doc.querySelector('#exit-compare-button');
   let currentResult = null;
   let historyEntries = [];
   let currentHistoryId = null;
+  let selectedHistoryIds = [];
+  let compareMode = false;
 
   setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
-  renderHistoryPanel(historyList, clearHistoryButton, historyEntries, currentHistoryId);
+  renderHistoryPanel({
+    historyList,
+    clearHistoryButton,
+    compareButton,
+    exitCompareButton,
+    entries: historyEntries,
+    currentHistoryId,
+    selectedHistoryIds,
+    compareMode
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -64,10 +77,20 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
       result.className = 'result';
       result.innerHTML = renderResult(payload);
       currentResult = payload;
+      compareMode = false;
       const historyEntry = createHistoryEntry(formState, payload);
       historyEntries = addHistoryEntry(historyEntries, historyEntry);
       currentHistoryId = historyEntry.id;
-      renderHistoryPanel(historyList, clearHistoryButton, historyEntries, currentHistoryId);
+      renderHistoryPanel({
+        historyList,
+        clearHistoryButton,
+        compareButton,
+        exitCompareButton,
+        entries: historyEntries,
+        currentHistoryId,
+        selectedHistoryIds,
+        compareMode
+      });
       setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, true);
     } catch (error) {
       showError(message, error instanceof Error ? error.message : 'Generate request failed.');
@@ -75,7 +98,17 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
       result.innerHTML = renderError(error instanceof Error ? error.message : 'Generate request failed.');
       currentResult = null;
       currentHistoryId = null;
-      renderHistoryPanel(historyList, clearHistoryButton, historyEntries, currentHistoryId);
+      compareMode = false;
+      renderHistoryPanel({
+        historyList,
+        clearHistoryButton,
+        compareButton,
+        exitCompareButton,
+        entries: historyEntries,
+        currentHistoryId,
+        selectedHistoryIds,
+        compareMode
+      });
       setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
     } finally {
       setLoading(button, message, result, false);
@@ -99,6 +132,27 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
   });
 
   historyList?.addEventListener('click', (event) => {
+    const compareCheckbox = event.target?.closest?.('[data-compare-id]');
+
+    if (compareCheckbox) {
+      selectedHistoryIds = toggleCompareSelection(
+        selectedHistoryIds,
+        compareCheckbox.dataset.compareId,
+        compareCheckbox.checked
+      );
+      renderHistoryPanel({
+        historyList,
+        clearHistoryButton,
+        compareButton,
+        exitCompareButton,
+        entries: historyEntries,
+        currentHistoryId,
+        selectedHistoryIds,
+        compareMode
+      });
+      return;
+    }
+
     const historyButton = event.target?.closest?.('[data-history-id]');
 
     if (!historyButton) {
@@ -113,19 +167,82 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
 
     currentResult = entry.result;
     currentHistoryId = entry.id;
+    compareMode = false;
     restoreFormState(doc, entry);
     message.className = 'message';
     message.textContent = 'History result restored.';
     result.className = 'result';
     result.innerHTML = renderResult(entry.result);
     setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, true);
-    renderHistoryPanel(historyList, clearHistoryButton, historyEntries, currentHistoryId);
+    renderHistoryPanel({
+      historyList,
+      clearHistoryButton,
+      compareButton,
+      exitCompareButton,
+      entries: historyEntries,
+      currentHistoryId,
+      selectedHistoryIds,
+      compareMode
+    });
   });
 
   clearHistoryButton?.addEventListener('click', () => {
     historyEntries = clearHistoryEntries();
     currentHistoryId = null;
-    renderHistoryPanel(historyList, clearHistoryButton, historyEntries, currentHistoryId);
+    selectedHistoryIds = [];
+    compareMode = false;
+    renderHistoryPanel({
+      historyList,
+      clearHistoryButton,
+      compareButton,
+      exitCompareButton,
+      entries: historyEntries,
+      currentHistoryId,
+      selectedHistoryIds,
+      compareMode
+    });
+    renderCurrentResult(result, currentResult);
+  });
+
+  compareButton?.addEventListener('click', () => {
+    const selectedEntries = getSelectedHistoryEntries(historyEntries, selectedHistoryIds);
+
+    if (!canCompare(selectedHistoryIds)) {
+      return;
+    }
+
+    compareMode = true;
+    message.className = 'message';
+    message.textContent = 'Compare mode active.';
+    result.className = 'result';
+    result.innerHTML = renderCompareView(selectedEntries);
+    renderHistoryPanel({
+      historyList,
+      clearHistoryButton,
+      compareButton,
+      exitCompareButton,
+      entries: historyEntries,
+      currentHistoryId,
+      selectedHistoryIds,
+      compareMode
+    });
+  });
+
+  exitCompareButton?.addEventListener('click', () => {
+    compareMode = false;
+    message.className = 'message';
+    message.textContent = currentResult ? 'Viewer restored.' : '';
+    renderCurrentResult(result, currentResult);
+    renderHistoryPanel({
+      historyList,
+      clearHistoryButton,
+      compareButton,
+      exitCompareButton,
+      entries: historyEntries,
+      currentHistoryId,
+      selectedHistoryIds,
+      compareMode
+    });
   });
 }
 
@@ -253,12 +370,106 @@ export function renderHistoryEntries(entries, currentHistoryId, now = new Date()
     const className = isCurrent ? 'history-item current' : 'history-item';
 
     return `
-      <button class="${className}" type="button" data-history-id="${escapeHtml(entry.id)}" aria-current="${isCurrent ? 'true' : 'false'}">
-        <span class="history-topic">${escapeHtml(entry.topic)}</span>
-        <span class="history-meta">${escapeHtml(entry.provider)} · ${escapeHtml(entry.magazine)} · ${escapeHtml(entry.language)} · ${escapeHtml(formatRelativeTimestamp(entry.generatedAt, now))}</span>
-      </button>
+      <div class="${className}" aria-current="${isCurrent ? 'true' : 'false'}">
+        <input type="checkbox" data-compare-id="${escapeHtml(entry.id)}" aria-label="Select ${escapeHtml(entry.topic)} for comparison">
+        <button class="history-restore" type="button" data-history-id="${escapeHtml(entry.id)}">
+          <span class="history-topic">${escapeHtml(entry.topic)}</span>
+          <span class="history-meta">${escapeHtml(entry.provider)} · ${escapeHtml(entry.magazine)} · ${escapeHtml(entry.language)} · ${escapeHtml(formatRelativeTimestamp(entry.generatedAt, now))}</span>
+        </button>
+      </div>
     `;
   }).join('');
+}
+
+export function toggleCompareSelection(selectedIds, id, selected, maxSelected = 3) {
+  if (!id) {
+    return selectedIds;
+  }
+
+  if (!selected) {
+    return selectedIds.filter((selectedId) => selectedId !== id);
+  }
+
+  if (selectedIds.includes(id)) {
+    return selectedIds;
+  }
+
+  if (selectedIds.length >= maxSelected) {
+    return selectedIds;
+  }
+
+  return [...selectedIds, id];
+}
+
+export function canCompare(selectedIds) {
+  return selectedIds.length >= 2 && selectedIds.length <= 3;
+}
+
+export function getSelectedHistoryEntries(entries, selectedIds) {
+  return selectedIds
+    .map((id) => entries.find((entry) => entry.id === id))
+    .filter(Boolean);
+}
+
+export function renderCompareView(entries) {
+  const fields = buildCompareFields(entries);
+  const differingKeys = findDifferingCompareFields(fields, [
+    'provider',
+    'title',
+    'summary',
+    'qualityScore',
+    'approval'
+  ]);
+
+  return section('Compare', `
+    <div class="compare-grid">
+      ${entries.map((entry) => renderCompareColumn(entry, fields, differingKeys)).join('')}
+    </div>
+  `);
+}
+
+export function buildCompareFields(entries) {
+  return entries.map((entry) => {
+    const result = entry.result ?? {};
+    const packageData = result.publishingPackage ?? {};
+    const article = packageData.article ?? {};
+    const summary = packageData.summary ?? {};
+    const seo = packageData.seo ?? {};
+    const metadata = result.contentGenerationMetadata ?? {};
+    const instagram = result.previewReport?.channels?.find((channel) => channel.type === 'instagram')?.data;
+    const podcast = result.previewReport?.channels?.find((channel) => channel.type === 'podcast')?.data;
+
+    return {
+      id: entry.id,
+      provider: entry.provider,
+      topic: entry.topic,
+      magazine: entry.magazine,
+      language: entry.language,
+      generatedAt: entry.generatedAt,
+      title: article.title ?? 'Untitled',
+      summary: summary.text ?? article.summary ?? 'No summary available.',
+      body: article.body ?? 'No article body available.',
+      seoTitle: seo.metaTitle ?? 'Unavailable',
+      seoDescription: seo.metaDescription ?? 'Unavailable',
+      faq: renderCompareFaq(packageData.faq),
+      qualityScore: metadata.qualityScore ?? 'Unavailable',
+      editorialScore: metadata.reviewScore ?? metadata.editorialReview?.score ?? 'Unavailable',
+      approval: metadata.approvalDecision ?? metadata.approvalResult?.decision ?? 'Unavailable',
+      instagram: instagram
+        ? `${instagram.shortCaption ?? ''}${instagram.cta ? `\nCTA: ${instagram.cta}` : ''}`.trim()
+        : 'Unavailable',
+      podcast: podcast
+        ? `${podcast.episodeTitle ?? ''}${podcast.estimatedDuration ? `\nDuration: ${podcast.estimatedDuration}` : ''}`.trim()
+        : 'Unavailable'
+    };
+  });
+}
+
+export function findDifferingCompareFields(fieldRows, keys) {
+  return new Set(keys.filter((key) => {
+    const values = fieldRows.map((row) => String(row[key] ?? ''));
+    return new Set(values).size > 1;
+  }));
 }
 
 export function formatRelativeTimestamp(generatedAt, now = new Date()) {
@@ -404,14 +615,56 @@ function setCopyFeedback(feedback, success) {
   feedback.textContent = state.text;
 }
 
-function renderHistoryPanel(historyList, clearHistoryButton, entries, currentHistoryId) {
+function renderHistoryPanel({
+  historyList,
+  clearHistoryButton,
+  compareButton,
+  exitCompareButton,
+  entries,
+  currentHistoryId,
+  selectedHistoryIds,
+  compareMode
+}) {
   if (historyList) {
     historyList.innerHTML = renderHistoryEntries(entries, currentHistoryId);
+
+    for (const checkbox of historyList.querySelectorAll('[data-compare-id]')) {
+      checkbox.checked = selectedHistoryIds.includes(checkbox.dataset.compareId);
+      checkbox.disabled = !checkbox.checked && selectedHistoryIds.length >= 3;
+    }
   }
 
   if (clearHistoryButton) {
     clearHistoryButton.disabled = entries.length === 0;
   }
+
+  if (compareButton) {
+    compareButton.disabled = !canCompare(selectedHistoryIds);
+  }
+
+  if (exitCompareButton) {
+    exitCompareButton.hidden = !compareMode;
+  }
+}
+
+function renderCurrentResult(resultElement, currentResult) {
+  if (!resultElement) {
+    return;
+  }
+
+  if (currentResult) {
+    resultElement.className = 'result';
+    resultElement.innerHTML = renderResult(currentResult);
+    return;
+  }
+
+  resultElement.className = 'result empty';
+  resultElement.innerHTML = `
+    <div class="empty-state">
+      <h2>Ready</h2>
+      <p>Enter a topic, choose a magazine and language, then generate a preview package.</p>
+    </div>
+  `;
 }
 
 function restoreFormState(doc, entry) {
@@ -440,6 +693,49 @@ function renderFaq(faq = []) {
   return `<ul>${faq.map((item) => `
     <li><strong>${escapeHtml(item.question ?? '')}</strong><br>${escapeHtml(item.answer ?? '')}</li>
   `).join('')}</ul>`;
+}
+
+function renderCompareColumn(entry, fieldRows, differingKeys) {
+  const fields = fieldRows.find((row) => row.id === entry.id);
+
+  return `
+    <article class="compare-column">
+      <h3>${escapeHtml(fields.title)}</h3>
+      ${compareField('Provider', fields.provider, differingKeys.has('provider'))}
+      ${compareField('Topic', fields.topic)}
+      ${compareField('Magazine', fields.magazine)}
+      ${compareField('Language', fields.language)}
+      ${compareField('Generation timestamp', fields.generatedAt)}
+      ${compareField('Article title', fields.title, differingKeys.has('title'))}
+      ${compareField('Summary', fields.summary, differingKeys.has('summary'))}
+      ${compareField('Article body', fields.body)}
+      ${compareField('SEO title', fields.seoTitle)}
+      ${compareField('SEO description', fields.seoDescription)}
+      ${compareField('FAQ', fields.faq)}
+      ${compareField('Quality score', fields.qualityScore, differingKeys.has('qualityScore'))}
+      ${compareField('Editorial score', fields.editorialScore)}
+      ${compareField('Approval decision', fields.approval, differingKeys.has('approval'))}
+      ${compareField('Instagram preview', fields.instagram)}
+      ${compareField('Podcast preview', fields.podcast)}
+    </article>
+  `;
+}
+
+function compareField(label, value, different = false) {
+  return `
+    <div class="compare-field ${different ? 'compare-different' : ''}">
+      <span class="compare-label">${escapeHtml(label)}</span>
+      <div class="compare-value">${escapeHtml(String(value))}</div>
+    </div>
+  `;
+}
+
+function renderCompareFaq(faq = []) {
+  if (!Array.isArray(faq) || faq.length === 0) {
+    return 'No FAQ available.';
+  }
+
+  return faq.map((item) => `${item.question ?? ''}\n${item.answer ?? ''}`.trim()).join('\n\n');
 }
 
 function section(title, body) {

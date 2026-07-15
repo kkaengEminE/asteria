@@ -62,7 +62,11 @@
         <section class="history-panel" aria-labelledby="history-title">
           <div class="history-header">
             <h2 id="history-title">History</h2>
-            <button id="clear-history-button" class="secondary-button" type="button" disabled>Clear History</button>
+            <div class="history-actions">
+              <button id="compare-button" class="secondary-button" type="button" disabled>Compare</button>
+              <button id="exit-compare-button" class="secondary-button" type="button" hidden>Exit Compare</button>
+              <button id="clear-history-button" class="secondary-button" type="button" disabled>Clear History</button>
+            </div>
           </div>
           <div id="history-list" class="history-list">
             <p class="history-empty">No generated results yet.</p>
