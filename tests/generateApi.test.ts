@@ -10,7 +10,8 @@ test('POST /generate calls existing generation runtime and returns JSON result',
     bodyText: JSON.stringify({
       topic: 'indoor enrichment',
       magazine: 'cat',
-      language: 'ko-KR'
+      language: 'ko-KR',
+      provider: 'mock'
     })
   });
   const body = response.body as Record<string, any>;
@@ -31,7 +32,8 @@ test('POST /generate passes request values to injected generation handler', asyn
     bodyText: JSON.stringify({
       topic: '강아지가 산책 중 냄새를 오래 맡는 이유',
       magazine: 'dog',
-      language: 'ko-KR'
+      language: 'ko-KR',
+      provider: 'gemini'
     })
   }, {
     generate: async (request) => {
@@ -45,9 +47,73 @@ test('POST /generate passes request values to injected generation handler', asyn
   assert.deepEqual(calls, [{
     topic: '강아지가 산책 중 냄새를 오래 맡는 이유',
     magazine: 'dog',
-    language: 'ko-KR'
+    language: 'ko-KR',
+    provider: 'gemini'
   }]);
   assert.equal(body.topic, '강아지가 산책 중 냄새를 오래 맡는 이유');
+});
+
+test('POST /generate accepts openai provider selection', async () => {
+  const calls: unknown[] = [];
+  const response = await processAsteriaApiRequest({
+    method: 'POST',
+    path: '/generate',
+    bodyText: JSON.stringify({
+      topic: 'indoor enrichment',
+      provider: 'openai'
+    })
+  }, {
+    generate: async (request) => {
+      calls.push(request);
+      return createApiResultFixture(request.topic);
+    }
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(calls, [{
+    topic: 'indoor enrichment',
+    magazine: undefined,
+    language: undefined,
+    provider: 'openai'
+  }]);
+});
+
+test('POST /generate rejects unsupported provider selection', async () => {
+  const response = await processAsteriaApiRequest({
+    method: 'POST',
+    path: '/generate',
+    bodyText: JSON.stringify({
+      topic: 'indoor enrichment',
+      provider: 'unknown'
+    })
+  }, {
+    generate: async () => createApiResultFixture('unused')
+  });
+  const body = response.body as Record<string, any>;
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(body.error, 'invalid_request');
+  assert.match(body.message, /provider must be one of/);
+});
+
+test('POST /generate returns clean error when selected provider is unavailable', async () => {
+  const response = await processAsteriaApiRequest({
+    method: 'POST',
+    path: '/generate',
+    bodyText: JSON.stringify({
+      topic: 'indoor enrichment',
+      provider: 'gemini'
+    })
+  }, {
+    generate: async () => {
+      throw new Error('Gemini production mode is disabled. Set GEMINI_PRODUCTION_ENABLED=true.');
+    }
+  });
+  const body = response.body as Record<string, any>;
+
+  assert.equal(response.statusCode, 500);
+  assert.equal(body.error, 'internal_error');
+  assert.match(body.message, /GEMINI_PRODUCTION_ENABLED=true/);
 });
 
 test('POST /generate rejects missing topic', async () => {

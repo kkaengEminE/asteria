@@ -117,7 +117,8 @@ async function defaultGenerate(request: GenerateApiRequest): Promise<DryRunResul
   return runMagazineDryRun({
     topic: request.topic,
     magazineSlug: request.magazine,
-    language: request.language
+    language: request.language,
+    aiMode: request.provider
   });
 }
 

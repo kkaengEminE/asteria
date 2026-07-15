@@ -28,7 +28,15 @@ Open the browser UI at:
 http://127.0.0.1:3000
 ```
 
-The Web MVP uses the existing `POST /generate` API and the default mock provider path, so no external AI API, database, authentication, queue execution, or publishing is required for local demos. Enter a topic, choose `cat` or `dog`, choose `ko-KR` or `en-US`, and click Generate to render the workflow status, article, summary, SEO, FAQ, selected image metadata, monetization preview, quality score, editorial review, and approval decision. After generation succeeds, use Copy Article or Copy Markdown to reuse the article title/body or a Markdown package containing summary, article, SEO, and FAQ sections.
+The Web MVP uses the existing `POST /generate` API and the default mock provider path, so no external AI API, database, authentication, queue execution, or publishing is required for local demos. Enter a topic, choose `cat` or `dog`, choose `ko-KR` or `en-US`, choose an AI provider, and click Generate to render the workflow status, provider, elapsed generation time, article, summary, SEO, FAQ, selected image metadata, monetization preview, quality score, editorial review, and approval decision. After generation succeeds, use Copy Article or Copy Markdown to reuse the article title/body or a Markdown package containing summary, article, SEO, and FAQ sections.
+
+AI provider options in the browser:
+
+- Mock: default, deterministic, no external API required.
+- Gemini: requires `GEMINI_PRODUCTION_ENABLED=true` and `GEMINI_API_KEY`; optional `GEMINI_MODEL`.
+- OpenAI: requires `OPENAI_PRODUCTION_ENABLED=true` and `OPENAI_API_KEY`; optional `OPENAI_MODEL`.
+
+If Gemini or OpenAI is selected without the required environment variables, the API returns a clean provider configuration error and the Web MVP displays it.
 
 Example Cat topic:
 
@@ -56,11 +64,12 @@ curl -X POST http://127.0.0.1:3000/generate \
   -d '{
     "topic": "고양이가 밤에 뛰어다니는 이유",
     "magazine": "cat",
-    "language": "ko-KR"
+    "language": "ko-KR",
+    "provider": "mock"
   }'
 ```
 
-`POST /generate` calls the existing provider-neutral `runMagazineDryRun` runtime and returns the generation result as JSON. The API adds no authentication, database, publishing, or queue execution. The CLI dry run remains unchanged.
+`POST /generate` calls the existing provider-neutral `runMagazineDryRun` runtime and returns the generation result as JSON. The optional `provider` field accepts `mock`, `gemini`, or `openai` and maps to the existing AI provider selection path. The API adds no authentication, database, publishing, or queue execution. The CLI dry run remains unchanged.
 
 Run the dry run with a custom topic:
 

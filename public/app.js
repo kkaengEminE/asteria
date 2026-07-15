@@ -1,7 +1,8 @@
 const DEFAULT_FORM_STATE = {
   topic: '',
   magazine: 'cat',
-  language: 'ko-KR'
+  language: 'ko-KR',
+  provider: 'mock'
 };
 
 if (typeof document !== 'undefined') {
@@ -91,7 +92,8 @@ export function readFormState(doc) {
   return {
     topic: doc.querySelector('#topic')?.value ?? DEFAULT_FORM_STATE.topic,
     magazine: doc.querySelector('#magazine')?.value ?? DEFAULT_FORM_STATE.magazine,
-    language: doc.querySelector('#language')?.value ?? DEFAULT_FORM_STATE.language
+    language: doc.querySelector('#language')?.value ?? DEFAULT_FORM_STATE.language,
+    provider: doc.querySelector('#provider')?.value ?? DEFAULT_FORM_STATE.provider
   };
 }
 
@@ -112,7 +114,8 @@ export function buildGenerateRequest(formState) {
   return {
     topic: formState.topic.trim(),
     magazine: formState.magazine || DEFAULT_FORM_STATE.magazine,
-    language: formState.language || DEFAULT_FORM_STATE.language
+    language: formState.language || DEFAULT_FORM_STATE.language,
+    provider: formState.provider || DEFAULT_FORM_STATE.provider
   };
 }
 
@@ -180,6 +183,8 @@ export function renderResult(result) {
   const seo = packageData.seo ?? {};
   const metadata = result.contentGenerationMetadata ?? {};
   const review = metadata.editorialReview ?? {};
+  const providerName = getProviderName(result);
+  const elapsed = getElapsedGenerationTime(result);
   const selectedImage = result.selectedImage;
   const instagram = result.previewReport?.channels?.find((channel) => channel.type === 'instagram')?.data;
   const podcast = result.previewReport?.channels?.find((channel) => channel.type === 'podcast')?.data;
@@ -188,11 +193,16 @@ export function renderResult(result) {
     section('Status', `
       <div class="status-row">
         ${metric('Workflow', result.workflowStatus)}
+        ${metric('Provider', providerName)}
+        ${metric('Elapsed', elapsed)}
         ${metric('Quality', metadata.qualityScore ?? 'Unavailable')}
         ${metric('Review', `${metadata.reviewResult ?? review.result ?? 'Unavailable'} / ${metadata.reviewScore ?? review.score ?? 'N/A'}`)}
         ${metric('Approval', metadata.approvalDecision ?? metadata.approvalResult?.decision ?? 'Unavailable')}
       </div>
     `),
+    result.workflowStatus === 'failed' && result.error
+      ? section('Error', `<p>${escapeHtml(result.error)}</p>`)
+      : '',
     section('Article', `
       <h3>${escapeHtml(article.title ?? 'Untitled')}</h3>
       <p>${escapeHtml(article.summary ?? summary.text ?? 'No summary available.')}</p>
@@ -301,6 +311,25 @@ function section(title, body) {
 
 function metric(label, value) {
   return `<div class="metric"><span>${escapeHtml(label)}</span>${escapeHtml(String(value))}</div>`;
+}
+
+function getProviderName(result) {
+  return result.contentGenerationMetadata?.providerName
+    ?? result.publishingPackage?.metadata?.provider
+    ?? result.publishingPackage?.metadata?.providerName
+    ?? 'Unavailable';
+}
+
+function getElapsedGenerationTime(result) {
+  const duration = result.contentGenerationMetadata?.durationMs
+    ?? result.contentGenerationMetadata?.generationDurationMs
+    ?? result.generationDurationMs;
+
+  if (typeof duration === 'number') {
+    return `${duration}ms`;
+  }
+
+  return 'Unavailable';
 }
 
 function escapeHtml(value) {

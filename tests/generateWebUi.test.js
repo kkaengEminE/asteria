@@ -27,21 +27,36 @@ test('web api request construction preserves cat dog and ko-KR selections', () =
   const catRequest = buildGenerateRequest({
     topic: ' 고양이가 밤에 뛰어다니는 이유 ',
     magazine: 'cat',
-    language: 'ko-KR'
+    language: 'ko-KR',
+    provider: 'mock'
   });
   const dogRequest = buildGenerateRequest({
     topic: '강아지가 산책 중 냄새를 오래 맡는 이유',
     magazine: 'dog',
-    language: 'en-US'
+    language: 'en-US',
+    provider: 'gemini'
   });
 
   assert.deepEqual(catRequest, {
     topic: '고양이가 밤에 뛰어다니는 이유',
     magazine: 'cat',
-    language: 'ko-KR'
+    language: 'ko-KR',
+    provider: 'mock'
   });
   assert.equal(dogRequest.magazine, 'dog');
   assert.equal(dogRequest.language, 'en-US');
+  assert.equal(dogRequest.provider, 'gemini');
+});
+
+test('web api request construction supports openai provider selection', () => {
+  const request = buildGenerateRequest({
+    topic: 'indoor enrichment',
+    magazine: 'cat',
+    language: 'en-US',
+    provider: 'openai'
+  });
+
+  assert.equal(request.provider, 'openai');
 });
 
 test('web loading state disables generate button', () => {
@@ -102,6 +117,10 @@ test('web result rendering shows useful generation sections', () => {
   const html = renderResult(createUiResultFixture());
 
   assert.match(html, /Workflow/);
+  assert.match(html, /Provider/);
+  assert.match(html, /mock-ai/);
+  assert.match(html, /Elapsed/);
+  assert.match(html, /123ms/);
   assert.match(html, /Mock Article: 고양이가 밤에 뛰어다니는 이유/);
   assert.match(html, /밤마다 우다다를 하는 이유/);
   assert.match(html, /SEO 제목/);
@@ -112,6 +131,19 @@ test('web result rendering shows useful generation sections', () => {
   assert.match(html, /Instagram/);
   assert.match(html, /Podcast/);
   assert.match(html, /Raw JSON/);
+});
+
+test('web result rendering shows unavailable provider workflow errors', () => {
+  const html = renderResult({
+    workflowStatus: 'failed',
+    error: 'Gemini production mode is disabled. Set GEMINI_PRODUCTION_ENABLED=true.',
+    previewReport: {
+      channels: []
+    }
+  });
+
+  assert.match(html, /Error/);
+  assert.match(html, /GEMINI_PRODUCTION_ENABLED=true/);
 });
 
 test('web error rendering shows api errors', () => {
@@ -126,6 +158,8 @@ function createUiResultFixture() {
     topic: '고양이가 밤에 뛰어다니는 이유',
     workflowStatus: 'success',
     contentGenerationMetadata: {
+      providerName: 'mock-ai',
+      generationDurationMs: 123,
       qualityScore: 100,
       reviewResult: 'WARNING',
       reviewScore: 92,

@@ -60,7 +60,7 @@ h1 {
 
 .control-panel {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) 160px 150px 128px;
+  grid-template-columns: minmax(260px, 1fr) 150px 140px 150px 128px;
   gap: 12px;
   align-items: end;
   padding: 16px;
@@ -201,7 +201,7 @@ details pre {
 
 .status-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
 }
 

@@ -2,7 +2,10 @@ export interface GenerateApiRequest {
   topic: string;
   magazine?: string;
   language?: string;
+  provider?: GenerateApiProvider;
 }
+
+export type GenerateApiProvider = 'mock' | 'gemini' | 'openai';
 
 export function validateGenerateApiRequest(value: unknown): GenerateApiRequest {
   if (!isObject(value)) {
@@ -12,11 +15,13 @@ export function validateGenerateApiRequest(value: unknown): GenerateApiRequest {
   const topic = parseRequiredString(value.topic, 'topic');
   const magazine = parseOptionalString(value.magazine, 'magazine');
   const language = parseOptionalString(value.language, 'language');
+  const provider = parseOptionalProvider(value.provider);
 
   return {
     topic,
     magazine,
-    language
+    language,
+    provider
   };
 }
 
@@ -43,6 +48,20 @@ function parseOptionalString(value: unknown, field: string): string | undefined 
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseOptionalProvider(value: unknown): GenerateApiProvider | undefined {
+  const provider = parseOptionalString(value, 'provider');
+
+  if (provider === undefined) {
+    return undefined;
+  }
+
+  if (provider !== 'mock' && provider !== 'gemini' && provider !== 'openai') {
+    throw new GenerateApiRequestError('provider must be one of: mock, gemini, openai.');
+  }
+
+  return provider;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
