@@ -4,11 +4,17 @@ import {
   buildArticleCopyText,
   buildGenerateRequest,
   buildMarkdownCopyText,
+  addHistoryEntry,
+  clearHistoryEntries,
+  createHistoryEntry,
+  formatRelativeTimestamp,
   getCopyButtonState,
   getCopyFeedbackState,
   getGenerateButtonState,
+  renderHistoryEntries,
   renderError,
   renderResult,
+  restoreHistoryEntry,
   validateGenerateForm
 } from '../public/app.js';
 
@@ -111,6 +117,78 @@ test('web copy feedback exposes copied and failed states', () => {
     className: 'copy-feedback error',
     text: 'Copy failed'
   });
+});
+
+test('web history insertion stores request metadata and full result', () => {
+  const result = createUiResultFixture();
+  const entry = createHistoryEntry({
+    topic: ' 고양이가 밤에 뛰어다니는 이유 ',
+    magazine: 'cat',
+    language: 'ko-KR',
+    provider: 'gemini'
+  }, result, new Date('2026-07-15T00:00:00.000Z'));
+  const entries = addHistoryEntry([], entry);
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].topic, '고양이가 밤에 뛰어다니는 이유');
+  assert.equal(entries[0].magazine, 'cat');
+  assert.equal(entries[0].language, 'ko-KR');
+  assert.equal(entries[0].provider, 'gemini');
+  assert.equal(entries[0].generatedAt, '2026-07-15T00:00:00.000Z');
+  assert.equal(entries[0].result, result);
+});
+
+test('web history restore returns stored result without requiring an api request', () => {
+  let apiRequestCount = 0;
+  const entry = createHistoryEntry({
+    topic: '강아지가 산책 중 냄새를 오래 맡는 이유',
+    magazine: 'dog',
+    language: 'ko-KR',
+    provider: 'mock'
+  }, createUiResultFixture());
+  const restored = restoreHistoryEntry([entry], entry.id);
+
+  assert.equal(restored?.result, entry.result);
+  assert.equal(restored?.magazine, 'dog');
+  assert.equal(restored?.provider, 'mock');
+  assert.equal(apiRequestCount, 0);
+});
+
+test('web history clear removes all session entries', () => {
+  const entry = createHistoryEntry({
+    topic: 'indoor enrichment',
+    magazine: 'cat',
+    language: 'en-US',
+    provider: 'openai'
+  }, createUiResultFixture());
+
+  assert.equal(clearHistoryEntries(addHistoryEntry([], entry)).length, 0);
+});
+
+test('web history rendering shows metadata relative time and current highlight', () => {
+  const entry = createHistoryEntry({
+    topic: '고양이가 밤에 뛰어다니는 이유',
+    magazine: 'cat',
+    language: 'ko-KR',
+    provider: 'gemini'
+  }, createUiResultFixture(), new Date('2026-07-15T00:00:00.000Z'));
+  const html = renderHistoryEntries([entry], entry.id, new Date('2026-07-15T00:05:00.000Z'));
+
+  assert.match(html, /고양이가 밤에 뛰어다니는 이유/);
+  assert.match(html, /gemini · cat · ko-KR · 5m ago/);
+  assert.match(html, /history-item current/);
+  assert.match(html, /aria-current="true"/);
+});
+
+test('web history relative timestamps support session-friendly labels', () => {
+  assert.equal(
+    formatRelativeTimestamp('2026-07-15T00:00:30.000Z', new Date('2026-07-15T00:00:50.000Z')),
+    'just now'
+  );
+  assert.equal(
+    formatRelativeTimestamp('2026-07-15T00:00:00.000Z', new Date('2026-07-15T02:00:00.000Z')),
+    '2h ago'
+  );
 });
 
 test('web result rendering shows useful generation sections', () => {

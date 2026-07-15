@@ -30,6 +30,8 @@ http://127.0.0.1:3000
 
 The Web MVP uses the existing `POST /generate` API and the default mock provider path, so no external AI API, database, authentication, queue execution, or publishing is required for local demos. Enter a topic, choose `cat` or `dog`, choose `ko-KR` or `en-US`, choose an AI provider, and click Generate to render the workflow status, provider, elapsed generation time, article, summary, SEO, FAQ, selected image metadata, monetization preview, quality score, editorial review, and approval decision. After generation succeeds, use Copy Article or Copy Markdown to reuse the article title/body or a Markdown package containing summary, article, SEO, and FAQ sections.
 
+The browser also keeps a session-only generation history in memory. Each generated result is listed with topic, provider, magazine, language, and relative timestamp. Selecting a history item restores the saved result without making a new API request. Clear History removes only the current browser-session list; no database or authentication is involved.
+
 AI provider options in the browser:
 
 - Mock: default, deterministic, no external API required.

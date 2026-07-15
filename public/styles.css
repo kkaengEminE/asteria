@@ -150,6 +150,62 @@ button:disabled {
   color: #a43131;
 }
 
+.history-panel {
+  margin: 0 0 14px;
+  border: 1px solid #d8dee6;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px 16px;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.history-header h2 {
+  font-size: 17px;
+}
+
+.history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.history-empty {
+  color: #607083;
+}
+
+.history-item {
+  height: auto;
+  border-color: #d8dee6;
+  background: #f8fafc;
+  color: #17202a;
+  padding: 10px;
+  text-align: left;
+}
+
+.history-item.current {
+  border-color: #25364a;
+  background: #edf3f8;
+}
+
+.history-topic {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 750;
+}
+
+.history-meta {
+  display: block;
+  color: #607083;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .message {
   min-height: 22px;
   margin: 10px 2px 14px;
@@ -251,6 +307,12 @@ summary {
 
   .secondary-button {
     width: 100%;
+  }
+
+  .history-header {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
   }
 
   .topbar {

@@ -21,9 +21,14 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
   const copyArticleButton = doc.querySelector('#copy-article-button');
   const copyMarkdownButton = doc.querySelector('#copy-markdown-button');
   const copyFeedback = doc.querySelector('#copy-feedback');
+  const historyList = doc.querySelector('#history-list');
+  const clearHistoryButton = doc.querySelector('#clear-history-button');
   let currentResult = null;
+  let historyEntries = [];
+  let currentHistoryId = null;
 
   setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
+  renderHistoryPanel(historyList, clearHistoryButton, historyEntries, currentHistoryId);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -59,12 +64,18 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
       result.className = 'result';
       result.innerHTML = renderResult(payload);
       currentResult = payload;
+      const historyEntry = createHistoryEntry(formState, payload);
+      historyEntries = addHistoryEntry(historyEntries, historyEntry);
+      currentHistoryId = historyEntry.id;
+      renderHistoryPanel(historyList, clearHistoryButton, historyEntries, currentHistoryId);
       setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, true);
     } catch (error) {
       showError(message, error instanceof Error ? error.message : 'Generate request failed.');
       result.className = 'result';
       result.innerHTML = renderError(error instanceof Error ? error.message : 'Generate request failed.');
       currentResult = null;
+      currentHistoryId = null;
+      renderHistoryPanel(historyList, clearHistoryButton, historyEntries, currentHistoryId);
       setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
     } finally {
       setLoading(button, message, result, false);
@@ -85,6 +96,36 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
       clipboardImpl,
       copyFeedback
     );
+  });
+
+  historyList?.addEventListener('click', (event) => {
+    const historyButton = event.target?.closest?.('[data-history-id]');
+
+    if (!historyButton) {
+      return;
+    }
+
+    const entry = restoreHistoryEntry(historyEntries, historyButton.dataset.historyId);
+
+    if (!entry) {
+      return;
+    }
+
+    currentResult = entry.result;
+    currentHistoryId = entry.id;
+    restoreFormState(doc, entry);
+    message.className = 'message';
+    message.textContent = 'History result restored.';
+    result.className = 'result';
+    result.innerHTML = renderResult(entry.result);
+    setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, true);
+    renderHistoryPanel(historyList, clearHistoryButton, historyEntries, currentHistoryId);
+  });
+
+  clearHistoryButton?.addEventListener('click', () => {
+    historyEntries = clearHistoryEntries();
+    currentHistoryId = null;
+    renderHistoryPanel(historyList, clearHistoryButton, historyEntries, currentHistoryId);
   });
 }
 
@@ -174,6 +215,79 @@ export function buildMarkdownCopyText(result) {
     '## FAQ',
     faqText
   ].join('\n\n').trim();
+}
+
+export function createHistoryEntry(formState, result, generatedAt = new Date()) {
+  const request = buildGenerateRequest(formState);
+
+  return {
+    id: `${Date.parse(generatedAt.toISOString())}-${Math.random().toString(36).slice(2)}`,
+    topic: request.topic,
+    magazine: request.magazine,
+    language: request.language,
+    provider: request.provider,
+    generatedAt: generatedAt.toISOString(),
+    result
+  };
+}
+
+export function addHistoryEntry(entries, entry) {
+  return [entry, ...entries];
+}
+
+export function restoreHistoryEntry(entries, id) {
+  return entries.find((entry) => entry.id === id) ?? null;
+}
+
+export function clearHistoryEntries() {
+  return [];
+}
+
+export function renderHistoryEntries(entries, currentHistoryId, now = new Date()) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return '<p class="history-empty">No generated results yet.</p>';
+  }
+
+  return entries.map((entry) => {
+    const isCurrent = entry.id === currentHistoryId;
+    const className = isCurrent ? 'history-item current' : 'history-item';
+
+    return `
+      <button class="${className}" type="button" data-history-id="${escapeHtml(entry.id)}" aria-current="${isCurrent ? 'true' : 'false'}">
+        <span class="history-topic">${escapeHtml(entry.topic)}</span>
+        <span class="history-meta">${escapeHtml(entry.provider)} · ${escapeHtml(entry.magazine)} · ${escapeHtml(entry.language)} · ${escapeHtml(formatRelativeTimestamp(entry.generatedAt, now))}</span>
+      </button>
+    `;
+  }).join('');
+}
+
+export function formatRelativeTimestamp(generatedAt, now = new Date()) {
+  const generatedTime = Date.parse(generatedAt);
+  const nowTime = Date.parse(now.toISOString());
+
+  if (!Number.isFinite(generatedTime) || !Number.isFinite(nowTime)) {
+    return 'just now';
+  }
+
+  const elapsedSeconds = Math.max(0, Math.floor((nowTime - generatedTime) / 1000));
+
+  if (elapsedSeconds < 60) {
+    return 'just now';
+  }
+
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+
+  if (elapsedMinutes < 60) {
+    return `${elapsedMinutes}m ago`;
+  }
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+
+  if (elapsedHours < 24) {
+    return `${elapsedHours}h ago`;
+  }
+
+  return `${Math.floor(elapsedHours / 24)}d ago`;
 }
 
 export function renderResult(result) {
@@ -288,6 +402,29 @@ function setCopyFeedback(feedback, success) {
   const state = getCopyFeedbackState(success);
   feedback.className = state.className;
   feedback.textContent = state.text;
+}
+
+function renderHistoryPanel(historyList, clearHistoryButton, entries, currentHistoryId) {
+  if (historyList) {
+    historyList.innerHTML = renderHistoryEntries(entries, currentHistoryId);
+  }
+
+  if (clearHistoryButton) {
+    clearHistoryButton.disabled = entries.length === 0;
+  }
+}
+
+function restoreFormState(doc, entry) {
+  setControlValue(doc.querySelector('#topic'), entry.topic);
+  setControlValue(doc.querySelector('#magazine'), entry.magazine);
+  setControlValue(doc.querySelector('#language'), entry.language);
+  setControlValue(doc.querySelector('#provider'), entry.provider);
+}
+
+function setControlValue(control, value) {
+  if (control) {
+    control.value = value;
+  }
 }
 
 function showError(message, text) {
