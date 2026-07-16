@@ -6,6 +6,7 @@ import {
   buildMarkdownCopyText,
   addHistoryEntry,
   clearHistoryEntries,
+  createWorkingCopy,
   createHistoryEntry,
   buildCompareFields,
   canCompare,
@@ -21,6 +22,7 @@ import {
   renderResult,
   restoreHistoryEntry,
   toggleCompareSelection,
+  updateWorkingCopy,
   validateGenerateForm
 } from '../public/app.js';
 
@@ -114,6 +116,59 @@ test('web copy markdown includes reusable sections and preserves Korean text', (
   assert.match(markdown, /놀이와 활동 리듬 때문일 수 있습니다/);
 });
 
+test('web editor creates an independent browser-side working copy', () => {
+  const original = createUiResultFixture();
+  const workingCopy = createWorkingCopy(original);
+
+  updateWorkingCopy(workingCopy, 'title', '편집된 제목');
+  updateWorkingCopy(workingCopy, 'body', '편집된 본문');
+  updateWorkingCopy(workingCopy, 'summary', '편집된 요약');
+  updateWorkingCopy(workingCopy, 'seoTitle', '편집된 SEO 제목');
+  updateWorkingCopy(workingCopy, 'seoDescription', '편집된 SEO 설명');
+  updateWorkingCopy(workingCopy, 'faqQuestion', '편집된 질문', 0);
+  updateWorkingCopy(workingCopy, 'faqAnswer', '편집된 답변', 0);
+
+  assert.notEqual(workingCopy, original);
+  assert.equal(original.publishingPackage.article.title, 'Mock Article: 고양이가 밤에 뛰어다니는 이유');
+  assert.equal(original.publishingPackage.faq[0].question, '왜 밤에 뛰나요?');
+  assert.equal(workingCopy.publishingPackage.article.title, '편집된 제목');
+  assert.equal(workingCopy.publishingPackage.article.body, '편집된 본문');
+  assert.equal(workingCopy.publishingPackage.summary.text, '편집된 요약');
+  assert.equal(workingCopy.publishingPackage.seo.metaTitle, '편집된 SEO 제목');
+  assert.equal(workingCopy.publishingPackage.seo.metaDescription, '편집된 SEO 설명');
+  assert.equal(workingCopy.publishingPackage.faq[0].question, '편집된 질문');
+  assert.equal(workingCopy.publishingPackage.faq[0].answer, '편집된 답변');
+});
+
+test('web copy actions export edited working-copy content', () => {
+  const workingCopy = createWorkingCopy(createUiResultFixture());
+
+  updateWorkingCopy(workingCopy, 'title', 'Edited title');
+  updateWorkingCopy(workingCopy, 'body', 'Edited body');
+  updateWorkingCopy(workingCopy, 'summary', 'Edited summary');
+  updateWorkingCopy(workingCopy, 'seoTitle', 'Edited SEO title');
+  updateWorkingCopy(workingCopy, 'seoDescription', 'Edited SEO description');
+  updateWorkingCopy(workingCopy, 'faqQuestion', 'Edited question?', 0);
+  updateWorkingCopy(workingCopy, 'faqAnswer', 'Edited answer.', 0);
+
+  assert.equal(buildArticleCopyText(workingCopy), 'Edited title\n\nEdited body');
+  const markdown = buildMarkdownCopyText(workingCopy);
+  assert.match(markdown, /^# Edited title/);
+  assert.match(markdown, /Edited summary/);
+  assert.match(markdown, /Title: Edited SEO title/);
+  assert.match(markdown, /Description: Edited SEO description/);
+  assert.match(markdown, /Edited question\?/);
+  assert.match(markdown, /Edited answer\./);
+});
+
+test('web result opens as an editor for every required field', () => {
+  const html = renderResult(createUiResultFixture());
+
+  for (const field of ['title', 'body', 'summary', 'seoTitle', 'seoDescription', 'faqQuestion', 'faqAnswer']) {
+    assert.match(html, new RegExp(`data-edit-field="${field}"`));
+  }
+});
+
 test('web copy feedback exposes copied and failed states', () => {
   assert.deepEqual(getCopyFeedbackState(true), {
     className: 'copy-feedback',
@@ -158,6 +213,24 @@ test('web history restore returns stored result without requiring an api request
   assert.equal(restored?.magazine, 'dog');
   assert.equal(restored?.provider, 'mock');
   assert.equal(apiRequestCount, 0);
+});
+
+test('web history restores and compare reads the edited working copy', () => {
+  const original = createUiResultFixture();
+  const entry = createHistoryEntry({
+    topic: 'Topic',
+    magazine: 'cat',
+    language: 'en-US',
+    provider: 'mock'
+  }, original);
+
+  updateWorkingCopy(entry.workingCopy, 'title', 'History edit');
+  const restored = restoreHistoryEntry([entry], entry.id);
+  const [fields] = buildCompareFields([entry]);
+
+  assert.equal(restored?.workingCopy.publishingPackage.article.title, 'History edit');
+  assert.equal(fields.title, 'History edit');
+  assert.notEqual(entry.workingCopy, original);
 });
 
 test('web history clear removes all session entries', () => {

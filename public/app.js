@@ -75,10 +75,10 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
       message.className = 'message';
       message.textContent = 'Generation complete.';
       result.className = 'result';
-      result.innerHTML = renderResult(payload);
-      currentResult = payload;
+      currentResult = createWorkingCopy(payload);
+      result.innerHTML = renderResult(currentResult);
       compareMode = false;
-      const historyEntry = createHistoryEntry(formState, payload);
+      const historyEntry = createHistoryEntry(formState, payload, new Date(), currentResult);
       historyEntries = addHistoryEntry(historyEntries, historyEntry);
       currentHistoryId = historyEntry.id;
       renderHistoryPanel({
@@ -131,6 +131,21 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
     );
   });
 
+  result?.addEventListener('input', (event) => {
+    const editorField = event.target?.closest?.('[data-edit-field]');
+
+    if (!editorField || !currentResult || compareMode) {
+      return;
+    }
+
+    updateWorkingCopy(
+      currentResult,
+      editorField.dataset.editField,
+      editorField.value,
+      Number(editorField.dataset.faqIndex)
+    );
+  });
+
   historyList?.addEventListener('click', (event) => {
     const compareCheckbox = event.target?.closest?.('[data-compare-id]');
 
@@ -165,14 +180,15 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
       return;
     }
 
-    currentResult = entry.result;
+    currentResult = entry.workingCopy ?? createWorkingCopy(entry.result);
+    entry.workingCopy = currentResult;
     currentHistoryId = entry.id;
     compareMode = false;
     restoreFormState(doc, entry);
     message.className = 'message';
     message.textContent = 'History result restored.';
     result.className = 'result';
-    result.innerHTML = renderResult(entry.result);
+    result.innerHTML = renderResult(currentResult);
     setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, true);
     renderHistoryPanel({
       historyList,
@@ -334,7 +350,48 @@ export function buildMarkdownCopyText(result) {
   ].join('\n\n').trim();
 }
 
-export function createHistoryEntry(formState, result, generatedAt = new Date()) {
+export function createWorkingCopy(result) {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(result);
+  }
+
+  return JSON.parse(JSON.stringify(result));
+}
+
+export function updateWorkingCopy(workingCopy, field, value, faqIndex = Number.NaN) {
+  const packageData = workingCopy?.publishingPackage;
+
+  if (!packageData) {
+    return workingCopy;
+  }
+
+  const fieldPaths = {
+    title: ['article', 'title'],
+    body: ['article', 'body'],
+    summary: ['summary', 'text'],
+    seoTitle: ['seo', 'metaTitle'],
+    seoDescription: ['seo', 'metaDescription']
+  };
+  const path = fieldPaths[field];
+
+  if (path) {
+    packageData[path[0]] ??= {};
+    packageData[path[0]][path[1]] = value;
+    return workingCopy;
+  }
+
+  if ((field === 'faqQuestion' || field === 'faqAnswer') && Number.isInteger(faqIndex)) {
+    const faqItem = packageData.faq?.[faqIndex];
+
+    if (faqItem) {
+      faqItem[field === 'faqQuestion' ? 'question' : 'answer'] = value;
+    }
+  }
+
+  return workingCopy;
+}
+
+export function createHistoryEntry(formState, result, generatedAt = new Date(), workingCopy = createWorkingCopy(result)) {
   const request = buildGenerateRequest(formState);
 
   return {
@@ -344,7 +401,8 @@ export function createHistoryEntry(formState, result, generatedAt = new Date()) 
     language: request.language,
     provider: request.provider,
     generatedAt: generatedAt.toISOString(),
-    result
+    result,
+    workingCopy
   };
 }
 
@@ -430,7 +488,7 @@ export function renderCompareView(entries) {
 
 export function buildCompareFields(entries) {
   return entries.map((entry) => {
-    const result = entry.result ?? {};
+    const result = entry.workingCopy ?? entry.result ?? {};
     const packageData = result.publishingPackage ?? {};
     const article = packageData.article ?? {};
     const summary = packageData.summary ?? {};
@@ -529,16 +587,15 @@ export function renderResult(result) {
       ? section('Error', `<p>${escapeHtml(result.error)}</p>`)
       : '',
     section('Article', `
-      <h3>${escapeHtml(article.title ?? 'Untitled')}</h3>
-      <p>${escapeHtml(article.summary ?? summary.text ?? 'No summary available.')}</p>
-      <pre>${escapeHtml(article.body ?? 'No article body available.')}</pre>
-    `),
-    section('Summary', `<p>${escapeHtml(summary.text ?? article.summary ?? 'No summary available.')}</p>`),
+      ${editorField('Title', 'title', article.title ?? '')}
+      ${editorField('Body', 'body', article.body ?? '', 'editor-textarea editor-body')}
+    `, 'editor-section'),
+    section('Summary', editorField('Summary', 'summary', summary.text ?? article.summary ?? '', 'editor-textarea'), 'editor-section'),
     section('SEO', `
-      <p><strong>Title:</strong> ${escapeHtml(seo.metaTitle ?? 'Unavailable')}</p>
-      <p><strong>Description:</strong> ${escapeHtml(seo.metaDescription ?? 'Unavailable')}</p>
-    `),
-    section('FAQ', renderFaq(packageData.faq)),
+      ${editorField('SEO title', 'seoTitle', seo.metaTitle ?? '')}
+      ${editorField('SEO description', 'seoDescription', seo.metaDescription ?? '', 'editor-textarea')}
+    `, 'editor-section'),
+    section('FAQ', renderEditableFaq(packageData.faq), 'editor-section'),
     section('Selected Image', selectedImage
       ? `
         <p><strong>Filename:</strong> ${escapeHtml(selectedImage.filename)}</p>
@@ -695,6 +752,40 @@ function renderFaq(faq = []) {
   `).join('')}</ul>`;
 }
 
+function editorField(label, field, value, className = 'editor-input') {
+  const isTextarea = className.includes('textarea');
+  const attributes = `class="${className}" data-edit-field="${field}" aria-label="${escapeHtml(label)}"`;
+
+  return `
+    <label class="editor-field">
+      <span>${escapeHtml(label)}</span>
+      ${isTextarea
+        ? `<textarea ${attributes}>${escapeHtml(value)}</textarea>`
+        : `<input ${attributes} type="text" value="${escapeHtml(value)}">`}
+    </label>
+  `;
+}
+
+function renderEditableFaq(faq = []) {
+  if (!Array.isArray(faq) || faq.length === 0) {
+    return '<p>No FAQ available.</p>';
+  }
+
+  return `<div class="faq-editor">${faq.map((item, index) => `
+    <fieldset class="faq-item">
+      <legend>FAQ ${index + 1}</legend>
+      <label class="editor-field">
+        <span>Question</span>
+        <input class="editor-input" type="text" data-edit-field="faqQuestion" data-faq-index="${index}" aria-label="FAQ ${index + 1} question" value="${escapeHtml(item.question ?? '')}">
+      </label>
+      <label class="editor-field">
+        <span>Answer</span>
+        <textarea class="editor-textarea" data-edit-field="faqAnswer" data-faq-index="${index}" aria-label="FAQ ${index + 1} answer">${escapeHtml(item.answer ?? '')}</textarea>
+      </label>
+    </fieldset>
+  `).join('')}</div>`;
+}
+
 function renderCompareColumn(entry, fieldRows, differingKeys) {
   const fields = fieldRows.find((row) => row.id === entry.id);
 
@@ -738,8 +829,8 @@ function renderCompareFaq(faq = []) {
   return faq.map((item) => `${item.question ?? ''}\n${item.answer ?? ''}`.trim()).join('\n\n');
 }
 
-function section(title, body) {
-  return `<section class="section"><h2>${escapeHtml(title)}</h2>${body}</section>`;
+function section(title, body, className = '') {
+  return `<section class="section${className ? ` ${className}` : ''}"><h2>${escapeHtml(title)}</h2>${body}</section>`;
 }
 
 function metric(label, value) {
