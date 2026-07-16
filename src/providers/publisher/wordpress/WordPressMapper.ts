@@ -4,7 +4,7 @@ import type { WordPressTransportPostResponse } from './WordPressTransport.ts';
 
 export function mapPublishRequestToWordPressPostPayload(
   request: PublishRequest,
-  defaultStatus: WordPressPostPayload['status'] = 'draft'
+  _defaultStatus: WordPressPostPayload['status'] = 'draft'
 ): WordPressPostPayload {
   return createWordPressPostPayload({
     draft: {
@@ -27,7 +27,7 @@ export function mapPublishRequestToWordPressPostPayload(
       ...request.metadata,
       publishingPackageMetadata: request.publishingPackage.metadata
     }
-  }, defaultStatus);
+  }, 'draft');
 }
 
 export function mapWordPressResponseToPublishResult(input: {
@@ -38,7 +38,8 @@ export function mapWordPressResponseToPublishResult(input: {
   siteUrl: string;
   publishingEnabled: boolean;
 }): PublishResult {
-  const publishId = `wordpress-preview-${String(input.response.id)}`;
+  const publishId = `wordpress-draft-${String(input.response.id)}`;
+  const editUrl = `${input.siteUrl.replace(/\/+$/, '')}/wp-admin/post.php?post=${encodeURIComponent(String(input.response.id))}&action=edit`;
 
   return {
     status: 'PREVIEW',
@@ -46,18 +47,19 @@ export function mapWordPressResponseToPublishResult(input: {
     mode: 'preview',
     destination: input.request.destination,
     publishId,
-    previewUrl: input.response.link ?? `${input.siteUrl.replace(/\/+$/, '')}/?p=${input.response.id}`,
-    message: `WordPress adapter preview created for "${input.post.title}". Publishing remains disabled.`,
+    previewUrl: editUrl,
+    message: `WordPress draft created for "${input.post.title}". The post was not published.`,
     metadata: {
       ...input.request.metadata,
       provider: 'wordpress',
       adapter: 'wordpress',
-      dryRun: true,
+      dryRun: false,
       published: false,
       publishingEnabled: input.publishingEnabled,
       targetSite: input.siteUrl,
       post: input.post,
-      wordpressStatus: input.response.status
+      wordpressStatus: input.response.status,
+      wordpressPostId: String(input.response.id)
     }
   };
 }

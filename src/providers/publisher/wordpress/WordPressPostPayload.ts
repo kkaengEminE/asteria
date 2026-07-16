@@ -5,7 +5,7 @@ export interface WordPressPostPayload {
   content: string;
   excerpt?: string;
   slug?: string;
-  status: 'draft' | 'pending' | 'private';
+  status: 'draft';
   tags?: string[];
   metadata?: Record<string, unknown>;
 }
@@ -36,14 +36,14 @@ export interface CreateWordPressPostPayloadInput {
 
 export function createWordPressPostPayload(
   payload: CreateWordPressPostPayloadInput,
-  defaultStatus: WordPressPostPayload['status'] = 'draft'
+  _defaultStatus: WordPressPostPayload['status'] = 'draft'
 ): WordPressPostPayload {
   const postPayload: WordPressPostPayload = {
     title: payload.draft.title,
     content: payload.draft.body,
     excerpt: payload.draft.summary,
     slug: payload.draft.slug,
-    status: defaultStatus,
+    status: 'draft',
     tags: payload.draft.tags,
     metadata: {
       ...payload.metadata,

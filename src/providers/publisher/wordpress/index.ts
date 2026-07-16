@@ -15,7 +15,7 @@ export {
   WordPressPostPayloadValidationError
 } from './WordPressPostPayload.ts';
 export type { WordPressPostPayload } from './WordPressPostPayload.ts';
-export { WordPressDisabledTransport, WordPressTransportNotConfiguredError } from './WordPressTransport.ts';
+export { FetchWordPressTransport, WordPressDisabledTransport, WordPressTransportNotConfiguredError } from './WordPressTransport.ts';
 export type {
   WordPressTransport,
   WordPressTransportCreatePostRequest,

@@ -9,7 +9,7 @@ import {
   mapPublishRequestToWordPressPostPayload,
   mapWordPressResponseToPublishResult
 } from './WordPressMapper.ts';
-import { WordPressDisabledTransport, type WordPressTransport } from './WordPressTransport.ts';
+import { FetchWordPressTransport, WordPressDisabledTransport, type WordPressTransport } from './WordPressTransport.ts';
 
 export const wordpressPublisherToken = createProviderToken<Publisher>(
   'Publisher',
@@ -27,7 +27,7 @@ export class WordPressPublisher implements Publisher {
   constructor(config: WordPressPublisherConfig) {
     validateWordPressPublisherConfig(config);
     this.config = config;
-    this.transport = config.transport ?? new WordPressDisabledTransport();
+    this.transport = config.transport ?? (config.enabled ? new FetchWordPressTransport() : new WordPressDisabledTransport());
     this.retryService = config.retryService ?? new RetryService();
   }
 
@@ -59,7 +59,7 @@ export class WordPressPublisher implements Publisher {
       };
     }
 
-    const post = mapPublishRequestToWordPressPostPayload(request, this.config.defaultStatus ?? 'draft');
+    const post = mapPublishRequestToWordPressPostPayload(request, 'draft');
     this.config.auditLog?.append({
       type: 'PUBLISH_STARTED',
       actor: createWordPressActor(),

@@ -7,19 +7,32 @@ import {
   validateGenerateApiRequest,
   type GenerateApiRequest
 } from './GenerateApiRequest.ts';
+import {
+  validateWordPressDraftApiRequest,
+  WordPressDraftApiRequestError,
+  type WordPressDraftApiRequest
+} from './WordPressDraftApiRequest.ts';
+import {
+  executeWordPressDraft,
+  WordPressDraftExecutionError,
+  type WordPressDraftApiResult
+} from './WordPressDraftExecution.ts';
 
 export interface AsteriaApiServerOptions {
   generate?: GenerateHandler;
+  wordpressDraft?: WordPressDraftHandler;
   maxBodyBytes?: number;
   publicDir?: string;
 }
 
 export type GenerateHandler = (request: GenerateApiRequest) => Promise<DryRunResult>;
+export type WordPressDraftHandler = (request: WordPressDraftApiRequest) => Promise<WordPressDraftApiResult>;
 
 export interface AsteriaApiRequest {
   method: string;
   path: string;
   bodyText: string;
+  headers?: Record<string, string | undefined>;
 }
 
 export interface AsteriaApiResponse {
@@ -32,12 +45,14 @@ const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
 
 export function createAsteriaApiServer(options: AsteriaApiServerOptions = {}): Server {
   const generate = options.generate ?? defaultGenerate;
+  const wordpressDraft = options.wordpressDraft ?? executeWordPressDraft;
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   const publicDir = options.publicDir ?? join(process.cwd(), 'public');
 
   return createServer(async (request, response) => {
     await handleAsteriaApiRequest(request, response, {
       generate,
+      wordpressDraft,
       maxBodyBytes,
       publicDir
     });
@@ -49,9 +64,10 @@ export async function processAsteriaApiRequest(
   options: AsteriaApiServerOptions = {}
 ): Promise<AsteriaApiResponse> {
   const generate = options.generate ?? defaultGenerate;
+  const wordpressDraft = options.wordpressDraft ?? executeWordPressDraft;
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
 
-  if (request.path !== '/generate') {
+  if (request.path !== '/generate' && request.path !== '/wordpress/drafts') {
     return jsonResponse(404, {
       error: 'not_found',
       message: 'Route not found.'
@@ -61,7 +77,7 @@ export async function processAsteriaApiRequest(
   if (request.method !== 'POST') {
     return jsonResponse(405, {
       error: 'method_not_allowed',
-      message: 'POST /generate is required.'
+      message: `POST ${request.path} is required.`
     }, {
       Allow: 'POST'
     });
@@ -69,14 +85,22 @@ export async function processAsteriaApiRequest(
 
   try {
     const body = parseJsonBody(request.bodyText, maxBodyBytes);
-    const generateRequest = validateGenerateApiRequest(body);
-    const result = await generate(generateRequest);
+    const result = request.path === '/generate'
+      ? await generate(validateGenerateApiRequest(body))
+      : await wordpressDraft(validateWordPressDraftApiRequest(body, request.headers?.['x-client-request-id']));
 
     return jsonResponse(200, result);
   } catch (error) {
-    if (error instanceof GenerateApiRequestError || error instanceof SyntaxError) {
+    if (error instanceof GenerateApiRequestError || error instanceof WordPressDraftApiRequestError || error instanceof SyntaxError) {
       return jsonResponse(400, {
         error: 'invalid_request',
+        message: error.message
+      });
+    }
+
+    if (error instanceof WordPressDraftExecutionError) {
+      return jsonResponse(503, {
+        error: error.code,
         message: error.message
       });
     }
@@ -95,7 +119,7 @@ async function handleAsteriaApiRequest(
 ): Promise<void> {
   const path = parsePath(request);
 
-  if (request.method === 'GET' && path !== '/generate') {
+  if (request.method === 'GET' && !isApiPath(path)) {
     const staticResponse = await serveStaticAsset(path, options.publicDir);
     writeStaticResponse(response, staticResponse);
     return;
@@ -107,10 +131,22 @@ async function handleAsteriaApiRequest(
   const apiResponse = await processAsteriaApiRequest({
     method: request.method ?? 'GET',
     path,
-    bodyText
+    bodyText,
+    headers: {
+      'x-client-request-id': readHeader(request, 'x-client-request-id')
+    }
   }, options);
 
   writeApiResponse(response, apiResponse);
+}
+
+function readHeader(request: IncomingMessage, name: string): string | undefined {
+  const value = request.headers[name];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isApiPath(path: string): boolean {
+  return path === '/generate' || path === '/wordpress/drafts';
 }
 
 async function defaultGenerate(request: GenerateApiRequest): Promise<DryRunResult> {

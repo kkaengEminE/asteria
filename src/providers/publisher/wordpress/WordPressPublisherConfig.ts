@@ -1,6 +1,7 @@
 export interface WordPressPublisherConfig {
   siteUrl: string;
-  defaultStatus?: 'draft' | 'pending' | 'private';
+  siteLabel?: string;
+  defaultStatus?: 'draft';
   dryRun?: boolean;
   enabled?: boolean;
   username?: string;
@@ -20,6 +21,15 @@ export class WordPressPublisherConfigError extends Error {
 export function validateWordPressPublisherConfig(config: WordPressPublisherConfig): void {
   if (!config.siteUrl || config.siteUrl.trim().length === 0) {
     throw new WordPressPublisherConfigError('WordPress publisher config requires siteUrl.');
+  }
+
+  try {
+    const siteUrl = new URL(config.siteUrl);
+    if (!['http:', 'https:'].includes(siteUrl.protocol) || siteUrl.username || siteUrl.password) {
+      throw new Error('invalid');
+    }
+  } catch {
+    throw new WordPressPublisherConfigError('WordPress publisher config requires a safe HTTP(S) base URL.');
   }
 
   if (config.dryRun === false && config.enabled !== true) {
@@ -44,7 +54,9 @@ export function validateWordPressPublisherConfig(config: WordPressPublisherConfi
 
 export interface WordPressEnvironment {
   WORDPRESS_ENABLED?: string;
+  WORDPRESS_BASE_URL?: string;
   WORDPRESS_SITE_URL?: string;
+  WORDPRESS_SITE_LABEL?: string;
   WORDPRESS_USERNAME?: string;
   WORDPRESS_APPLICATION_PASSWORD?: string;
 }
@@ -55,7 +67,8 @@ export function createWordPressPublisherConfigFromEnv(
   return {
     dryRun: false,
     enabled: env.WORDPRESS_ENABLED === 'true',
-    siteUrl: env.WORDPRESS_SITE_URL ?? '',
+    siteUrl: env.WORDPRESS_BASE_URL ?? env.WORDPRESS_SITE_URL ?? '',
+    siteLabel: env.WORDPRESS_SITE_LABEL ?? 'Configured WordPress site',
     username: env.WORDPRESS_USERNAME,
     applicationPassword: env.WORDPRESS_APPLICATION_PASSWORD
   };

@@ -13,7 +13,12 @@ if (typeof document !== 'undefined') {
   }
 }
 
-export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = navigator.clipboard) {
+export function initAsteriaWebApp(
+  doc,
+  fetchImpl = fetch,
+  clipboardImpl = navigator.clipboard,
+  confirmImpl = globalThis.confirm
+) {
   const form = doc.querySelector('#generate-form');
   const button = doc.querySelector('#generate-button');
   const message = doc.querySelector('#form-message');
@@ -21,6 +26,8 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
   const copyArticleButton = doc.querySelector('#copy-article-button');
   const copyMarkdownButton = doc.querySelector('#copy-markdown-button');
   const copyFeedback = doc.querySelector('#copy-feedback');
+  const saveDraftButton = doc.querySelector('#save-wordpress-draft-button');
+  const draftStatus = doc.querySelector('#wordpress-draft-status');
   const historyList = doc.querySelector('#history-list');
   const clearHistoryButton = doc.querySelector('#clear-history-button');
   const compareButton = doc.querySelector('#compare-button');
@@ -30,8 +37,10 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
   let currentHistoryId = null;
   let selectedHistoryIds = [];
   let compareMode = false;
+  let draftSaving = false;
 
   setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
+  setDraftControl(saveDraftButton, draftStatus, { state: 'ready', hasResult: false });
   renderHistoryPanel({
     historyList,
     clearHistoryButton,
@@ -55,6 +64,7 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
     }
 
     currentResult = null;
+    setDraftControl(saveDraftButton, draftStatus, { state: 'ready', hasResult: false });
     setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
     setLoading(button, message, result, true);
 
@@ -92,6 +102,7 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
         compareMode
       });
       setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, true);
+      setDraftControl(saveDraftButton, draftStatus, { state: 'ready', hasResult: true });
     } catch (error) {
       showError(message, error instanceof Error ? error.message : 'Generate request failed.');
       result.className = 'result';
@@ -110,6 +121,7 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
         compareMode
       });
       setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
+      setDraftControl(saveDraftButton, draftStatus, { state: 'ready', hasResult: false });
     } finally {
       setLoading(button, message, result, false);
     }
@@ -129,6 +141,43 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
       clipboardImpl,
       copyFeedback
     );
+  });
+
+  saveDraftButton?.addEventListener('click', async () => {
+    if (!canStartWordPressDraftSave(currentResult, draftSaving, true)) return;
+
+    const confirmed = confirmImpl?.('Save this edited content as a private WordPress Draft? It will not be published.');
+    if (!canStartWordPressDraftSave(currentResult, draftSaving, confirmed)) return;
+
+    draftSaving = true;
+    setDraftControl(saveDraftButton, draftStatus, { state: 'saving', hasResult: true });
+
+    try {
+      const clientRequestId = createClientRequestId();
+      const response = await fetchImpl('/wordpress/drafts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Request-Id': clientRequestId
+        },
+        body: JSON.stringify(buildWordPressDraftRequest(
+          currentResult,
+          readFormState(doc).magazine
+        ))
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || 'WordPress draft request failed.');
+      setDraftControl(saveDraftButton, draftStatus, { state: 'saved', hasResult: true, result: payload });
+    } catch (error) {
+      setDraftControl(saveDraftButton, draftStatus, {
+        state: 'failed',
+        hasResult: true,
+        message: error instanceof Error ? error.message : 'WordPress draft request failed.'
+      });
+    } finally {
+      draftSaving = false;
+      saveDraftButton.disabled = !currentResult;
+    }
   });
 
   result?.addEventListener('input', (event) => {
@@ -190,6 +239,7 @@ export function initAsteriaWebApp(doc, fetchImpl = fetch, clipboardImpl = naviga
     result.className = 'result';
     result.innerHTML = renderResult(currentResult);
     setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, true);
+    setDraftControl(saveDraftButton, draftStatus, { state: 'ready', hasResult: true });
     renderHistoryPanel({
       historyList,
       clearHistoryButton,
@@ -348,6 +398,55 @@ export function buildMarkdownCopyText(result) {
     '## FAQ',
     faqText
   ].join('\n\n').trim();
+}
+
+export function buildWordPressDraftRequest(result, magazine) {
+  const packageData = result?.publishingPackage ?? {};
+  const article = packageData.article ?? {};
+  const summary = packageData.summary ?? {};
+  const seo = packageData.seo ?? {};
+
+  return {
+    article: {
+      title: article.title ?? '',
+      body: article.body ?? '',
+      summary: summary.text ?? article.summary ?? '',
+      slug: article.slug ?? slugifyForDraft(article.title ?? ''),
+      language: article.language ?? 'ko-KR'
+    },
+    seo: {
+      metaTitle: seo.metaTitle ?? '',
+      metaDescription: seo.metaDescription ?? '',
+      keywords: Array.isArray(seo.keywords) ? [...seo.keywords] : []
+    },
+    faq: Array.isArray(packageData.faq)
+      ? packageData.faq.map((item) => ({ question: item.question ?? '', answer: item.answer ?? '' }))
+      : [],
+    magazine: magazine === 'dog' ? 'dog' : 'cat'
+  };
+}
+
+export function getWordPressDraftButtonState(hasResult, isSaving) {
+  return {
+    disabled: !hasResult || isSaving,
+    label: isSaving ? 'Saving draft...' : 'Save to WordPress Draft'
+  };
+}
+
+export function canStartWordPressDraftSave(currentResult, isSaving, confirmed) {
+  return Boolean(currentResult) && !isSaving && confirmed === true;
+}
+
+export function renderWordPressDraftState({ state, hasResult, result, message }) {
+  if (state === 'saving') return '<strong>Saving draft</strong><span>Sending the edited working copy as Draft only.</span>';
+  if (state === 'saved') {
+    const editLink = result?.editUrl
+      ? `<a href="${escapeHtml(result.editUrl)}" target="_blank" rel="noreferrer">Open draft editor</a>`
+      : '<span>Edit URL unavailable.</span>';
+    return `<strong>Draft saved</strong><span>ID: ${escapeHtml(result?.draftId ?? 'Unavailable')}</span><span>Site: ${escapeHtml(result?.destinationSite ?? 'Configured WordPress site')}</span><span>Saved: ${escapeHtml(result?.savedAt ?? '')}</span>${editLink}`;
+  }
+  if (state === 'failed') return `<strong>Draft failed</strong><span>${escapeHtml(message ?? 'WordPress draft request failed.')}</span>`;
+  return `<strong>Ready</strong><span>${hasResult ? 'The edited working copy is ready to save as Draft.' : 'Generate content to enable draft saving.'}</span>`;
 }
 
 export function createWorkingCopy(result) {
@@ -647,6 +746,26 @@ function setCopyControls(buttons, feedback, hasResult) {
     feedback.className = 'copy-feedback';
     feedback.textContent = '';
   }
+}
+
+function setDraftControl(button, statusElement, options) {
+  if (button) {
+    const state = getWordPressDraftButtonState(options.hasResult, options.state === 'saving');
+    button.disabled = state.disabled;
+    button.textContent = state.label;
+  }
+  if (statusElement) {
+    statusElement.className = `draft-status ${options.state}`;
+    statusElement.innerHTML = renderWordPressDraftState(options);
+  }
+}
+
+function createClientRequestId() {
+  return globalThis.crypto?.randomUUID?.() ?? `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function slugifyForDraft(value) {
+  return String(value).trim().toLowerCase().replace(/[^a-z0-9가-힣]+/g, '-').replace(/^-|-$/g, '') || 'wordpress-draft';
 }
 
 async function copyGeneratedText(text, clipboard, feedback) {

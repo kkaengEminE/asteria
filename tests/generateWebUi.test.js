@@ -4,6 +4,8 @@ import {
   buildArticleCopyText,
   buildGenerateRequest,
   buildMarkdownCopyText,
+  buildWordPressDraftRequest,
+  canStartWordPressDraftSave,
   addHistoryEntry,
   clearHistoryEntries,
   createWorkingCopy,
@@ -16,10 +18,12 @@ import {
   getCopyButtonState,
   getCopyFeedbackState,
   getGenerateButtonState,
+  getWordPressDraftButtonState,
   renderHistoryEntries,
   renderCompareView,
   renderError,
   renderResult,
+  renderWordPressDraftState,
   restoreHistoryEntry,
   toggleCompareSelection,
   updateWorkingCopy,
@@ -159,6 +163,63 @@ test('web copy actions export edited working-copy content', () => {
   assert.match(markdown, /Description: Edited SEO description/);
   assert.match(markdown, /Edited question\?/);
   assert.match(markdown, /Edited answer\./);
+});
+
+test('wordpress draft request uses every edited working-copy field', () => {
+  const workingCopy = createWorkingCopy(createUiResultFixture());
+  updateWorkingCopy(workingCopy, 'title', 'Draft title');
+  updateWorkingCopy(workingCopy, 'body', 'Draft body');
+  updateWorkingCopy(workingCopy, 'summary', 'Draft summary');
+  updateWorkingCopy(workingCopy, 'seoTitle', 'Draft SEO title');
+  updateWorkingCopy(workingCopy, 'seoDescription', 'Draft SEO description');
+  updateWorkingCopy(workingCopy, 'faqQuestion', 'Draft question?', 0);
+  updateWorkingCopy(workingCopy, 'faqAnswer', 'Draft answer.', 0);
+
+  const request = buildWordPressDraftRequest(workingCopy, 'dog');
+
+  assert.equal(request.article.title, 'Draft title');
+  assert.equal(request.article.body, 'Draft body');
+  assert.equal(request.article.summary, 'Draft summary');
+  assert.equal(request.seo.metaTitle, 'Draft SEO title');
+  assert.equal(request.seo.metaDescription, 'Draft SEO description');
+  assert.deepEqual(request.faq, [{ question: 'Draft question?', answer: 'Draft answer.' }]);
+  assert.equal(request.magazine, 'dog');
+  assert.equal('status' in request, false);
+  assert.equal('clientRequestId' in request, false);
+});
+
+test('wordpress draft controls cover disabled loading confirmation and duplicate prevention', () => {
+  assert.deepEqual(getWordPressDraftButtonState(false, false), {
+    disabled: true,
+    label: 'Save to WordPress Draft'
+  });
+  assert.deepEqual(getWordPressDraftButtonState(true, true), {
+    disabled: true,
+    label: 'Saving draft...'
+  });
+  assert.equal(canStartWordPressDraftSave({}, false, true), true);
+  assert.equal(canStartWordPressDraftSave({}, false, false), false);
+  assert.equal(canStartWordPressDraftSave({}, true, true), false);
+  assert.equal(canStartWordPressDraftSave(null, false, true), false);
+});
+
+test('wordpress draft states render ready success and redacted failure details', () => {
+  assert.match(renderWordPressDraftState({ state: 'ready', hasResult: true }), /Ready/);
+  assert.match(renderWordPressDraftState({ state: 'saving', hasResult: true }), /Saving draft/);
+  const success = renderWordPressDraftState({
+    state: 'saved',
+    hasResult: true,
+    result: {
+      draftId: '88',
+      editUrl: 'https://example.test/wp-admin/post.php?post=88&amp;action=edit',
+      destinationSite: 'Editorial WordPress',
+      savedAt: '2026-07-16T00:00:00.000Z'
+    }
+  });
+  assert.match(success, /Draft saved/);
+  assert.match(success, /ID: 88/);
+  assert.match(success, /Editorial WordPress/);
+  assert.match(renderWordPressDraftState({ state: 'failed', message: 'Safe failure' }), /Draft failed/);
 });
 
 test('web result opens as an editor for every required field', () => {

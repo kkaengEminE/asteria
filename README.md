@@ -34,6 +34,25 @@ The browser also keeps a session-only generation history in memory. Each generat
 
 History entries can also be compared side-by-side. Select two or three history checkboxes, click Compare, and Asteria renders parallel columns for provider, topic, magazine, language, generation timestamp, article, SEO, FAQ, quality score, editorial score, approval decision, and available Instagram or Podcast previews. Differing provider, title, summary, quality score, and approval values are highlighted. Compare mode uses stored browser-session results only and does not call `POST /generate`.
 
+### WordPress drafts
+
+The browser editor can send its current edited working copy to `POST /wordpress/drafts`. This path creates a WordPress **Draft only**; public publishing is unavailable. It is disabled by default and does not affect mock generation, dry runs, History, or Compare.
+
+Enable draft saving explicitly before starting `npm run dev`:
+
+```bash
+WORDPRESS_ENABLED=true
+ASTERIA_WORDPRESS_DRAFT_ENABLED=true
+WORDPRESS_BASE_URL=https://wordpress.example
+WORDPRESS_USERNAME=editor
+WORDPRESS_APPLICATION_PASSWORD='application-password'
+WORDPRESS_SITE_LABEL='Editorial WordPress'
+```
+
+Use a WordPress Application Password created for a dedicated least-privilege editor account. Keep it in the local environment or secret manager; never add it to browser requests, source files, logs, screenshots, or commits. Base URLs containing embedded credentials are rejected.
+
+After generation, edit the document and select **Save to WordPress Draft**. Confirm the draft-only dialog, then use the returned draft ID and edit URL to open WordPress administration. Verify the post status reads **Draft** before making any further changes. The application exposes no public publish endpoint and sends `status: draft` regardless of adapter defaults.
+
 AI provider options in the browser:
 
 - Mock: default, deterministic, no external API required.
@@ -190,7 +209,7 @@ Scheduled Job Executor sits after Scheduler. It checks due status, skips future/
 
 Publisher Foundation sits between scheduled execution and concrete publisher adapters. It defines provider-neutral publish request/result/failure/status models, validates requests, dispatches through PublisherService, audits publish started/succeeded/failed/skipped events, and supports DryRunPublisher preview mode while real publishing remains disabled.
 
-WordPress Publisher Adapter sits behind the Publisher boundary. It maps provider-neutral publish requests into WordPress post payloads, uses an injectable transport, retries recoverable transport failures, emits publish audit events, and requires `WORDPRESS_ENABLED=true`, `WORDPRESS_SITE_URL`, `WORDPRESS_USERNAME`, and `WORDPRESS_APPLICATION_PASSWORD` before adapter execution. Tests use mocked transport only.
+WordPress Publisher Adapter sits behind the Publisher boundary. It maps provider-neutral publish requests into draft-only WordPress post payloads, uses an injectable transport, retries recoverable transport failures, emits publish audit events, and requires `WORDPRESS_ENABLED=true`, `ASTERIA_WORDPRESS_DRAFT_ENABLED=true`, `WORDPRESS_BASE_URL`, `WORDPRESS_USERNAME`, and `WORDPRESS_APPLICATION_PASSWORD` for the browser draft endpoint. Tests use mocked transport only.
 
 Legacy provider contracts are being retired gradually. Current AI providers live under `src/providers/ai`, publisher execution models live under `src/domain/publisher`, and provider adapters must not import obsolete `src/core` contracts. Remaining `src/core` contracts are kept only where they are still active or compatibility-safe.
 
@@ -216,7 +235,7 @@ Retry Foundation provides a reusable retry service for future AI providers, stor
 
 The CLI loads `.env` automatically for local development. Existing exported shell environment variables take precedence over `.env` values. OpenAI production mode requires `OPENAI_PRODUCTION_ENABLED=true` and `OPENAI_API_KEY`. Gemini production mode requires `GEMINI_PRODUCTION_ENABLED=true` and `GEMINI_API_KEY`. Without the matching flag and key, the dry run fails clearly before any external request is made and names the required variables.
 
-WordPress adapter execution requires `WORDPRESS_ENABLED=true`, `WORDPRESS_SITE_URL`, `WORDPRESS_USERNAME`, and `WORDPRESS_APPLICATION_PASSWORD`. The default dry run does not use the WordPress adapter for scheduled execution; it uses DryRunPublisher. Real WordPress publishing remains disabled.
+WordPress browser draft execution requires `WORDPRESS_ENABLED=true`, `ASTERIA_WORDPRESS_DRAFT_ENABLED=true`, `WORDPRESS_BASE_URL`, `WORDPRESS_USERNAME`, and `WORDPRESS_APPLICATION_PASSWORD`. The legacy `WORDPRESS_SITE_URL` value remains accepted as a base URL fallback. The default dry run does not use the WordPress adapter for scheduled execution; it uses DryRunPublisher. Public WordPress publishing remains unavailable.
 
 Coupang affiliate mode requires `COUPANG_ENABLED=true`, `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY`, and `COUPANG_PARTNER_ID`. Mock affiliate mode remains the default. Coupang request and response shapes stay inside the adapter, tests use mocked transport, and dry-run output reports provider name, request count, retry count, returned products, and failure reason.
 

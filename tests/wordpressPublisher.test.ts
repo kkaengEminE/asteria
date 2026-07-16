@@ -5,6 +5,8 @@ import type { PublishRequest } from '../src/domain/publisher/index.ts';
 import { ProviderRegistry } from '../src/providers/index.ts';
 import {
   createWordPressPublisherConfigFromEnv,
+  FetchWordPressTransport,
+  mapPublishRequestToWordPressPostPayload,
   WordPressPostPayloadValidationError,
   WordPressPublisher,
   wordpressPublisherToken,
@@ -13,6 +15,7 @@ import {
   type WordPressTransportCreatePostRequest,
   type WordPressTransportPostResponse
 } from '../src/providers/publisher/wordpress/index.ts';
+import { PublisherService } from '../src/services/publisher/index.ts';
 import { AuditLog } from '../src/services/auditLog/index.ts';
 import { createInMemoryPersistenceComposition } from '../src/services/persistence/index.ts';
 
@@ -23,10 +26,10 @@ test('valid post payload returns preview publish result', async () => {
   assert.equal(result.status, 'PREVIEW');
   assert.equal(result.destination.type, 'wordpress');
   assert.equal(result.metadata?.provider, 'wordpress');
-  assert.equal(result.metadata?.dryRun, true);
+  assert.equal(result.metadata?.dryRun, false);
   assert.equal((result.metadata?.post as { title?: string }).title, 'WordPress Adapter Article');
   assert.equal((result.metadata?.post as { content?: string }).content, 'This article verifies WordPress adapter mapping without network calls.');
-  assert.match(result.message, /Publishing remains disabled/);
+  assert.match(result.message, /draft created/);
 });
 
 test('missing title fails validation', async () => {
@@ -71,9 +74,9 @@ test('wordpress publisher draft makes no external api call', async () => {
   const publisher = createEnabledPublisher({ transport });
   const result = await publisher.publish(createPublishRequest());
 
-  assert.equal(result.previewUrl, 'https://example.test/?p=101');
-  assert.equal(result.metadata?.dryRun, true);
-  assert.match(result.publishId ?? '', /^wordpress-preview-/);
+  assert.equal(result.previewUrl, 'https://example.test/wp-admin/post.php?post=101&action=edit');
+  assert.equal(result.metadata?.dryRun, false);
+  assert.match(result.publishId ?? '', /^wordpress-draft-/);
   assert.equal(transport.networkCalls, 0);
 });
 
@@ -121,11 +124,55 @@ test('wordpress publisher maps publish request through mocked transport', async 
 
   assert.equal(result.status, 'PREVIEW');
   assert.equal(result.publisher, 'wordpress');
-  assert.equal(result.previewUrl, 'https://example.test/?p=101');
+  assert.equal(result.previewUrl, 'https://example.test/wp-admin/post.php?post=101&action=edit');
   assert.equal(result.metadata?.targetSite, 'https://example.test');
   assert.equal(result.metadata?.publishingEnabled, true);
   assert.equal(transport.requests.length, 1);
   assert.equal(transport.requests[0].post.title, 'WordPress Adapter Article');
+  assert.equal(transport.requests[0].post.status, 'draft');
+});
+
+test('wordpress mapping forces draft status when an override is attempted', () => {
+  const post = mapPublishRequestToWordPressPostPayload(createPublishRequest(), 'publish' as 'draft');
+  assert.equal(post.status, 'draft');
+});
+
+test('wordpress draft execution reuses PublisherService and WordPressPublisher', async () => {
+  const transport = new MockWordPressTransport();
+  const service = new PublisherService({
+    publisher: createEnabledPublisher({ transport }),
+    publishingEnabled: true
+  });
+  const result = await service.publish({ ...createPublishRequest(), mode: 'production' });
+
+  assert.equal(result.publisher, 'wordpress');
+  assert.equal(result.metadata?.wordpressStatus, 'draft');
+  assert.equal(transport.requests.length, 1);
+});
+
+test('fetch wordpress transport posts only draft status through a mocked fetch', async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const transport = new FetchWordPressTransport(async (url, init) => {
+    calls.push({ url: String(url), init });
+    return new Response(JSON.stringify({ id: 303, status: 'draft' }), {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  });
+  const request = createPublishRequest();
+  const post = mapPublishRequestToWordPressPostPayload(request);
+  const response = await transport.createPost({
+    siteUrl: 'https://example.test',
+    username: 'editor',
+    applicationPassword: 'app-password',
+    post
+  });
+  const body = JSON.parse(String(calls[0].init?.body));
+
+  assert.equal(response.id, '303');
+  assert.equal(calls[0].url, 'https://example.test/wp-json/wp/v2/posts');
+  assert.equal(body.status, 'draft');
+  assert.equal(calls.length, 1);
 });
 
 test('wordpress publisher retries mocked transport failures', async () => {
