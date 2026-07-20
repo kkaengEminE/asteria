@@ -14,10 +14,13 @@ export interface WordPressDraftApiResult {
 
 export class WordPressDraftExecutionError extends Error {
   readonly code: string;
-  constructor(code: string, message: string) {
+  readonly details?: Record<string, unknown>;
+
+  constructor(code: string, message: string, details?: Record<string, unknown>) {
     super(message);
     this.name = 'WordPressDraftExecutionError';
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -59,7 +62,8 @@ function mapDraftResult(result: PublishResult, clientRequestId: string): WordPre
   if (result.status === 'FAILED' || result.status === 'SKIPPED' || !result.publishId) {
     throw new WordPressDraftExecutionError(
       result.failure?.code ?? 'wordpress_draft_failed',
-      redactWordPressError(result.failure?.reason ?? result.message)
+      redactWordPressError(result.failure?.reason ?? result.message),
+      isRecord(result.metadata?.failureDetails) ? result.metadata.failureDetails : undefined
     );
   }
   return {
@@ -70,6 +74,10 @@ function mapDraftResult(result: PublishResult, clientRequestId: string): WordPre
     savedAt: new Date().toISOString(),
     clientRequestId
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function redactWordPressError(error: unknown): string {

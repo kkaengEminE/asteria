@@ -275,7 +275,7 @@ Current WordPress publisher adapter:
 - `providers/publisher/wordpress/WordPressMapper`
 - `providers/publisher/wordpress/WordPressPostPayload`
 
-The WordPress adapter implements the provider-neutral `Publisher` interface. It maps `PublishRequest` values into WordPress post payloads, validates title and content, requires `WORDPRESS_ENABLED=true` and credentials for adapter execution, uses injectable transport, retries recoverable transport failures, records publish audit events, and returns preview results while real publishing remains disabled. Tests use mocked transport only.
+The WordPress adapter implements the provider-neutral `Publisher` interface. It maps `PublishRequest` values into draft-only REST payloads, resolves categories and tags, supports an optional existing featured-media ID, validates title and content, requires explicit environment gates and Application Password credentials, retries transient transport failures, records publish audit events, and reports structured failures. It creates drafts only; public publishing remains manual. Tests use mocked transport only.
 
 The older WordPress legacy preview payload/result helper has been removed from the adapter. Runtime dry-run compatibility uses a simple mock publisher where the older publishing workflow still needs a preview-only publisher shape.
 

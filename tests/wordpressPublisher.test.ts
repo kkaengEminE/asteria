@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createPublishingPackage, createTag, type PublishingPackage } from '../src/domain/content/index.ts';
+import { createCategory, createPublishingPackage, createTag, type PublishingPackage } from '../src/domain/content/index.ts';
 import type { PublishRequest } from '../src/domain/publisher/index.ts';
 import { ProviderRegistry } from '../src/providers/index.ts';
 import {
@@ -11,6 +11,7 @@ import {
   WordPressPublisher,
   wordpressPublisherToken,
   WordPressPublisherConfigError,
+  WordPressTransportError,
   type WordPressTransport,
   type WordPressTransportCreatePostRequest,
   type WordPressTransportPostResponse
@@ -154,12 +155,19 @@ test('fetch wordpress transport posts only draft status through a mocked fetch',
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   const transport = new FetchWordPressTransport(async (url, init) => {
     calls.push({ url: String(url), init });
+    if (String(url).includes('/categories?')) {
+      return new Response(JSON.stringify([{ id: 11, name: 'Guides' }]), { status: 200 });
+    }
+    if (String(url).includes('/tags?')) {
+      return new Response(JSON.stringify([{ id: 22, name: 'wordpress' }]), { status: 200 });
+    }
     return new Response(JSON.stringify({ id: 303, status: 'draft' }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' }
     });
   });
   const request = createPublishRequest();
+  request.metadata = { ...request.metadata, wordpressFeaturedMediaId: 44 };
   const post = mapPublishRequestToWordPressPostPayload(request);
   const response = await transport.createPost({
     siteUrl: 'https://example.test',
@@ -167,12 +175,85 @@ test('fetch wordpress transport posts only draft status through a mocked fetch',
     applicationPassword: 'app-password',
     post
   });
-  const body = JSON.parse(String(calls[0].init?.body));
+  const postCall = calls.find((call) => call.url.endsWith('/wp-json/wp/v2/posts'))!;
+  const body = JSON.parse(String(postCall.init?.body));
 
   assert.equal(response.id, '303');
-  assert.equal(calls[0].url, 'https://example.test/wp-json/wp/v2/posts');
+  assert.equal(postCall.url, 'https://example.test/wp-json/wp/v2/posts');
   assert.equal(body.status, 'draft');
-  assert.equal(calls.length, 1);
+  assert.deepEqual(body.categories, [11]);
+  assert.deepEqual(body.tags, [22]);
+  assert.equal(body.featured_media, 44);
+  assert.match(String(postCall.init?.headers && (postCall.init.headers as Record<string, string>).Authorization), /^Basic /);
+  assert.equal(calls.length, 3);
+});
+
+test('wordpress transport creates missing taxonomy terms before the draft', async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const transport = new FetchWordPressTransport(async (url, init) => {
+    calls.push({ url: String(url), init });
+    if (String(url).includes('?search=')) return new Response('[]', { status: 200 });
+    if (String(url).endsWith('/categories')) return new Response(JSON.stringify({ id: 31, name: 'Guides' }), { status: 201 });
+    if (String(url).endsWith('/tags')) return new Response(JSON.stringify({ id: 32, name: 'wordpress' }), { status: 201 });
+    return new Response(JSON.stringify({ id: 304, status: 'draft' }), { status: 201 });
+  });
+
+  await transport.createPost({
+    siteUrl: 'https://example.test',
+    username: 'draft-writer',
+    applicationPassword: 'app-password',
+    post: mapPublishRequestToWordPressPostPayload(createPublishRequest())
+  });
+
+  const postBody = JSON.parse(String(calls.at(-1)?.init?.body));
+  assert.deepEqual(postBody.categories, [31]);
+  assert.deepEqual(postBody.tags, [32]);
+  assert.equal(postBody.status, 'draft');
+  assert.equal(calls.length, 5);
+});
+
+test('wordpress transport reports non-retryable authentication failures structurally', async () => {
+  const transport = new FetchWordPressTransport(async () => new Response(JSON.stringify({
+    code: 'rest_cannot_create',
+    message: 'Unauthorized'
+  }), { status: 401 }));
+
+  await assert.rejects(
+    () => transport.createPost({
+      siteUrl: 'https://example.test',
+      username: 'draft-writer',
+      applicationPassword: 'invalid',
+      post: mapPublishRequestToWordPressPostPayload(createPublishRequest())
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof WordPressTransportError);
+      assert.equal(error.code, 'wordpress_rest_cannot_create');
+      assert.equal(error.retryable, false);
+      assert.deepEqual(error.details, {
+        operation: 'category',
+        httpStatus: 401,
+        wordpressCode: 'rest_cannot_create'
+      });
+      assert.doesNotMatch(error.message, /invalid|draft-writer/);
+      return true;
+    }
+  );
+});
+
+test('wordpress transport marks transient server failures retryable', async () => {
+  const transport = new FetchWordPressTransport(async () => new Response(JSON.stringify({
+    code: 'server_busy'
+  }), { status: 503 }));
+
+  await assert.rejects(
+    () => transport.createPost({
+      siteUrl: 'https://example.test',
+      username: 'draft-writer',
+      applicationPassword: 'app-password',
+      post: mapPublishRequestToWordPressPostPayload(createPublishRequest())
+    }),
+    (error: unknown) => error instanceof WordPressTransportError && error.retryable && error.details.httpStatus === 503
+  );
 });
 
 test('wordpress publisher retries mocked transport failures', async () => {
@@ -304,6 +385,7 @@ function createPackageFixture(): PublishingPackage {
       updatedAt: '2026-07-10T00:00:00.000Z',
       metadata: {
         status: 'draft',
+        category: createCategory('Guides'),
         tags: [createTag('wordpress')]
       }
     },

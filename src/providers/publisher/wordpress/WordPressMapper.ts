@@ -6,6 +6,8 @@ export function mapPublishRequestToWordPressPostPayload(
   request: PublishRequest,
   _defaultStatus: WordPressPostPayload['status'] = 'draft'
 ): WordPressPostPayload {
+  const category = request.publishingPackage.article.metadata.category;
+
   return createWordPressPostPayload({
     draft: {
       title: request.publishingPackage.article.title,
@@ -14,7 +16,9 @@ export function mapPublishRequestToWordPressPostPayload(
       body: request.publishingPackage.article.body,
       format: 'article',
       language: request.publishingPackage.article.language,
+      categories: category ? [category.name] : readStringArray(request.publishingPackage.metadata?.wordpressCategories),
       tags: request.publishingPackage.article.metadata.tags.map((tag) => tag.name),
+      featuredMediaId: readFeaturedMediaId(request),
       metadata: {
         seo: request.publishingPackage.seo,
         faq: request.publishingPackage.faq,
@@ -28,6 +32,15 @@ export function mapPublishRequestToWordPressPostPayload(
       publishingPackageMetadata: request.publishingPackage.metadata
     }
   }, 'draft');
+}
+
+function readFeaturedMediaId(request: PublishRequest): number | undefined {
+  const value = request.metadata?.wordpressFeaturedMediaId ?? request.publishingPackage.metadata?.wordpressFeaturedMediaId;
+  return typeof value === 'number' ? value : undefined;
+}
+
+function readStringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : undefined;
 }
 
 export function mapWordPressResponseToPublishResult(input: {

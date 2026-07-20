@@ -9,7 +9,12 @@ import {
   mapPublishRequestToWordPressPostPayload,
   mapWordPressResponseToPublishResult
 } from './WordPressMapper.ts';
-import { FetchWordPressTransport, WordPressDisabledTransport, type WordPressTransport } from './WordPressTransport.ts';
+import {
+  FetchWordPressTransport,
+  WordPressDisabledTransport,
+  WordPressTransportError,
+  type WordPressTransport
+} from './WordPressTransport.ts';
 
 export const wordpressPublisherToken = createProviderToken<Publisher>(
   'Publisher',
@@ -81,7 +86,7 @@ export class WordPressPublisher implements Publisher {
         }),
       {
         policy: {
-          maxAttempts: 2,
+          maxAttempts: 3,
           delayMs: 25
         }
       }
@@ -120,7 +125,8 @@ export class WordPressPublisher implements Publisher {
       };
     }
 
-    const message = retryResult.finalReason?.message ?? 'WordPress adapter preview failed.';
+    const message = retryResult.finalReason?.message ?? 'WordPress draft creation failed.';
+    const transportError = retryResult.error instanceof WordPressTransportError ? retryResult.error : undefined;
     this.config.auditLog?.append({
       type: 'PUBLISH_FAILED',
       actor: createWordPressActor(),
@@ -129,7 +135,8 @@ export class WordPressPublisher implements Publisher {
       metadata: {
         adapter: 'wordpress',
         failureCode: retryResult.finalReason?.code,
-        retryCount: retryResult.retryCount
+        retryCount: retryResult.retryCount,
+        failureDetails: transportError?.details
       }
     });
 
@@ -152,7 +159,8 @@ export class WordPressPublisher implements Publisher {
         targetSite: this.config.siteUrl,
         published: false,
         attemptCount: retryResult.attemptCount,
-        retryCount: retryResult.retryCount
+        retryCount: retryResult.retryCount,
+        failureDetails: transportError?.details
       }
     };
   }

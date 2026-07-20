@@ -202,4 +202,4 @@ Current editorial review output is informational. It does not publish, block pub
 
 Publishing is guarded by a provider-neutral workflow after editorial approval. The workflow requires approval metadata, skips non-approved packages, maps approved `PublishingPackage` values into `PublishingPayload`, and calls only the shared `Publisher` interface.
 
-Real publishing remains disabled by default. A future production publishing sprint must require explicit configuration, preserve approval checks, and keep provider-specific WordPress API details inside the WordPress adapter.
+Real WordPress draft creation remains disabled by default and requires explicit WordPress and browser-draft gates. The production WordPress transport preserves approval boundaries, keeps provider-specific REST details inside the adapter, and forces draft status. Public publishing remains a separate manual action in WordPress.

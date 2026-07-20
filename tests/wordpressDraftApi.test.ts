@@ -5,6 +5,7 @@ import {
   processAsteriaApiRequest,
   redactWordPressError,
   validateWordPressDraftApiRequest,
+  createWordPressDraftPublishingPackage,
   WordPressDraftExecutionError
 } from '../src/api/index.ts';
 
@@ -103,6 +104,49 @@ test('wordpress draft endpoint exposes no public publishing route', async () => 
   });
 
   assert.equal(response.statusCode, 404);
+});
+
+test('wordpress draft endpoint returns structured safe execution errors', async () => {
+  const response = await processAsteriaApiRequest({
+    method: 'POST',
+    path: '/wordpress/drafts',
+    bodyText: JSON.stringify(createDraftRequest()),
+    headers: { 'x-client-request-id': 'draft-request-failure' }
+  }, {
+    wordpressDraft: async () => {
+      throw new WordPressDraftExecutionError(
+        'wordpress_rest_cannot_create',
+        'WordPress post request failed with status 401.',
+        { operation: 'post', httpStatus: 401, wordpressCode: 'rest_cannot_create' }
+      );
+    }
+  });
+
+  assert.equal(response.statusCode, 503);
+  assert.deepEqual(response.body, {
+    error: 'wordpress_rest_cannot_create',
+    message: 'WordPress post request failed with status 401.',
+    details: { operation: 'post', httpStatus: 401, wordpressCode: 'rest_cannot_create' }
+  });
+});
+
+test('wordpress draft request maps magazine keywords and optional featured media', () => {
+  const request = validateWordPressDraftApiRequest({
+    ...createDraftRequest(),
+    featuredImageId: 91
+  }, 'draft-request-taxonomy');
+  const pkg = createWordPressDraftPublishingPackage(request, new Date('2026-07-20T00:00:00.000Z'));
+
+  assert.equal(pkg.article.metadata.category?.name, 'cat');
+  assert.deepEqual(pkg.article.metadata.tags.map((tag) => tag.name), ['editorial']);
+  assert.equal(pkg.metadata?.wordpressFeaturedMediaId, 91);
+});
+
+test('wordpress draft request rejects invalid featured media IDs', () => {
+  assert.throws(
+    () => validateWordPressDraftApiRequest({ ...createDraftRequest(), featuredImageId: 0 }, 'draft-request-image'),
+    /featuredImageId must be a positive integer/
+  );
 });
 
 function createDraftRequest() {

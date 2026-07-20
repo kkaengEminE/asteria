@@ -1,10 +1,11 @@
-import { createPublishingPackage, type PublishingPackage } from '../domain/content/index.ts';
+import { createPublishingPackage, createTag, type PublishingPackage } from '../domain/content/index.ts';
 
 export interface WordPressDraftApiRequest {
   article: { title: string; body: string; summary: string; slug: string; language: string };
   seo: { metaTitle: string; metaDescription: string; keywords: string[] };
   faq: Array<{ question: string; answer: string }>;
   magazine: 'cat' | 'dog';
+  featuredImageId?: number;
   clientRequestId: string;
 }
 
@@ -17,7 +18,7 @@ export class WordPressDraftApiRequestError extends Error {
 
 export function validateWordPressDraftApiRequest(value: unknown, clientRequestId?: string): WordPressDraftApiRequest {
   const input = requireObject(value, 'request');
-  rejectUnknownKeys(input, ['article', 'seo', 'faq', 'magazine']);
+  rejectUnknownKeys(input, ['article', 'seo', 'faq', 'magazine', 'featuredImageId']);
   const article = requireObject(input.article, 'article');
   const seo = requireObject(input.seo, 'seo');
   rejectUnknownKeys(article, ['title', 'body', 'summary', 'slug', 'language']);
@@ -50,6 +51,7 @@ export function validateWordPressDraftApiRequest(value: unknown, clientRequestId
       };
     }),
     magazine: requireMagazine(input.magazine),
+    featuredImageId: requireOptionalPositiveInteger(input.featuredImageId, 'featuredImageId'),
     clientRequestId: requireString(clientRequestId, 'X-Client-Request-Id header')
   };
 }
@@ -59,14 +61,22 @@ export function createWordPressDraftPublishingPackage(request: WordPressDraftApi
     article: {
       ...request.article,
       createdAt: now.toISOString(),
-      metadata: { status: 'draft', tags: [], metadata: { magazine: request.magazine } }
+      metadata: {
+        status: 'draft',
+        category: { name: request.magazine, slug: request.magazine },
+        tags: request.seo.keywords.map(createTag)
+      }
     },
     summary: { text: request.article.summary },
     seo: request.seo,
     faq: request.faq,
     imagePrompt: { prompt: `WordPress draft image for ${request.article.title}` },
     productPrompt: { prompt: `WordPress draft products for ${request.article.title}` },
-    metadata: { magazine: request.magazine, clientRequestId: request.clientRequestId }
+    metadata: {
+      magazine: request.magazine,
+      clientRequestId: request.clientRequestId,
+      wordpressFeaturedMediaId: request.featuredImageId
+    }
   });
 }
 
@@ -96,6 +106,14 @@ function requireMagazine(value: unknown): 'cat' | 'dog' {
     throw new WordPressDraftApiRequestError('magazine must be one of: cat, dog.');
   }
   return value;
+}
+
+function requireOptionalPositiveInteger(value: unknown, name: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isInteger(value) || (value as number) < 1) {
+    throw new WordPressDraftApiRequestError(`${name} must be a positive integer.`);
+  }
+  return value as number;
 }
 
 function rejectUnknownKeys(value: Record<string, unknown>, allowed: string[]): void {

@@ -2,7 +2,7 @@
 
 ## Context
 
-Asteria needs publisher adapters that can be swapped without changing workflow orchestration. WordPress is the first publisher target in the roadmap, but production publishing requires credentials, API behavior, retries, and operational safeguards that should not be introduced yet.
+Asteria needs publisher adapters that can be swapped without changing workflow orchestration. WordPress is the first publisher target in the roadmap. The original decision introduced a mock-first adapter; WordPress Integration 001 extends that boundary with a production REST transport while retaining draft-only behavior.
 
 The system needs a draft adapter shape to validate provider boundaries before real WordPress integration.
 
@@ -19,14 +19,16 @@ The adapter will:
 - Return a structured dry-run preview result.
 - Register through Provider Registry using a provider token.
 
-The adapter will not:
+The production transport now:
 
-- Call WordPress APIs.
-- Use a WordPress SDK.
-- Read or require secrets.
-- Publish content.
+- Calls WordPress REST API endpoints using a dedicated user's Application Password.
+- Resolves or creates categories and tags and submits their numeric IDs with the post.
+- Optionally attaches an existing WordPress Media Library ID as featured media.
+- Retries network failures and transient HTTP responses while reporting structured failures.
+- Forces `draft` in the mapper and transport and rejects any non-draft attempt.
+
+The adapter does not publish content. Public publishing remains a manual action by an authorized human in WordPress.
 
 ## Consequences
 
-Workflow code can depend on `Publisher` while the provider layer owns WordPress-specific mapping. The Cat dry run can exercise a realistic publisher adapter boundary without external side effects. Real publishing will require a later sprint for credentials, HTTP/API client boundaries, error handling, retries, and production safety controls.
-
+Workflow code can depend on `Publisher` while the provider layer owns WordPress-specific mapping. The REST transport is production-capable for draft creation. The approval gates, explicit environment flags, least-privilege credentials, and manual WordPress publishing remain mandatory.

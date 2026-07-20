@@ -6,7 +6,9 @@ export interface WordPressPostPayload {
   excerpt?: string;
   slug?: string;
   status: 'draft';
+  categories?: string[];
   tags?: string[];
+  featuredMediaId?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -23,7 +25,9 @@ export interface CreateWordPressPostPayloadInput {
     body: string;
     summary?: string;
     slug?: string;
+    categories?: string[];
     tags?: string[];
+    featuredMediaId?: number;
     format?: string;
     language?: string;
     metadata?: Record<string, unknown>;
@@ -44,7 +48,9 @@ export function createWordPressPostPayload(
     excerpt: payload.draft.summary,
     slug: payload.draft.slug,
     status: 'draft',
-    tags: payload.draft.tags,
+    categories: normalizeTerms(payload.draft.categories),
+    tags: normalizeTerms(payload.draft.tags),
+    featuredMediaId: payload.draft.featuredMediaId,
     metadata: {
       ...payload.metadata,
       destination: payload.destination,
@@ -66,4 +72,13 @@ export function validateWordPressPostPayload(payload: WordPressPostPayload): voi
   if (!payload.content || payload.content.trim().length === 0) {
     throw new WordPressPostPayloadValidationError('WordPress post payload requires content.');
   }
+
+  if (payload.featuredMediaId !== undefined && (!Number.isInteger(payload.featuredMediaId) || payload.featuredMediaId < 1)) {
+    throw new WordPressPostPayloadValidationError('WordPress featured media ID must be a positive integer.');
+  }
+}
+
+function normalizeTerms(values: string[] | undefined): string[] | undefined {
+  if (!values) return undefined;
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }

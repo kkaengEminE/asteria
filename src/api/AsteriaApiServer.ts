@@ -101,7 +101,8 @@ export async function processAsteriaApiRequest(
     if (error instanceof WordPressDraftExecutionError) {
       return jsonResponse(503, {
         error: error.code,
-        message: error.message
+        message: error.message,
+        details: error.details
       });
     }
 

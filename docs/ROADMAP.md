@@ -260,13 +260,13 @@ Status: Implemented with production-capable Coupang monetization adapter, disabl
 
 Complete the provider-neutral Publisher layer between ScheduledJobExecutor and concrete publisher adapters.
 
-Status: Implemented with provider-neutral publisher domain models, PublisherService validation/dispatch/result normalization, DryRunPublisher deterministic preview IDs and URLs, ScheduledJobExecutor publish request integration, publish audit events, RetryService integration, dry-run publisher output, and tests. Real WordPress publishing, network calls, persistence, and production publishing remain disabled.
+Status: Implemented with provider-neutral publisher domain models, PublisherService validation/dispatch/result normalization, DryRunPublisher deterministic preview IDs and URLs, ScheduledJobExecutor publish request integration, publish audit events, RetryService integration, dry-run publisher output, and tests. WordPress Integration 001 later added guarded production draft creation; public publishing remains unavailable.
 
 ### Sprint 44: WordPress Publisher Adapter
 
 Implement the provider-specific WordPress Publisher adapter behind the provider-neutral Publisher interface.
 
-Status: Implemented with WordPressPublisher, WordPressTransport, WordPressMapper, guarded WordPress environment config, mocked transport tests, retry integration, audit integration, provider-neutral publish result mapping, legacy dry-run preview compatibility, and documentation. DryRunPublisher remains default. Production publishing, network calls, persistence, and WordPress execution remain disabled.
+Status: Implemented initially with WordPressPublisher, WordPressTransport, WordPressMapper, guarded environment config, mocked transport tests, retry integration, audit integration, provider-neutral result mapping, and dry-run compatibility. WordPress Integration 001 later added the guarded REST draft transport, taxonomy resolution, optional featured media, transient retry classification, and structured failures. DryRunPublisher remains the default, and public publishing remains unavailable.
 
 ### Sprint 45: Metrics Foundation
 

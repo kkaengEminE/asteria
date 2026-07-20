@@ -68,7 +68,7 @@ In explicit Gemini mode, the adapter consumes rendered Prompt Asset System outpu
 
 Gemini publishing-package requests use strict JSON instructions and Gemini JSON response MIME hints. The adapter attempts safe repair for common malformed JSON issues such as raw newlines inside strings, unescaped quotes inside strings, and unterminated trailing strings before surfacing a parse error with a truncated response preview.
 
-`src/providers/publisher/wordpress` contains the WordPress publisher adapter. It implements the provider-neutral Publisher interface, maps publish requests into WordPress post payloads, reads guarded configuration from environment-compatible inputs, uses an injectable transport, integrates RetryService and AuditLog, and returns preview results while publishing remains disabled. Tests use mocked transport only.
+`src/providers/publisher/wordpress` contains the production WordPress draft publisher. It implements the provider-neutral Publisher interface, maps publish requests into draft-only REST payloads, resolves categories and tags, supports an optional existing Media Library featured-image ID, authenticates with an Application Password, integrates RetryService and AuditLog, and returns structured results. It cannot request public status. Tests use mocked transport only.
 
 Provider adapters must not depend on legacy `src/core` contracts. WordPress maps from `PublishRequest` to WordPress-specific payloads inside the adapter, and AI providers use the `src/providers/ai` contract.
 
@@ -242,7 +242,7 @@ Publishers implement the provider-neutral `Publisher` interface and receive `Pub
 
 Legacy WordPress preview payload/result contracts are retired from the adapter path. WordPress receives provider-neutral `PublishRequest` input and returns provider-neutral `PublishResult` output.
 
-The current WordPress adapter is production-capable in shape but does not enable production publishing. It requires `WORDPRESS_ENABLED=true`, a target site, username, and application password before adapter execution. Transport is injectable; tests use mocked transport and no default network transport is configured.
+The WordPress adapter can create real drafts through the default REST transport only when `WORDPRESS_ENABLED=true`, the browser draft gate is enabled, and a target site, username, and Application Password are configured. The mapper and transport both force `draft`; public publishing remains a manual WordPress action. Transport is injectable and all automated tests use mocked network behavior.
 
 Publishing workflow safeguards live outside provider adapters. Real publishing is disabled by default, requires explicit configuration such as `ASTERIA_PUBLISHING_ENABLED=true`, and still requires approval metadata before a payload can be sent to a publisher. Dry-run publishing previews may use preview-only adapters, but they must not bypass approval checks.
 

@@ -55,6 +55,8 @@ Use a WordPress Application Password created for a dedicated least-privilege edi
 
 After generation, edit the document and select **Save to WordPress Draft**. Confirm the draft-only dialog, then use the returned draft ID and edit URL to open WordPress administration. Verify the post status reads **Draft** before making any further changes. The application exposes no public publish endpoint and sends `status: draft` regardless of adapter defaults.
 
+The production transport uses the WordPress REST API with Application Password Basic Authentication. It resolves or creates the article category and tags before creating the post, and can attach an existing WordPress Media Library ID as the featured image when `wordpressFeaturedMediaId` is supplied in publisher metadata. Missing featured media is non-blocking. Network failures and HTTP `408`, `425`, `429`, and `5xx` responses are retried up to three attempts; authentication, permission, and validation errors return immediately with a structured code and safe operation/status details. The integration credential still requires draft-only least privilege, and a human must publish in WordPress.
+
 AI provider options in the browser:
 
 - Mock: default, deterministic, no external API required.
@@ -211,7 +213,7 @@ Scheduled Job Executor sits after Scheduler. It checks due status, skips future/
 
 Publisher Foundation sits between scheduled execution and concrete publisher adapters. It defines provider-neutral publish request/result/failure/status models, validates requests, dispatches through PublisherService, audits publish started/succeeded/failed/skipped events, and supports DryRunPublisher preview mode while real publishing remains disabled.
 
-WordPress Publisher Adapter sits behind the Publisher boundary. It maps provider-neutral publish requests into draft-only WordPress post payloads, uses an injectable transport, retries recoverable transport failures, emits publish audit events, and requires `WORDPRESS_ENABLED=true`, `ASTERIA_WORDPRESS_DRAFT_ENABLED=true`, `WORDPRESS_BASE_URL`, `WORDPRESS_USERNAME`, and `WORDPRESS_APPLICATION_PASSWORD` for the browser draft endpoint. Tests use mocked transport only.
+WordPress Publisher Adapter sits behind the Publisher boundary. It maps provider-neutral publish requests into draft-only WordPress REST API payloads, resolves categories and tags, supports an optional existing Media Library featured-image ID, uses Application Password authentication through an injectable transport, retries transient failures, returns structured failures, emits publish audit events, and requires `WORDPRESS_ENABLED=true`, `ASTERIA_WORDPRESS_DRAFT_ENABLED=true`, `WORDPRESS_BASE_URL`, `WORDPRESS_USERNAME`, and `WORDPRESS_APPLICATION_PASSWORD` for the browser draft endpoint. Tests use mocked transport only.
 
 Legacy provider contracts are being retired gradually. Current AI providers live under `src/providers/ai`, publisher execution models live under `src/domain/publisher`, and provider adapters must not import obsolete `src/core` contracts. Remaining `src/core` contracts are kept only where they are still active or compatibility-safe.
 
@@ -247,7 +249,7 @@ When a PublishingPackage exists, dry-run Article and SEO Preview sections use th
 
 The dry run prints the assembled PublishingPackage, prompt profile, prompt stack, prompt id, prompt version, rendered variables, composed prompt preview, retry count, validation result, validation report, quality score, quality report, review score, review result, review summary, review issues, threshold result, article title, article word and character count, SEO title and description, FAQ count, approval decision, approval reasons, blocking issues, recommendations, generation duration, queue result, queue item ID, queue status, queue destination, scheduler result, scheduled job ID, scheduled job status, scheduler job counts, duplicate and lookup state, schedule retry attempts, execution preview status, due status, execution attempts, execution queue status, publisher adapter, publisher mode, preview URL, target site, publishing enabled flag, publish result, publish ID, metrics summary, Instagram preview, Podcast preview, audit timeline, retry metadata, publishing preview status, monetization provider diagnostics, recommended product names, recommendation reasons, affiliate links, disclosure text, selected image filename, tags, category, score, and mock preview URI.
 
-OpenAI and Gemini are not required for local dry runs or tests. MockAIProvider remains the default. Real publishing remains disabled unless a future composition explicitly sets `ASTERIA_PUBLISHING_ENABLED=true`; the current WordPress path is preview-only.
+OpenAI and Gemini are not required for local dry runs or tests. MockAIProvider remains the default. General workflow publishing remains disabled unless composition explicitly enables it; the separate browser WordPress path can create guarded drafts when both WordPress flags and credentials are configured. No Asteria path can publish a WordPress post publicly.
 
 Install dependencies before running type checking in a fresh environment:
 
