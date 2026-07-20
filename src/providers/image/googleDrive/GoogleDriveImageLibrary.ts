@@ -84,29 +84,31 @@ export class GoogleDriveImageLibrary implements ImageDomainLibrary {
   }
 
   private async ensureAssetsRegistered(): Promise<void> {
-    this.assetsReady ??= Promise.all(
-      this.records.map((record) => this.assetLibrary.registerAsset({
-        id: record.id,
-        filename: record.filename,
-        mimeType: inferImageMimeType(record.filename),
-        category: record.category,
-        tags: record.tags,
-        storagePath: `images/${record.filename}`,
-        storageUri: record.mockUri,
-        metadata: {
-          title: record.title,
-          description: record.description,
-          width: record.width,
-          height: record.height,
-          takenAt: record.takenAt,
-          rating: record.rating,
-          favorite: record.favorite,
-          checksum: record.checksum,
-          driveFileId: record.driveFileId,
-          dryRun: true
-        }
-      }))
-    ).then(() => undefined);
+    this.assetsReady ??= (async () => {
+      for (const record of this.records) {
+        await this.assetLibrary.registerAsset({
+          id: record.id,
+          filename: record.filename,
+          mimeType: inferImageMimeType(record.filename),
+          category: record.category,
+          tags: record.tags,
+          storagePath: `images/${record.filename}`,
+          storageUri: record.mockUri,
+          metadata: {
+            title: record.title,
+            description: record.description,
+            width: record.width,
+            height: record.height,
+            takenAt: record.takenAt,
+            rating: record.rating,
+            favorite: record.favorite,
+            checksum: record.checksum,
+            driveFileId: record.driveFileId,
+            dryRun: true
+          }
+        });
+      }
+    })();
 
     await this.assetsReady;
   }

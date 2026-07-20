@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   buildArticleCopyText,
+  buildFounderReviewExport,
   buildGenerateRequest,
   buildMarkdownCopyText,
   buildWordPressDraftRequest,
@@ -10,6 +11,7 @@ import {
   clearHistoryEntries,
   createWorkingCopy,
   createHistoryEntry,
+  createFounderReview,
   buildCompareFields,
   canCompare,
   findDifferingCompareFields,
@@ -25,8 +27,12 @@ import {
   renderResult,
   renderWordPressDraftState,
   restoreHistoryEntry,
+  selectPresetTopic,
+  serializeFounderReview,
+  TEST_TOPIC_PRESETS,
   toggleCompareSelection,
   updateWorkingCopy,
+  updateFounderReview,
   validateGenerateForm
 } from '../public/app.js';
 
@@ -75,6 +81,27 @@ test('web api request construction supports openai provider selection', () => {
   });
 
   assert.equal(request.provider, 'openai');
+});
+
+test('web topic presets select all five configured Korean topics', () => {
+  assert.equal(TEST_TOPIC_PRESETS.length, 5);
+  for (const topic of TEST_TOPIC_PRESETS) {
+    assert.equal(selectPresetTopic(topic), topic);
+  }
+  assert.equal(selectPresetTopic('not a preset'), '');
+});
+
+test('web form continues to accept a custom topic', () => {
+  const custom = '우리 집 고양이의 새로운 습관';
+  const request = buildGenerateRequest({
+    topic: custom,
+    magazine: 'cat',
+    language: 'ko-KR',
+    provider: 'gemini'
+  });
+
+  assert.equal(validateGenerateForm(request).valid, true);
+  assert.equal(request.topic, custom);
 });
 
 test('web loading state disables generate button', () => {
@@ -292,6 +319,85 @@ test('web history restores and compare reads the edited working copy', () => {
   assert.equal(restored?.workingCopy.publishingPackage.article.title, 'History edit');
   assert.equal(fields.title, 'History edit');
   assert.notEqual(entry.workingCopy, original);
+});
+
+test('founder review records scores flags and feedback on the history item', () => {
+  const review = createFounderReview();
+  updateFounderReview(review, 'overallScore', '5');
+  updateFounderReview(review, 'articleUsefulness', '4');
+  updateFounderReview(review, 'writingNaturalness', '3');
+  updateFounderReview(review, 'seoUsefulness', '2');
+  updateFounderReview(review, 'faqUsefulness', '1');
+  updateFounderReview(review, 'tooRepetitive', true);
+  updateFounderReview(review, 'requiresMajorRewrite', false);
+  updateFounderReview(review, 'feedback', '실제 사용에 도움이 됩니다.');
+
+  assert.deepEqual(review, {
+    overallScore: 5,
+    articleUsefulness: 4,
+    writingNaturalness: 3,
+    seoUsefulness: 2,
+    faqUsefulness: 1,
+    tooRepetitive: true,
+    requiresMajorRewrite: false,
+    feedback: '실제 사용에 도움이 됩니다.'
+  });
+});
+
+test('history restoration preserves its associated founder review', () => {
+  const entry = createHistoryEntry({
+    topic: '실내 고양이를 위한 놀이 방법',
+    magazine: 'cat',
+    language: 'ko-KR',
+    provider: 'gemini'
+  }, createUiResultFixture());
+  updateFounderReview(entry.review, 'overallScore', '4');
+  updateFounderReview(entry.review, 'feedback', '복원 확인');
+
+  const restored = restoreHistoryEntry([entry], entry.id);
+  assert.equal(restored?.review.overallScore, 4);
+  assert.equal(restored?.review.feedback, '복원 확인');
+});
+
+test('compare displays founder review scores when available', () => {
+  const first = createHistoryEntry({ topic: 'Topic A', magazine: 'cat', language: 'ko-KR', provider: 'gemini' }, createUiResultFixture());
+  const second = createHistoryEntry({ topic: 'Topic B', magazine: 'cat', language: 'ko-KR', provider: 'gemini' }, createUiResultFixture());
+  updateFounderReview(first.review, 'overallScore', '5');
+  updateFounderReview(first.review, 'seoUsefulness', '4');
+  updateFounderReview(second.review, 'overallScore', '2');
+
+  const html = renderCompareView([first, second]);
+  assert.match(html, /Founder overall/);
+  assert.match(html, /5\/5/);
+  assert.match(html, /2\/5/);
+  assert.match(html, /Founder SEO usefulness/);
+  assert.match(html, /4\/5/);
+});
+
+test('founder review export contains edited review data and excludes secrets', () => {
+  const result = createUiResultFixture();
+  result.apiKey = 'do-not-export';
+  result.environment = { GEMINI_API_KEY: 'also-do-not-export' };
+  const entry = createHistoryEntry({
+    topic: '초보 집사가 자주 하는 실수',
+    magazine: 'cat',
+    language: 'ko-KR',
+    provider: 'gemini'
+  }, result, new Date('2026-07-20T00:00:00.000Z'));
+  updateWorkingCopy(entry.workingCopy, 'title', 'Founder edited title');
+  updateFounderReview(entry.review, 'overallScore', '5');
+  updateFounderReview(entry.review, 'articleUsefulness', '4');
+  updateFounderReview(entry.review, 'tooRepetitive', true);
+  updateFounderReview(entry.review, 'feedback', '좋은 초안');
+
+  const exported = buildFounderReviewExport(entry);
+  const serialized = serializeFounderReview(entry);
+  assert.equal(exported.editedTitle, 'Founder edited title');
+  assert.equal(exported.overallScore, 5);
+  assert.equal(exported.detailedScores.articleUsefulness, 4);
+  assert.equal(exported.flags.tooRepetitive, true);
+  assert.equal(exported.feedback, '좋은 초안');
+  assert.doesNotMatch(serialized, /do-not-export|GEMINI_API_KEY|environment|apiKey/);
 });
 
 test('web history clear removes all session entries', () => {

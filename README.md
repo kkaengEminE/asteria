@@ -34,6 +34,8 @@ The browser also keeps a session-only generation history in memory. Each generat
 
 History entries can also be compared side-by-side. Select two or three history checkboxes, click Compare, and Asteria renders parallel columns for provider, topic, magazine, language, generation timestamp, article, SEO, FAQ, quality score, editorial score, approval decision, and available Instagram or Podcast previews. Differing provider, title, summary, quality score, and approval values are highlighted. Compare mode uses stored browser-session results only and does not call `POST /generate`.
 
+For Founder content-quality testing, the Web MVP includes five Korean cat-topic presets while keeping the Topic field open to custom input. Each generated History item carries a browser-only Founder Review with 1–5 scores for overall quality, article usefulness, writing naturalness, SEO usefulness, and FAQ usefulness; yes/no flags for repetition and major rewrites; and free-form feedback. Restoring History restores its review, Compare shows available Founder scores, and Export Review downloads a JSON file containing only review metadata and the edited title. Review data is session-only and exports never include provider credentials or environment values.
+
 ### WordPress drafts
 
 The browser editor can send its current edited working copy to `POST /wordpress/drafts`. This path creates a WordPress **Draft only**; public publishing is unavailable. It is disabled by default and does not affect mock generation, dry runs, History, or Compare.

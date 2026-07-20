@@ -51,11 +51,23 @@
           <button id="generate-button" type="submit">Generate</button>
         </form>
 
+        <section class="preset-panel" aria-labelledby="preset-title">
+          <h2 id="preset-title">Test topics</h2>
+          <div id="topic-presets" class="preset-list">
+            <button type="button" class="preset-button" data-topic-preset="고양이가 밤에 뛰어다니는 이유">고양이가 밤에 뛰어다니는 이유</button>
+            <button type="button" class="preset-button" data-topic-preset="고양이가 자꾸 상자에 들어가는 이유">고양이가 자꾸 상자에 들어가는 이유</button>
+            <button type="button" class="preset-button" data-topic-preset="실내 고양이를 위한 놀이 방법">실내 고양이를 위한 놀이 방법</button>
+            <button type="button" class="preset-button" data-topic-preset="고양이가 물을 잘 마시지 않는 이유">고양이가 물을 잘 마시지 않는 이유</button>
+            <button type="button" class="preset-button" data-topic-preset="초보 집사가 자주 하는 실수">초보 집사가 자주 하는 실수</button>
+          </div>
+        </section>
+
         <p id="form-message" class="message" role="status"></p>
 
         <div class="copy-panel" aria-label="Copy generated content">
           <button id="copy-article-button" class="secondary-button" type="button" disabled>Copy Article</button>
           <button id="copy-markdown-button" class="secondary-button" type="button" disabled>Copy Markdown</button>
+          <button id="export-review-button" class="secondary-button" type="button" disabled>Export Review</button>
           <button id="save-wordpress-draft-button" class="secondary-button" type="button" disabled>Save to WordPress Draft</button>
           <span id="copy-feedback" class="copy-feedback" role="status"></span>
         </div>

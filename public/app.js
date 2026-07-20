@@ -5,6 +5,14 @@ const DEFAULT_FORM_STATE = {
   provider: 'mock'
 };
 
+export const TEST_TOPIC_PRESETS = [
+  '고양이가 밤에 뛰어다니는 이유',
+  '고양이가 자꾸 상자에 들어가는 이유',
+  '실내 고양이를 위한 놀이 방법',
+  '고양이가 물을 잘 마시지 않는 이유',
+  '초보 집사가 자주 하는 실수'
+];
+
 if (typeof document !== 'undefined') {
   const form = document.querySelector('#generate-form');
 
@@ -26,6 +34,8 @@ export function initAsteriaWebApp(
   const copyArticleButton = doc.querySelector('#copy-article-button');
   const copyMarkdownButton = doc.querySelector('#copy-markdown-button');
   const copyFeedback = doc.querySelector('#copy-feedback');
+  const exportReviewButton = doc.querySelector('#export-review-button');
+  const topicPresets = doc.querySelector('#topic-presets');
   const saveDraftButton = doc.querySelector('#save-wordpress-draft-button');
   const draftStatus = doc.querySelector('#wordpress-draft-status');
   const historyList = doc.querySelector('#history-list');
@@ -33,6 +43,7 @@ export function initAsteriaWebApp(
   const compareButton = doc.querySelector('#compare-button');
   const exitCompareButton = doc.querySelector('#exit-compare-button');
   let currentResult = null;
+  let currentReview = null;
   let historyEntries = [];
   let currentHistoryId = null;
   let selectedHistoryIds = [];
@@ -40,6 +51,7 @@ export function initAsteriaWebApp(
   let draftSaving = false;
 
   setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
+  setExportReviewControl(exportReviewButton, false);
   setDraftControl(saveDraftButton, draftStatus, { state: 'ready', hasResult: false });
   renderHistoryPanel({
     historyList,
@@ -64,6 +76,8 @@ export function initAsteriaWebApp(
     }
 
     currentResult = null;
+    currentReview = null;
+    setExportReviewControl(exportReviewButton, false);
     setDraftControl(saveDraftButton, draftStatus, { state: 'ready', hasResult: false });
     setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
     setLoading(button, message, result, true);
@@ -86,9 +100,10 @@ export function initAsteriaWebApp(
       message.textContent = 'Generation complete.';
       result.className = 'result';
       currentResult = createWorkingCopy(payload);
-      result.innerHTML = renderResult(currentResult);
+      currentReview = createFounderReview();
+      result.innerHTML = renderResult(currentResult, currentReview);
       compareMode = false;
-      const historyEntry = createHistoryEntry(formState, payload, new Date(), currentResult);
+      const historyEntry = createHistoryEntry(formState, payload, new Date(), currentResult, currentReview);
       historyEntries = addHistoryEntry(historyEntries, historyEntry);
       currentHistoryId = historyEntry.id;
       renderHistoryPanel({
@@ -102,12 +117,14 @@ export function initAsteriaWebApp(
         compareMode
       });
       setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, true);
+      setExportReviewControl(exportReviewButton, true);
       setDraftControl(saveDraftButton, draftStatus, { state: 'ready', hasResult: true });
     } catch (error) {
       showError(message, error instanceof Error ? error.message : 'Generate request failed.');
       result.className = 'result';
       result.innerHTML = renderError(error instanceof Error ? error.message : 'Generate request failed.');
       currentResult = null;
+      currentReview = null;
       currentHistoryId = null;
       compareMode = false;
       renderHistoryPanel({
@@ -121,6 +138,7 @@ export function initAsteriaWebApp(
         compareMode
       });
       setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, false);
+      setExportReviewControl(exportReviewButton, false);
       setDraftControl(saveDraftButton, draftStatus, { state: 'ready', hasResult: false });
     } finally {
       setLoading(button, message, result, false);
@@ -141,6 +159,19 @@ export function initAsteriaWebApp(
       clipboardImpl,
       copyFeedback
     );
+  });
+
+  topicPresets?.addEventListener('click', (event) => {
+    const preset = event.target?.closest?.('[data-topic-preset]');
+    if (!preset) return;
+    const topic = selectPresetTopic(preset.dataset.topicPreset);
+    if (topic) setControlValue(doc.querySelector('#topic'), topic);
+  });
+
+  exportReviewButton?.addEventListener('click', () => {
+    const entry = historyEntries.find((item) => item.id === currentHistoryId);
+    if (!entry) return;
+    downloadFounderReview(doc, buildFounderReviewExport(entry));
   });
 
   saveDraftButton?.addEventListener('click', async () => {
@@ -183,16 +214,23 @@ export function initAsteriaWebApp(
   result?.addEventListener('input', (event) => {
     const editorField = event.target?.closest?.('[data-edit-field]');
 
-    if (!editorField || !currentResult || compareMode) {
-      return;
+    if (editorField && currentResult && !compareMode) {
+      updateWorkingCopy(
+        currentResult,
+        editorField.dataset.editField,
+        editorField.value,
+        Number(editorField.dataset.faqIndex)
+      );
     }
 
-    updateWorkingCopy(
-      currentResult,
-      editorField.dataset.editField,
-      editorField.value,
-      Number(editorField.dataset.faqIndex)
-    );
+    const reviewField = event.target?.closest?.('[data-review-field]');
+    if (reviewField && currentReview && !compareMode) {
+      updateFounderReview(
+        currentReview,
+        reviewField.dataset.reviewField,
+        reviewField.type === 'checkbox' ? reviewField.checked : reviewField.value
+      );
+    }
   });
 
   historyList?.addEventListener('click', (event) => {
@@ -231,14 +269,17 @@ export function initAsteriaWebApp(
 
     currentResult = entry.workingCopy ?? createWorkingCopy(entry.result);
     entry.workingCopy = currentResult;
+    currentReview = entry.review ?? createFounderReview();
+    entry.review = currentReview;
     currentHistoryId = entry.id;
     compareMode = false;
     restoreFormState(doc, entry);
     message.className = 'message';
     message.textContent = 'History result restored.';
     result.className = 'result';
-    result.innerHTML = renderResult(currentResult);
+    result.innerHTML = renderResult(currentResult, currentReview);
     setCopyControls([copyArticleButton, copyMarkdownButton], copyFeedback, true);
+    setExportReviewControl(exportReviewButton, true);
     setDraftControl(saveDraftButton, draftStatus, { state: 'ready', hasResult: true });
     renderHistoryPanel({
       historyList,
@@ -267,7 +308,7 @@ export function initAsteriaWebApp(
       selectedHistoryIds,
       compareMode
     });
-    renderCurrentResult(result, currentResult);
+    renderCurrentResult(result, currentResult, currentReview);
   });
 
   compareButton?.addEventListener('click', () => {
@@ -298,7 +339,7 @@ export function initAsteriaWebApp(
     compareMode = false;
     message.className = 'message';
     message.textContent = currentResult ? 'Viewer restored.' : '';
-    renderCurrentResult(result, currentResult);
+    renderCurrentResult(result, currentResult, currentReview);
     renderHistoryPanel({
       historyList,
       clearHistoryButton,
@@ -449,6 +490,72 @@ export function renderWordPressDraftState({ state, hasResult, result, message })
   return `<strong>Ready</strong><span>${hasResult ? 'The edited working copy is ready to save as Draft.' : 'Generate content to enable draft saving.'}</span>`;
 }
 
+export function selectPresetTopic(topic) {
+  return TEST_TOPIC_PRESETS.includes(topic) ? topic : '';
+}
+
+export function createFounderReview() {
+  return {
+    overallScore: null,
+    articleUsefulness: null,
+    writingNaturalness: null,
+    seoUsefulness: null,
+    faqUsefulness: null,
+    tooRepetitive: false,
+    requiresMajorRewrite: false,
+    feedback: ''
+  };
+}
+
+export function updateFounderReview(review, field, value) {
+  const scoreFields = new Set([
+    'overallScore',
+    'articleUsefulness',
+    'writingNaturalness',
+    'seoUsefulness',
+    'faqUsefulness'
+  ]);
+
+  if (scoreFields.has(field)) {
+    const score = Number(value);
+    review[field] = Number.isInteger(score) && score >= 1 && score <= 5 ? score : null;
+  } else if (field === 'tooRepetitive' || field === 'requiresMajorRewrite') {
+    review[field] = value === true;
+  } else if (field === 'feedback') {
+    review.feedback = String(value);
+  }
+
+  return review;
+}
+
+export function buildFounderReviewExport(entry) {
+  const workingCopy = entry?.workingCopy ?? entry?.result ?? {};
+  const review = entry?.review ?? createFounderReview();
+
+  return {
+    topic: entry?.topic ?? '',
+    provider: entry?.provider ?? '',
+    generatedAt: entry?.generatedAt ?? '',
+    editedTitle: workingCopy.publishingPackage?.article?.title ?? '',
+    overallScore: review.overallScore,
+    detailedScores: {
+      articleUsefulness: review.articleUsefulness,
+      writingNaturalness: review.writingNaturalness,
+      seoUsefulness: review.seoUsefulness,
+      faqUsefulness: review.faqUsefulness
+    },
+    flags: {
+      tooRepetitive: review.tooRepetitive === true,
+      requiresMajorRewrite: review.requiresMajorRewrite === true
+    },
+    feedback: review.feedback ?? ''
+  };
+}
+
+export function serializeFounderReview(entry) {
+  return JSON.stringify(buildFounderReviewExport(entry), null, 2);
+}
+
 export function createWorkingCopy(result) {
   if (typeof structuredClone === 'function') {
     return structuredClone(result);
@@ -490,7 +597,13 @@ export function updateWorkingCopy(workingCopy, field, value, faqIndex = Number.N
   return workingCopy;
 }
 
-export function createHistoryEntry(formState, result, generatedAt = new Date(), workingCopy = createWorkingCopy(result)) {
+export function createHistoryEntry(
+  formState,
+  result,
+  generatedAt = new Date(),
+  workingCopy = createWorkingCopy(result),
+  review = createFounderReview()
+) {
   const request = buildGenerateRequest(formState);
 
   return {
@@ -501,7 +614,8 @@ export function createHistoryEntry(formState, result, generatedAt = new Date(), 
     provider: request.provider,
     generatedAt: generatedAt.toISOString(),
     result,
-    workingCopy
+    workingCopy,
+    review
   };
 }
 
@@ -575,7 +689,8 @@ export function renderCompareView(entries) {
     'title',
     'summary',
     'qualityScore',
-    'approval'
+    'approval',
+    'founderOverall'
   ]);
 
   return section('Compare', `
@@ -617,7 +732,12 @@ export function buildCompareFields(entries) {
         : 'Unavailable',
       podcast: podcast
         ? `${podcast.episodeTitle ?? ''}${podcast.estimatedDuration ? `\nDuration: ${podcast.estimatedDuration}` : ''}`.trim()
-        : 'Unavailable'
+        : 'Unavailable',
+      founderOverall: formatFounderScore(entry.review?.overallScore),
+      founderArticle: formatFounderScore(entry.review?.articleUsefulness),
+      founderNaturalness: formatFounderScore(entry.review?.writingNaturalness),
+      founderSeo: formatFounderScore(entry.review?.seoUsefulness),
+      founderFaq: formatFounderScore(entry.review?.faqUsefulness)
     };
   });
 }
@@ -658,7 +778,7 @@ export function formatRelativeTimestamp(generatedAt, now = new Date()) {
   return `${Math.floor(elapsedHours / 24)}d ago`;
 }
 
-export function renderResult(result) {
+export function renderResult(result, founderReview = createFounderReview()) {
   const packageData = result.publishingPackage ?? {};
   const article = packageData.article ?? {};
   const summary = packageData.summary ?? {};
@@ -695,6 +815,7 @@ export function renderResult(result) {
       ${editorField('SEO description', 'seoDescription', seo.metaDescription ?? '', 'editor-textarea')}
     `, 'editor-section'),
     section('FAQ', renderEditableFaq(packageData.faq), 'editor-section'),
+    section('Founder Review', renderFounderReview(founderReview), 'review-section'),
     section('Selected Image', selectedImage
       ? `
         <p><strong>Filename:</strong> ${escapeHtml(selectedImage.filename)}</p>
@@ -746,6 +867,23 @@ function setCopyControls(buttons, feedback, hasResult) {
     feedback.className = 'copy-feedback';
     feedback.textContent = '';
   }
+}
+
+function setExportReviewControl(button, hasResult) {
+  if (button) button.disabled = !hasResult;
+}
+
+function downloadFounderReview(doc, exportData) {
+  const content = JSON.stringify(exportData, null, 2);
+  const blob = new Blob([content], { type: 'application/json' });
+  const href = URL.createObjectURL(blob);
+  const link = doc.createElement('a');
+  link.href = href;
+  link.download = `asteria-founder-review-${slugifyForDraft(exportData.topic)}.json`;
+  doc.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 0);
 }
 
 function setDraftControl(button, statusElement, options) {
@@ -823,14 +961,14 @@ function renderHistoryPanel({
   }
 }
 
-function renderCurrentResult(resultElement, currentResult) {
+function renderCurrentResult(resultElement, currentResult, currentReview) {
   if (!resultElement) {
     return;
   }
 
   if (currentResult) {
     resultElement.className = 'result';
-    resultElement.innerHTML = renderResult(currentResult);
+    resultElement.innerHTML = renderResult(currentResult, currentReview ?? createFounderReview());
     return;
   }
 
@@ -905,6 +1043,52 @@ function renderEditableFaq(faq = []) {
   `).join('')}</div>`;
 }
 
+function renderFounderReview(review) {
+  return `
+    <div class="review-score-grid">
+      ${reviewScoreField('Overall score', 'overallScore', review.overallScore)}
+      ${reviewScoreField('Article usefulness', 'articleUsefulness', review.articleUsefulness)}
+      ${reviewScoreField('Writing naturalness', 'writingNaturalness', review.writingNaturalness)}
+      ${reviewScoreField('SEO usefulness', 'seoUsefulness', review.seoUsefulness)}
+      ${reviewScoreField('FAQ usefulness', 'faqUsefulness', review.faqUsefulness)}
+    </div>
+    <div class="review-flags">
+      ${reviewFlagField('Too repetitive', 'tooRepetitive', review.tooRepetitive)}
+      ${reviewFlagField('Requires major rewrite', 'requiresMajorRewrite', review.requiresMajorRewrite)}
+    </div>
+    <label class="editor-field">
+      <span>Feedback</span>
+      <textarea class="editor-textarea review-feedback" data-review-field="feedback" aria-label="Founder feedback">${escapeHtml(review.feedback ?? '')}</textarea>
+    </label>
+  `;
+}
+
+function reviewScoreField(label, field, value) {
+  const options = ['<option value="">Not scored</option>'];
+  for (let score = 1; score <= 5; score += 1) {
+    options.push(`<option value="${score}"${value === score ? ' selected' : ''}>${score}</option>`);
+  }
+  return `
+    <label class="editor-field">
+      <span>${escapeHtml(label)}</span>
+      <select data-review-field="${field}" aria-label="${escapeHtml(label)}">${options.join('')}</select>
+    </label>
+  `;
+}
+
+function reviewFlagField(label, field, checked) {
+  return `
+    <label class="review-flag">
+      <input type="checkbox" data-review-field="${field}"${checked ? ' checked' : ''}>
+      <span>${escapeHtml(label)}: Yes</span>
+    </label>
+  `;
+}
+
+function formatFounderScore(value) {
+  return Number.isInteger(value) ? `${value}/5` : 'Not scored';
+}
+
 function renderCompareColumn(entry, fieldRows, differingKeys) {
   const fields = fieldRows.find((row) => row.id === entry.id);
 
@@ -925,6 +1109,11 @@ function renderCompareColumn(entry, fieldRows, differingKeys) {
       ${compareField('Quality score', fields.qualityScore, differingKeys.has('qualityScore'))}
       ${compareField('Editorial score', fields.editorialScore)}
       ${compareField('Approval decision', fields.approval, differingKeys.has('approval'))}
+      ${compareField('Founder overall', fields.founderOverall, differingKeys.has('founderOverall'))}
+      ${compareField('Founder article usefulness', fields.founderArticle)}
+      ${compareField('Founder writing naturalness', fields.founderNaturalness)}
+      ${compareField('Founder SEO usefulness', fields.founderSeo)}
+      ${compareField('Founder FAQ usefulness', fields.founderFaq)}
       ${compareField('Instagram preview', fields.instagram)}
       ${compareField('Podcast preview', fields.podcast)}
     </article>

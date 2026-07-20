@@ -69,6 +69,33 @@ h1 {
   background: #ffffff;
 }
 
+.preset-panel {
+  margin-top: 10px;
+}
+
+.preset-panel h2 {
+  margin-bottom: 7px;
+  color: #526274;
+  font-size: 13px;
+}
+
+.preset-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.preset-button {
+  width: auto;
+  height: 34px;
+  border-color: #c8d2dc;
+  background: #ffffff;
+  color: #25364a;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .field {
   display: grid;
   gap: 6px;
@@ -415,6 +442,42 @@ details pre {
   padding: 12px;
 }
 
+.review-section {
+  display: grid;
+  gap: 12px;
+}
+
+.review-score-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.review-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.review-flag {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #2e3c4d;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.review-flag input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.review-feedback {
+  min-height: 90px;
+}
+
 .status-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
@@ -463,6 +526,16 @@ summary {
     align-items: stretch;
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .preset-list,
+  .review-flags {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .preset-button {
+    width: 100%;
   }
 
   .draft-status {
