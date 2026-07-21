@@ -1,5 +1,9 @@
 # ADR 0007: WordPress Publisher Adapter
 
+## Status
+
+Deprecated and inactive for Asteria v1 as of 2026-07-21. The adapter is retained, not deleted. Astro + Cloudflare Pages is the active public path, and automatic public publishing remains prohibited.
+
 ## Context
 
 Asteria needs publisher adapters that can be swapped without changing workflow orchestration. WordPress is the first publisher target in the roadmap. The original decision introduced a mock-first adapter; WordPress Integration 001 extends that boundary with a production REST transport while retaining draft-only behavior.

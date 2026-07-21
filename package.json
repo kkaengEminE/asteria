@@ -9,12 +9,18 @@
     "dev": "node --experimental-strip-types scripts/api.ts",
     "dry-run": "node --experimental-strip-types scripts/dry-run.ts",
     "quality-lab": "node --experimental-strip-types scripts/quality-lab.ts",
+    "site:prepare": "node --experimental-strip-types scripts/prepare-public-content.ts",
+    "site:dev": "npm run site:prepare && ASTRO_TELEMETRY_DISABLED=1 astro dev --root sites/pets",
+    "site:build": "npm run site:prepare && ASTRO_TELEMETRY_DISABLED=1 astro build --root sites/pets",
     "postgresql:smoke": "node --experimental-strip-types scripts/postgresql-smoke.ts",
     "test:postgresql": "node --test --experimental-strip-types tests/integration/postgresqlRealDatabase.test.ts",
     "test": "node --test --experimental-strip-types tests/*.test.ts tests/*.test.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/sitemap": "^3.7.3",
+    "astro": "^7.1.3",
     "pg": "^8.22.0"
   },
   "devDependencies": {

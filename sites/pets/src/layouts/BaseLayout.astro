@@ -1,0 +1,57 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  canonicalPath?: string;
+}
+
+const {
+  title = 'Asteria Pets',
+  description = '반려동물과 더 잘 살아가기 위한 실용적인 가이드',
+  canonicalPath = Astro.url.pathname
+} = Astro.props;
+const canonical = new URL(canonicalPath, Astro.site);
+const pageTitle = title === 'Asteria Pets' ? title : `${title} | Asteria Pets`;
+---
+
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" type="application/rss+xml" title="Asteria Pets RSS" href={new URL('/rss.xml', Astro.site)} />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Asteria Pets" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Asteria Pets 홈">
+        <span class="brand-mark" aria-hidden="true">A</span>
+        <span>Asteria Pets</span>
+      </a>
+      <nav aria-label="주요 메뉴">
+        <a href="/articles/">전체 글</a>
+        <a href="/categories/">카테고리</a>
+        <a href="/rss.xml">RSS</a>
+      </nav>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <strong>Asteria Pets</strong>
+      <span>사람이 검토하고 승인한 반려생활 가이드</span>
+      <span>건강 관련 내용은 진료를 대신하지 않습니다.</span>
+    </footer>
+  </body>
+</html>

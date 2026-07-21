@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "approvals": [
+    {
+      "source": "generated/pets/001-adoption-responsibilities.md",
+      "slug": "adoption-responsibilities",
+      "category": "adoption",
+      "categoryLabel": "입양 준비",
+      "approved": true,
+      "approvedBy": "Asteria Founder",
+      "approvedAt": "2026-07-21T00:00:00.000Z",
+      "approvedRevision": "6e641231e8fe9b3a4766971e579b40bb41b373b2220cf22bddce425877956434"
+    },
+    {
+      "source": "generated/pets/002-first-30-days.md",
+      "slug": "first-30-days",
+      "category": "cat-care",
+      "categoryLabel": "고양이 돌봄",
+      "approved": true,
+      "approvedBy": "Asteria Founder",
+      "approvedAt": "2026-07-21T00:00:00.000Z",
+      "approvedRevision": "8bc060907dbd79b8e1d8125c5cbe45098d6e8992bb2e27f149a890fd0e63364c"
+    },
+    {
+      "source": "generated/pets/004-pet-care-budget.md",
+      "slug": "pet-care-budget",
+      "category": "planning",
+      "categoryLabel": "생활 계획",
+      "approved": true,
+      "approvedBy": "Asteria Founder",
+      "approvedAt": "2026-07-21T00:00:00.000Z",
+      "approvedRevision": "8cce0a997ed3d741ca60496cd13eb8cce6603e6963c5c3212caa178da256747e"
+    },
+    {
+      "source": "generated/pets/005-first-vet-visit.md",
+      "slug": "first-vet-visit",
+      "category": "health",
+      "categoryLabel": "건강 관리",
+      "approved": true,
+      "approvedBy": "Asteria Founder",
+      "approvedAt": "2026-07-21T00:00:00.000Z",
+      "approvedRevision": "3209434a3056c2dd2ce53e1d3ca683a46a396c7d996c03918c92fd4da6931092"
+    },
+    {
+      "source": "generated/pets/006-pet-safe-home.md",
+      "slug": "pet-safe-home",
+      "category": "home-safety",
+      "categoryLabel": "안전한 집",
+      "approved": true,
+      "approvedBy": "Asteria Founder",
+      "approvedAt": "2026-07-21T00:00:00.000Z",
+      "approvedRevision": "1b92c2de21bf3d4d82e0f4197454eed0b382374526c60d3a4be85715d6bc06c6"
+    },
+    {
+      "source": "generated/pets/011-cat-night-activity.md",
+      "slug": "cat-night-activity",
+      "category": "behavior",
+      "categoryLabel": "행동 이해",
+      "approved": true,
+      "approvedBy": "Asteria Founder",
+      "approvedAt": "2026-07-21T00:00:00.000Z",
+      "approvedRevision": "495062abf6c844fcdc5ac757f1a22c63dbfb6c60a1d0109d68d64a764e0ef2b6"
+    },
+    {
+      "source": "generated/pets/012-dog-sniffing-on-walks.md",
+      "slug": "dog-sniffing-on-walks",
+      "category": "dog-care",
+      "categoryLabel": "강아지 돌봄",
+      "approved": true,
+      "approvedBy": "Asteria Founder",
+      "approvedAt": "2026-07-21T00:00:00.000Z",
+      "approvedRevision": "c08fdae24e87cbfe22a77056aa259016b057306f51aa71937c6f260fb2cfa9a3"
+    },
+    {
+      "source": "generated/pets/013-cat-box-behavior.md",
+      "slug": "cat-box-behavior",
+      "category": "behavior",
+      "categoryLabel": "행동 이해",
+      "approved": true,
+      "approvedBy": "Asteria Founder",
+      "approvedAt": "2026-07-21T00:00:00.000Z",
+      "approvedRevision": "40f25cc849472b705884fea19d139217fd06d8d2242103bdcee5450d32e16cd4"
+    },
+    {
+      "source": "generated/pets/014-dog-following-guardian.md",
+      "slug": "dog-following-guardian",
+      "category": "behavior",
+      "categoryLabel": "행동 이해",
+      "approved": true,
+      "approvedBy": "Asteria Founder",
+      "approvedAt": "2026-07-21T00:00:00.000Z",
+      "approvedRevision": "6871e655ae82ca3a951c7b76794d603039408d1e99dffa1936233e61ae968ff4"
+    }
+  ]
+}

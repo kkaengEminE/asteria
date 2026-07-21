@@ -4,12 +4,14 @@
 
 This playbook defines how the existing Asteria editorial process is operated each week. It does not replace the Magazine Profile, Editorial Calendar, Launch Checklist, or Operation Log. When guidance conflicts, animal safety, factual accuracy, explicit human approval, and the current HOLD/PUBLISH decision take precedence over publishing volume.
 
+> **Publishing update — 2026-07-21:** Astro + Cloudflare Pages is the active v1 path. References below to WordPress draft transfer are superseded by the checksum-pinned approval manifest and Astro build process in `docs/business/ASTRO_PUBLISHING.md`. The WordPress adapter is deprecated and inactive.
+
 ## Operating Principles
 
 - Treat every generated package as a draft, regardless of automated quality or review scores.
 - Publish only after a named human editor completes review and records an explicit decision.
 - Keep Asteria generation and editing separate from public WordPress publication.
-- Keep WordPress publishing manual for v1; Asteria may create a draft but must not publish publicly.
+- Keep public publishing manual for v1; Asteria may prepare an approved static build but must not deploy publicly.
 - Measure editing time and repeated problems rather than guessing where the process is slow.
 - Record each real editorial run in `docs/operations/OPERATION_LOG.md` using only its six approved fields.
 - Do not change prompts, workflow, architecture, or product behavior from an isolated result. Open a separately approved task when repeated evidence supports a change.

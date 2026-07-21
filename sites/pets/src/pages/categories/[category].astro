@@ -1,0 +1,32 @@
+---
+import { getCollection, type CollectionEntry } from 'astro:content';
+import ArticleCard from '../../components/ArticleCard.astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+export async function getStaticPaths() {
+  const articles = await getCollection('articles');
+  const groups = new Map<string, CollectionEntry<'articles'>[]>();
+  for (const article of articles) {
+    groups.set(article.data.category, [...(groups.get(article.data.category) ?? []), article]);
+  }
+  return [...groups.entries()].map(([category, entries]) => ({ params: { category }, props: { entries } }));
+}
+
+interface Props {
+  entries: CollectionEntry<'articles'>[];
+}
+
+const { entries } = Astro.props;
+const label = entries[0].data.categoryLabel;
+---
+
+<BaseLayout title={label} description={`${label}에 관한 Asteria Pets의 승인된 가이드를 확인하세요.`}>
+  <header class="page-heading">
+    <p class="eyebrow">Category</p>
+    <h1>{label}</h1>
+    <p>{entries.length}개의 가이드를 모았습니다.</p>
+  </header>
+  <section class="content-band article-grid" aria-label={`${label} 글 목록`}>
+    {entries.map((article) => <ArticleCard slug={article.id} {...article.data} />)}
+  </section>
+</BaseLayout>

@@ -1,5 +1,7 @@
 # Roadmap
 
+> **Publishing decision update — 2026-07-21:** Astro + Cloudflare Pages is the active v1 public path. WordPress milestones below are retained as implementation history; the adapter is deprecated and inactive.
+
 ## Phase 1: Core Interfaces
 
 Define stable contracts for providers, generators, publishers, workflow steps, and magazine configuration.

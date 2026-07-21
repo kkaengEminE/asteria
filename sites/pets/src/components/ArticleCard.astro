@@ -1,0 +1,18 @@
+---
+interface Props {
+  slug: string;
+  title: string;
+  description: string;
+  category: string;
+  categoryLabel: string;
+}
+
+const { slug, title, description, category, categoryLabel } = Astro.props;
+---
+
+<article class="article-card">
+  <a class="category-link" href={`/categories/${category}/`}>{categoryLabel}</a>
+  <h2><a href={`/articles/${slug}/`}>{title}</a></h2>
+  <p>{description}</p>
+  <a class="read-link" href={`/articles/${slug}/`}>읽어보기 <span aria-hidden="true">→</span></a>
+</article>

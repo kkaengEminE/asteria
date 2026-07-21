@@ -1,0 +1,19 @@
+---
+import { getCollection } from 'astro:content';
+import ArticleCard from '../../components/ArticleCard.astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const articles = (await getCollection('articles'))
+  .sort((a, b) => a.data.title.localeCompare(b.data.title, 'ko'));
+---
+
+<BaseLayout title="전체 가이드" description="Asteria Pets의 사람이 검토하고 승인한 반려생활 가이드를 모아봅니다.">
+  <header class="page-heading">
+    <p class="eyebrow">All articles</p>
+    <h1>전체 가이드</h1>
+    <p>입양 준비부터 행동 이해와 건강 관리까지, 생활에 바로 적용할 수 있는 내용을 정리했습니다.</p>
+  </header>
+  <section class="content-band article-grid" aria-label="전체 글">
+    {articles.map((article) => <ArticleCard slug={article.id} {...article.data} />)}
+  </section>
+</BaseLayout>

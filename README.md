@@ -38,6 +38,8 @@ For Founder content-quality testing, the Web MVP includes five Korean cat-topic 
 
 ### WordPress drafts
 
+> Deprecated and inactive for Asteria v1. The adapter remains in the repository, but the active public path is the Astro Pets site. Do not configure or use WordPress for v1 publishing.
+
 The browser editor can send its current edited working copy to `POST /wordpress/drafts`. This path creates a WordPress **Draft only**; public publishing is unavailable. It is disabled by default and does not affect mock generation, dry runs, History, or Compare.
 
 Enable draft saving explicitly before starting `npm run dev`:
@@ -56,6 +58,17 @@ Use a WordPress Application Password created for a dedicated least-privilege edi
 After generation, edit the document and select **Save to WordPress Draft**. Confirm the draft-only dialog, then use the returned draft ID and edit URL to open WordPress administration. Verify the post status reads **Draft** before making any further changes. The application exposes no public publish endpoint and sends `status: draft` regardless of adapter defaults.
 
 The production transport uses the WordPress REST API with Application Password Basic Authentication. It resolves or creates the article category and tags before creating the post, and can attach an existing WordPress Media Library ID as the featured image when `wordpressFeaturedMediaId` is supplied in publisher metadata. Missing featured media is non-blocking. Network failures and HTTP `408`, `425`, `429`, and `5xx` responses are retried up to three attempts; authentication, permission, and validation errors return immediately with a structured code and safe operation/status details. The integration credential still requires draft-only least privilege, and a human must publish in WordPress.
+
+### Astro Pets public site
+
+The active Asteria v1 public site lives under `sites/pets` and builds static output for a future Cloudflare Pages deployment. A human approval manifest pins each publishable Markdown source to an exact SHA-256 revision. The build copies only Article, Summary, SEO, FAQ, and public category fields into an isolated Astro content collection; run metadata, provider/model details, editorial diagnostics, review internals, and approval records never enter public output.
+
+```bash
+npm run site:dev
+npm run site:build
+```
+
+Cloudflare is not configured and no deployment is performed. See `docs/business/ASTRO_PUBLISHING.md` for the approval procedure and future Pages handoff.
 
 AI provider options in the browser:
 

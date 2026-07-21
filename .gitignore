@@ -1,4 +1,8 @@
 node_modules/
+sites/pets/.astro/
+sites/pets/.generated/
+sites/pets/dist/
+sites/pets/sites/
 dist/
 coverage/
 .env
@@ -6,4 +10,3 @@ coverage/
 !.env.example
 .DS_Store
 npm-debug.log*
-

@@ -1,0 +1,30 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const articles = await getCollection('articles');
+const categories = [...new Map(articles.map((article) => [
+  article.data.category,
+  { slug: article.data.category, label: article.data.categoryLabel, count: 0 }
+])).values()];
+for (const category of categories) {
+  category.count = articles.filter((article) => article.data.category === category.slug).length;
+}
+categories.sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+---
+
+<BaseLayout title="카테고리" description="관심 주제별로 Asteria Pets의 반려생활 가이드를 찾아보세요.">
+  <header class="page-heading">
+    <p class="eyebrow">Browse by topic</p>
+    <h1>카테고리</h1>
+    <p>지금 필요한 돌봄 주제를 골라보세요.</p>
+  </header>
+  <section class="content-band category-grid" aria-label="카테고리 목록">
+    {categories.map((category) => (
+      <a href={`/categories/${category.slug}/`}>
+        <strong>{category.label}</strong>
+        <span>{category.count}개의 가이드</span>
+      </a>
+    ))}
+  </section>
+</BaseLayout>

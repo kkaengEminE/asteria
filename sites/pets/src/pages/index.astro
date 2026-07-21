@@ -1,0 +1,52 @@
+---
+import { getCollection } from 'astro:content';
+import ArticleCard from '../components/ArticleCard.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const articles = (await getCollection('articles'))
+  .sort((a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf());
+const featured = articles[0];
+const recent = articles.slice(1, 7);
+---
+
+<BaseLayout>
+  <section class="home-hero">
+    <img src="/images/pets-home-hero.png" alt="햇빛이 드는 거실에서 편안하게 쉬는 고양이와 강아지" />
+    <div class="hero-shade"></div>
+    <div class="hero-content">
+      <p class="eyebrow">Better days, together</p>
+      <h1>Asteria Pets</h1>
+      <p>반려동물의 행동을 이해하고, 오늘의 돌봄을 더 구체적으로 만드는 가이드.</p>
+      <a class="hero-link" href="/articles/">모든 가이드 보기 <span aria-hidden="true">→</span></a>
+    </div>
+  </section>
+
+  <section class="content-band featured-band">
+    <div class="section-heading">
+      <p class="eyebrow">Editor’s pick</p>
+      <h2>처음 함께 살기 전에</h2>
+    </div>
+    {featured && (
+      <a class="featured-story" href={`/articles/${featured.id}/`}>
+        <span>{featured.data.categoryLabel}</span>
+        <strong>{featured.data.title}</strong>
+        <p>{featured.data.description}</p>
+      </a>
+    )}
+  </section>
+
+  <section class="content-band">
+    <div class="section-heading heading-row">
+      <div>
+        <p class="eyebrow">Latest guides</p>
+        <h2>최근 가이드</h2>
+      </div>
+      <a href="/articles/">전체 보기</a>
+    </div>
+    <div class="article-grid">
+      {recent.map((article) => (
+        <ArticleCard slug={article.id} {...article.data} />
+      ))}
+    </div>
+  </section>
+</BaseLayout>

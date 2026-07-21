@@ -1,5 +1,7 @@
 # Asteria Public Deployment Plan
 
+> **Decision update — 2026-07-21:** Astro + Cloudflare Pages replaces managed WordPress as the active Asteria v1 public path. The WordPress recommendation below is superseded and retained only as historical comparison. See `docs/business/ASTRO_PUBLISHING.md` for the active approval and build process. Cloudflare is not configured and automatic public publishing remains prohibited.
+
 ## Purpose
 
 Select the public publishing destination for Asteria v1 without changing the internal generation workflow or redesigning the architecture. The decision should minimize time to the first human-approved public article while satisfying the launch checklist for SEO, ownership, disclosure, backup, monitoring, and editorial control.
@@ -84,9 +86,9 @@ Ratings are relative to Asteria's present state. Costs are qualitative because h
 
 ## Asteria v1 Decision
 
-### Recommended Option: Managed WordPress
+### Superseded Option: Managed WordPress
 
-Use a dedicated managed WordPress site as the Asteria v1 public destination.
+This former v1 recommendation is deprecated and inactive. Do not provision WordPress for Asteria v1.
 
 This is the shortest responsible path because:
 
@@ -160,4 +162,4 @@ Reopen the platform decision only when one or more of these conditions is measur
 - WordPress maintenance cost exceeds a documented Astro or Next.js migration and ownership estimate.
 - A verified existing blog becomes available and passes the complete launch checklist.
 
-Until a trigger is supported by operating evidence, managed WordPress remains the Asteria v1 public deployment decision.
+The 2026-07-21 product decision supersedes this conclusion. Astro + Cloudflare Pages is the active v1 path, subject to the human approval gate and a later deployment mission.

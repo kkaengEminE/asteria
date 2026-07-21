@@ -68,7 +68,7 @@ In explicit Gemini mode, the adapter consumes rendered Prompt Asset System outpu
 
 Gemini publishing-package requests use strict JSON instructions and Gemini JSON response MIME hints. The adapter attempts safe repair for common malformed JSON issues such as raw newlines inside strings, unescaped quotes inside strings, and unterminated trailing strings before surfacing a parse error with a truncated response preview.
 
-`src/providers/publisher/wordpress` contains the production WordPress draft publisher. It implements the provider-neutral Publisher interface, maps publish requests into draft-only REST payloads, resolves categories and tags, supports an optional existing Media Library featured-image ID, authenticates with an Application Password, integrates RetryService and AuditLog, and returns structured results. It cannot request public status. Tests use mocked transport only.
+`src/providers/publisher/wordpress` contains the deprecated WordPress draft publisher. The adapter remains tested and available for compatibility, but it is inactive for Asteria v1. The active public path is the checksum-gated Astro site under `sites/pets`; provider-specific WordPress code must not be composed into v1 publishing.
 
 Provider adapters must not depend on legacy `src/core` contracts. WordPress maps from `PublishRequest` to WordPress-specific payloads inside the adapter, and AI providers use the `src/providers/ai` contract.
 

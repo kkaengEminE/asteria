@@ -1,5 +1,7 @@
 # Asteria Production WordPress Setup Plan
 
+> **Deprecated and inactive — 2026-07-21:** WordPress will not be used for Asteria v1. This plan is retained for historical reference only and must not be executed. The active path is Astro + Cloudflare Pages as defined in `docs/business/ASTRO_PUBLISHING.md`.
+
 ## Purpose
 
 This document defines the minimum production WordPress environment for the Asteria Pets Magazine. It is an operational plan, not a deployment record. Every generated article remains a draft until a named human editor reviews and manually publishes it.
